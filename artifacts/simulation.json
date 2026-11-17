@@ -2,7 +2,7 @@
   "runsPerStrategy": 1000,
   "dtSeconds": 2,
   "limitMinutes": 60,
-  "generatedAt": "2026-11-17T10:03:30.060Z",
+  "generatedAt": "2026-11-17T14:25:47.299Z",
   "balance": [
     {
       "id": 1,
@@ -24,6 +24,20 @@
       "q": 0.25,
       "buildCoins": 25000,
       "buildData": 18000
+    },
+    {
+      "id": 4,
+      "anchorP": 0.0009,
+      "q": 0.48,
+      "buildCoins": 250000,
+      "buildData": 90000
+    },
+    {
+      "id": 5,
+      "anchorP": 0.000025,
+      "q": 0.55,
+      "buildCoins": 4000000,
+      "buildData": 600000
     }
   ],
   "newcomerPolicy": "opening hints, one action every 8 seconds",
@@ -51,7 +65,7 @@
         "element4": {
           "reached": 1000,
           "p10": 0.27,
-          "p50": 0.47,
+          "p50": 0.43,
           "p90": 0.83
         },
         "module_feed": {
@@ -64,45 +78,93 @@
           "reached": 1000,
           "p10": 0.8,
           "p50": 0.87,
-          "p90": 1.03
+          "p90": 0.97
         },
         "module_reaction": {
           "reached": 1000,
           "p10": 0.83,
           "p50": 0.9,
-          "p90": 1.07
+          "p90": 1
         },
         "firstArchive": {
           "reached": 1000,
           "p10": 0.87,
           "p50": 0.93,
-          "p90": 1.1
+          "p90": 1.03
         },
         "reactor3": {
           "reached": 1000,
           "p10": 4.3,
           "p50": 4.37,
-          "p90": 4.53
+          "p90": 4.5
         },
         "element10": {
           "reached": 1000,
-          "p10": 5.03,
-          "p50": 5.97,
-          "p90": 7.97
+          "p10": 4.97,
+          "p50": 5.87,
+          "p90": 7.6
+        },
+        "neonArchive": {
+          "reached": 1000,
+          "p10": 9.43,
+          "p50": 9.8,
+          "p90": 10.3
+        },
+        "reactor4": {
+          "reached": 1000,
+          "p10": 7.8,
+          "p50": 7.9,
+          "p90": 8.17
+        },
+        "element11": {
+          "reached": 1000,
+          "p10": 7.83,
+          "p50": 7.9,
+          "p90": 8.2
+        },
+        "element15": {
+          "reached": 1000,
+          "p10": 8.17,
+          "p50": 8.37,
+          "p90": 8.8
+        },
+        "element18": {
+          "reached": 1000,
+          "p10": 9.23,
+          "p50": 10.47,
+          "p90": 12.97
+        },
+        "reactor5": {
+          "reached": 1000,
+          "p10": 11.57,
+          "p50": 11.7,
+          "p90": 13.2
+        },
+        "element19": {
+          "reached": 1000,
+          "p10": 11.63,
+          "p50": 11.87,
+          "p90": 13.3
+        },
+        "element20": {
+          "reached": 1000,
+          "p10": 11.83,
+          "p50": 12.13,
+          "p90": 13.5
         },
         "complete": {
           "reached": 1000,
-          "p10": 6.87,
-          "p50": 7.83,
-          "p90": 9.83
+          "p10": 12.13,
+          "p50": 12.4,
+          "p90": 13.8
         }
       },
       "opening3Minutes": {
-        "reactor2Percent": 99.9,
+        "reactor2Percent": 100,
         "automationPercent": 100,
-        "parallelProductionPercent": 99.9,
-        "firstArchivePercent": 99.9,
-        "averageDiscovered": 7.01
+        "parallelProductionPercent": 100,
+        "firstArchivePercent": 100,
+        "averageDiscovered": 7.03
       },
       "failed": 0,
       "stalledExamples": [],
@@ -124,9 +186,21 @@
           "speed": 0,
           "yield": 8,
           "capacity": 4
+        },
+        {
+          "atoms": 0,
+          "speed": 0,
+          "yield": 8,
+          "capacity": 4
+        },
+        {
+          "atoms": 0,
+          "speed": 0,
+          "yield": 8,
+          "capacity": 4
         }
       ],
-      "wallSeconds": 36.45
+      "wallSeconds": 146
     },
     "automation": {
       "stages": {
@@ -176,7 +250,7 @@
           "reached": 1000,
           "p10": 0.87,
           "p50": 0.93,
-          "p90": 1.03
+          "p90": 1.07
         },
         "reactor3": {
           "reached": 1000,
@@ -186,15 +260,63 @@
         },
         "element10": {
           "reached": 1000,
-          "p10": 5,
+          "p10": 5.03,
           "p50": 5.8,
-          "p90": 7.67
+          "p90": 7.77
+        },
+        "neonArchive": {
+          "reached": 1000,
+          "p10": 9.43,
+          "p50": 9.8,
+          "p90": 10.33
+        },
+        "reactor4": {
+          "reached": 1000,
+          "p10": 7.8,
+          "p50": 7.9,
+          "p90": 8.23
+        },
+        "element11": {
+          "reached": 1000,
+          "p10": 7.83,
+          "p50": 7.93,
+          "p90": 8.23
+        },
+        "element15": {
+          "reached": 1000,
+          "p10": 8.17,
+          "p50": 8.37,
+          "p90": 8.83
+        },
+        "element18": {
+          "reached": 1000,
+          "p10": 9.23,
+          "p50": 10.53,
+          "p90": 13.07
+        },
+        "reactor5": {
+          "reached": 1000,
+          "p10": 11.57,
+          "p50": 11.7,
+          "p90": 13.2
+        },
+        "element19": {
+          "reached": 1000,
+          "p10": 11.63,
+          "p50": 11.9,
+          "p90": 13.33
+        },
+        "element20": {
+          "reached": 1000,
+          "p10": 11.83,
+          "p50": 12.13,
+          "p90": 13.63
         },
         "complete": {
           "reached": 1000,
-          "p10": 6.83,
-          "p50": 7.7,
-          "p90": 9.63
+          "p10": 12.13,
+          "p50": 12.4,
+          "p90": 13.9
         }
       },
       "opening3Minutes": {
@@ -202,7 +324,7 @@
         "automationPercent": 100,
         "parallelProductionPercent": 100,
         "firstArchivePercent": 100,
-        "averageDiscovered": 7.02
+        "averageDiscovered": 7.01
       },
       "failed": 0,
       "stalledExamples": [],
@@ -224,9 +346,21 @@
           "speed": 0,
           "yield": 8,
           "capacity": 4
+        },
+        {
+          "atoms": 0,
+          "speed": 0,
+          "yield": 8,
+          "capacity": 4
+        },
+        {
+          "atoms": 0,
+          "speed": 0,
+          "yield": 8,
+          "capacity": 4
         }
       ],
-      "wallSeconds": 38.37
+      "wallSeconds": 156.72
     },
     "newcomer": {
       "stages": {
@@ -246,11 +380,11 @@
           "reached": 1000,
           "p10": 0.57,
           "p50": 0.73,
-          "p90": 0.97
+          "p90": 1
         },
         "element4": {
           "reached": 1000,
-          "p10": 0.83,
+          "p10": 0.87,
           "p50": 1.1,
           "p90": 1.53
         },
@@ -282,26 +416,74 @@
           "reached": 1000,
           "p10": 5.6,
           "p50": 5.6,
-          "p90": 5.73
+          "p90": 5.87
         },
         "element10": {
           "reached": 1000,
           "p10": 6.57,
-          "p50": 7.63,
+          "p50": 7.7,
           "p90": 9.6
+        },
+        "neonArchive": {
+          "reached": 1000,
+          "p10": 11.03,
+          "p50": 11.4,
+          "p90": 12
+        },
+        "reactor4": {
+          "reached": 1000,
+          "p10": 9.47,
+          "p50": 9.47,
+          "p90": 9.87
+        },
+        "element11": {
+          "reached": 1000,
+          "p10": 9.5,
+          "p50": 9.5,
+          "p90": 9.93
+        },
+        "element15": {
+          "reached": 1000,
+          "p10": 10.1,
+          "p50": 10.43,
+          "p90": 11.13
+        },
+        "element18": {
+          "reached": 1000,
+          "p10": 11.63,
+          "p50": 12.9,
+          "p90": 15.7
+        },
+        "reactor5": {
+          "reached": 1000,
+          "p10": 13.6,
+          "p50": 13.73,
+          "p90": 15.87
+        },
+        "element19": {
+          "reached": 1000,
+          "p10": 13.63,
+          "p50": 13.93,
+          "p90": 16
+        },
+        "element20": {
+          "reached": 1000,
+          "p10": 13.83,
+          "p50": 14.33,
+          "p90": 16.4
         },
         "complete": {
           "reached": 1000,
-          "p10": 8.6,
-          "p50": 9.53,
-          "p90": 11.5
+          "p10": 14.33,
+          "p50": 14.83,
+          "p90": 16.83
         }
       },
       "opening3Minutes": {
         "reactor2Percent": 100,
         "automationPercent": 100,
-        "parallelProductionPercent": 100,
-        "firstArchivePercent": 99.8,
+        "parallelProductionPercent": 99.8,
+        "firstArchivePercent": 99.7,
         "averageDiscovered": 6.32
       },
       "failed": 0,
@@ -324,9 +506,21 @@
           "speed": 0,
           "yield": 8,
           "capacity": 4
+        },
+        {
+          "atoms": 0,
+          "speed": 0,
+          "yield": 8,
+          "capacity": 4
+        },
+        {
+          "atoms": 0,
+          "speed": 0,
+          "yield": 8,
+          "capacity": 2
         }
       ],
-      "wallSeconds": 21.25
+      "wallSeconds": 71.79
     }
   }
 }

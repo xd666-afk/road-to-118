@@ -10,6 +10,48 @@
       "file": "specimen-atlas.png",
       "layout": "5 columns x 2 rows; H He Li Be B / C N O F Ne",
       "prompt": "Use case: scientific-educational / realistic game specimen artwork. Make a single exact 5-column by 2-row image sprite atlas (aspect ratio 2.5:1), ten equal square panels no gutters, each on identical dark neutral charcoal laboratory background. No text, labels, letters, people or logos anywhere. Studio macro product photographs, realistic transparent glass, brushed steel and true physical material textures, subtle warm white rim light. Panels in this EXACT reading order: top row 1 hydrogen: transparent colorless gas in a small sealed glass spherical sample cell on metal stand, no colored vapor; 2 helium: clear colorless gas in taller sealed glass sample vessel, no colored vapor; 3 lithium: small silvery metal pieces immersed in clear mineral oil in sealed glass vial; 4 beryllium: a small silver-grey metallic solid sample enclosed in a clear glass specimen capsule; 5 boron: dark brown-black crystalline fragments in a glass sample dish. Bottom row 6 carbon: irregular black graphite specimen with subtle metallic sheen in glass sample dish; 7 nitrogen: transparent colorless gas in a sealed glass cylindrical cell on metal base; 8 oxygen: transparent colorless gas in a thick sealed glass cylindrical cell on metal base; 9 fluorine: very pale yellow gas in a fully sealed specialist metal-and-transparent-cell specimen housing, extremely subtle yellow tint no dramatic toxic cloud; 10 neon: small straight laboratory glass discharge tube glowing distinctive orange-red, on dark metal stand. Each item centered within its panel filling about 65% width and 70% height; no item overlaps any adjacent panel; all background near #12191c. Educational exhibit imagery only, not lab instructions. Muted realistic imagery suitable for element knowledge cards in an elegant browser game."
+    },
+    {
+      "file": "reactor-expansion-atlas.png",
+      "layout": "2 equal square columns: IV ion-beam reactor / V cyclotron",
+      "dimensions": [
+        1774,
+        887
+      ],
+      "generator": "Built-in image generation",
+      "prompt": "Use case: product-mockup / realistic scientific game asset. Generate ONE exact 2-column by 1-row sprite atlas, overall aspect ratio 2:1, two equal SQUARE panels without gutters or borders. Same near-black charcoal laboratory background #101719 in both panels, objects self-contained and not crossing panel boundaries. Match premium physically based 3D product photography of substantial brushed stainless steel experimental devices with copper coils, real glass, precision vacuum flanges, a few restrained amber status lamps, gentle age and machining marks. Each device is viewed straight on, near orthographic, full base visible; fills central 85% width and 85% height of its square. Critical compositing layout: in EACH square, the central EMPTY BLACK circular observation window is centered at exactly x=50%, y=44% of that square, clear circular internal opening radius 20% of that square's width, front-facing and undistorted. Leave this inner circle completely black and featureless, ready for a separate animated particle overlay; do not draw atoms, particles, writing, labels, HUD or plasma inside. LEFT square is fourth-generation ION-BEAM REACTOR: two horizontal linear beam pipes extend symmetrically from the central large circular stainless-steel viewing chamber, precise focusing coils, compact vacuum pumps and credible routed cables, squat sturdy rectangular laboratory base. RIGHT square is fifth-generation CYCLOTRON: visibly more advanced, larger ring-shaped segmented magnetic assembly with copper winding visible between steel sectors, a central round empty observation port at the same specified location and size, substantial dark metal base and orderly precision cabling. High tactile detail, realistic restrained proportions, cinematic soft overhead neutral-white lighting and warm bronze glints, sharp focus. No text, letters, symbols, logos, watermarks, people or diagrams. Educational game concept apparatus, not a real engineering plan. Output the finished image atlas, not an interface mockup.",
+      "viewport_normalized": [
+        {
+          "reactor": 4,
+          "center": [
+            0.497745,
+            0.431229
+          ],
+          "innerRadiusX": 0.130214,
+          "innerRadiusY": 0.134724
+        },
+        {
+          "reactor": 5,
+          "center": [
+            0.499436,
+            0.4177
+          ],
+          "innerRadiusX": 0.142052,
+          "innerRadiusY": 0.147125
+        }
+      ],
+      "note": "Generated black windows are smaller than requested. Align particle overlays to the measured per-device viewport, not the original atlas geometry."
+    },
+    {
+      "file": "specimen-expansion-atlas.png",
+      "layout": "5 columns x 2 rows; Na Mg Al Si red-P / S Cl Ar K Ca",
+      "dimensions": [
+        1983,
+        793
+      ],
+      "generator": "Built-in image generation",
+      "prompt": "Use case: scientific-educational / realistic game specimen photography. Generate ONE exact 5-column by 2-row sprite atlas, overall aspect ratio 2.5:1, TEN equal SQUARE panels without gutters or drawn borders. Identical dark charcoal studio laboratory background #12191c, premium realistic glass and brushed-metal sample holders, sharp macro product photography with neutral-white rim light. Every item centered, occupies about 65% panel width and 70% panel height; nothing crosses panel boundaries. Exact left-to-right reading order: TOP row panel 1 SODIUM: small clean silvery metal fragments visibly immersed in clear colorless oil inside a fully sealed clear specimen vial; panel 2 MAGNESIUM: silver-grey metallic ribbon and small metal chips in a sealed transparent specimen capsule; panel 3 ALUMINIUM: small bright silver metal sheet and folded foil fragments in a glass specimen dish; panel 4 SILICON: dark metallic-grey glossy crystalline chunks in a glass sample dish; panel 5 PHOSPHORUS: deep brick-red red-phosphorus powder in a fully sealed small clear glass capsule with metal ends, never white phosphorus. BOTTOM row panel 6 SULFUR: distinct vivid but natural yellow crystalline chunks in a glass sample dish; panel 7 CHLORINE: specialist corrosion-resistant sealed metal-and-transparent observation cell containing a VERY pale yellow-green gas, no escaping cloud or exaggerated glow; panel 8 ARGON: clear COLORLESS gas represented by an empty-looking sealed clear glass cylindrical sample vessel on a small metal base, no colored gas, no electrical discharge; panel 9 POTASSIUM: small silvery metallic fragments immersed in transparent colorless oil in a sealed glass vial, visually separate from sodium with different vial proportions; panel 10 CALCIUM: small silver-grey metallic solid pieces in a sealed transparent specimen capsule. Realistic physical material textures, no cartoon or fantasy coloring. Elements and samples are illustrative educational exhibits, not instructions for handling. No text, labels, letters, symbols, logos, people, plasma, watermarks or decorative graphics anywhere. Output only the atlas.",
+      "note": "Room-temperature illustrative exhibits. Na and K immersed in transparent oil; phosphorus shown as red phosphorus; chlorine pale yellow-green; argon colorless, without discharge."
     }
   ],
   "note": "Concept instrument and specimen imagery for an educational game. Not a real nuclear apparatus. Neon panel depicts discharge, not ordinary color."

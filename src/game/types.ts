@@ -6,10 +6,10 @@ export interface ElementState { discovered: boolean; inventory: Amount; deposite
 export interface ReactorState { id: number; built: boolean; active: boolean; target: number; exploring: boolean; upgrades: Record<Upgrade, number>; events: Amount; discoveryHazard: number; productionRemainder: Amount; eventRemainder: Amount; }
 export interface Notice { id: number; kind: 'discovery' | 'archive' | 'achievement' | 'milestone' | 'complete' | 'info'; text: string; z?: number; }
 export interface GameState {
-  saveVersion: 1; savedAt: number; elapsed: number; seed: number; rng: number; coins: Amount; data: Amount;
+  saveVersion: 2; savedAt: number; elapsed: number; seed: number; rng: number; coins: Amount; data: Amount;
   reactors: ReactorState[]; elements: ElementState[];
   modules: Record<Module, boolean>; automation: { feed: boolean; reaction: boolean; allocation: boolean; reserve: Amount; mode: WorkMode; target: number };
-  stats: { events: Amount; produced: Amount; earned: Amount; peak: Amount; builds: number; purchases: number; lastEvent: string; completedAt: number | null; milestones: Record<string, number>; };
+  stats: { events: Amount; produced: Amount; earned: Amount; peak: Amount; builds: number; purchases: number; lastEvent: string; neonCompletedAt: number | null; completedAt: number | null; milestones: Record<string, number>; };
   achievements: string[]; settings: { scientific: boolean; reducedMotion: boolean; guideDismissed: boolean; mix: number[] };
   notices: Notice[]; noticeSeq: number;
 }

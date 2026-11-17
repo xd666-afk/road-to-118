@@ -40,20 +40,29 @@ test('mobile 360px: usable navigation, scrollable table, knowledge cards, no pag
   await expect(page.getByText('让实验室，自己运转。')).toBeVisible();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
-test('first-discovery cards queue once; submission at 49/50 remains incomplete, 50 completes', async ({ page }) => {
-  const e=new Engine(createState(222));
-  for(let z=2;z<=10;z++) { e.target(1,z); e.state.reactors[0].discoveryHazard=0; e.step(.1); }
-  const ne=e.state.elements[9]; ne.inventory=D(50);ne.totalProduced=D(50);ne.deposited=0;
-  e.state.reactors[0].active=false;
+test('49 Ca remains incomplete; one more production and submission completes once', async ({ page }) => {
+  const e=new Engine(createState(222));e.state.coins=D('1e30');e.state.data=D('1e30');
+  for(let z=2;z<=20;z++){e.target(1,z);e.state.reactors[0].discoveryHazard=0;e.step(.1);}
+  for(let id=2;id<=5;id++)e.build(id);
+  e.state.modules.feed=true;e.state.modules.reaction=true;e.state.automation.reaction=true;
+  e.state.reactors.forEach(r=>r.active=false);e.target(5,20);
+  const ca=e.state.elements[19];ca.inventory=D(49);ca.totalProduced=D(49);e.state.notices=[];
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(e.state)});
-  await page.goto('/'); await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'周期表'}).click();
-  await page.locator('[data-z="10"]').click(); await expect(page.getByRole('dialog')).toContainText('氖');
-  await page.getByRole('button',{name:'提交 50 单位至档案'}).click();
+  await page.goto('/');await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'周期表'}).click();
+  await page.locator('[data-z="20"]').click();await page.getByRole('button',{name:'提交 49 单位至档案'}).click();
+  await expect(page.getByRole('dialog').locator('.inventory-block')).toContainText('49 / 50');
+  await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'实验室',exact:true}).click();
+  await page.getByLabel('切换反应容器').selectOption('5');await page.getByRole('button',{name:'已暂停'}).click();
+  await page.locator('.route-cell').nth(19).click();
+  await page.getByRole('button',{name:'提交 1 单位至档案'}).click({timeout:15000});
   await expect(page.getByRole('dialog')).toContainText('周期表已永久点亮');
-  await page.keyboard.press('Escape'); await expect(page.getByRole('dialog')).toContainText('你的第十号里程碑');
+  await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).toContainText('你的第二十号里程碑');
+  await expect(page.getByRole('dialog')).toContainText('CALCIUM / 钙');
   await page.getByRole('button',{name:'继续我的实验室'}).click();
-  await expect(page.locator('[data-z="10"]')).toHaveClass(/archived/);
+  await expect(page.locator('.route-cell').nth(19)).toHaveClass(/archived/);
 });
+
 test('corrupt import is rejected without losing the active run', async ({ page }) => {
   const state=createState(53);state.reactors[0].discoveryHazard=100;
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(state)});
@@ -80,7 +89,7 @@ test('opening hints lead from Be to a new reactor, parallel production and a rea
   await page.goto('/');
   await expect(page.getByRole('button',{name:'购买粒子加速',exact:true})).toBeDisabled();
   await page.locator('.mission-card').getByRole('button',{name:'研发原料补充'}).click();
-  await page.locator('.mission-card').getByRole('button',{name:'建造 II 型容器'}).click();
+  await page.locator('.mission-card').getByRole('button',{name:'建造 II 级仪器'}).click();
   await expect(page.getByRole('heading',{name:/受控反应容器/})).toBeVisible();
   await page.locator('.mission-card').getByRole('button',{name:'研发自动反应'}).click();
   await page.locator('.mission-card').getByRole('button',{name:'让 I 型生产氢样本'}).click();
@@ -103,10 +112,10 @@ test('III displays newly discovered heavier elements while I retains its chosen 
   e.build(2);e.build(3);e.target(3,9);e.state.settings.mix=[1,2,3,4,5];e.state.notices=[];
   for(const r of e.state.reactors)r.discoveryHazard=100;
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(e.state)});
-  await page.goto('/');await page.getByRole('button',{name:/III 先进核反应装置/}).click();
+  await page.goto('/');await page.getByLabel('切换反应容器').selectOption('3');
   await expect(page.locator('.mix-control .element-sample-chip')).toHaveText(['N','O','F']);
   await expect(page.locator('canvas')).toHaveAttribute('aria-label',/展示元素：N、O、F。/);
-  await page.getByRole('button',{name:'I 自由碰撞容器',exact:true}).click();
+  await page.getByLabel('切换反应容器').selectOption('1');
   await expect(page.locator('canvas')).toHaveAttribute('aria-label',/展示元素：H、He、Li、Be、B。/);
 });
 
@@ -146,7 +155,7 @@ test('total speed sums devices; switching the device only changes its own speed 
   await page.goto('/');
   await expect(page.locator('.resource-bar .resource-item').first()).toContainText('56次/秒');
   await expect(page.locator('.resource-income')).toContainText('+270');
-  await page.getByRole('button',{name:'II 受控反应容器',exact:true}).click();
+  await page.getByLabel('切换反应容器').selectOption('2');
   await expect(page.getByTestId('current-rate')).toHaveText('42 次/秒');
   await expect(page.locator('.upgrade').filter({hasText:'单次收益'})).toContainText('每次 6 → 8.1 碰撞能');
   await expect(page.locator('.chamber-footer')).toContainText('批量生产 ×32');
@@ -193,14 +202,14 @@ test('tutorial keeps experiments running and defers discovery popups until retur
   await expect(page.getByRole('dialog')).toContainText('新元素发现 · 氦');
 });
 
-test('all ten knowledge cards show neutral electrons, isotope-specific neutrons and electronic structure',async({page})=>{
+test('all twenty knowledge cards show neutral electrons, isotope-specific neutrons and electronic structure',async({page})=>{
   const state=createState(68);state.elements.forEach(e=>e.discovered=true);state.reactors[0].active=false;
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(state)});
   await page.setViewportSize({width:1280,height:1000});await page.goto('/');
   await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'周期表'}).click();
   const dialog=page.getByRole('dialog');
   const value=(label:string)=>dialog.locator('.atomic-facts>div').filter({has:page.getByText(label,{exact:true})}).locator('dd');
-  for(let z=1;z<=10;z++){
+  for(let z=1;z<=20;z++){
     await page.locator(`[data-z="${z}"]`).click();
     await expect(value('质子数')).toHaveText(String(z));
     await expect(value('电子数（中性）')).toHaveText(String(z));
@@ -215,6 +224,8 @@ test('all ten knowledge cards show neutral electrons, isotope-specific neutrons 
       await expect(dialog.locator('.further-science')).toContainText('碳-14');
       await expect(dialog.getByText('沸点',{exact:true})).toHaveCount(0);
     }
+    if(z===15){await dialog.locator('summary').click();await expect(dialog.locator('.physical-facts')).toContainText('白磷');await expect(dialog.locator('.specimen')).toHaveAttribute('aria-label',/红磷/);}
+    if(z===20){await expect(dialog.locator('.electron-configuration')).toContainText('4s²');await expect(dialog.locator('.electron-shells')).toHaveAttribute('aria-label','电子层由内到外：2、8、8、2');}
     if(z===2){await dialog.locator('summary').click();await expect(dialog.locator('.physical-facts')).toContainText('常压下不凝固');}
     await page.keyboard.press('Escape');
   }
@@ -246,4 +257,65 @@ test('320px and 360px knowledge cards keep atomic data readable and distinguish 
   await expect(dialog.locator('.further-science')).toContainText('氟唯一的稳定同位素');
   await expect(dialog.getByRole('button',{name:'关闭弹窗'})).toBeInViewport();
   await dialog.screenshot({path:'artifacts/knowledge-fluorine-details-mobile.png',animations:'disabled'});
+});
+
+test('released Ne save upgrades in place, builds IV and discovers Na without clearing old progress',async({page})=>{
+  const e=new Engine(createState(801));e.state.coins=D('1e12');e.state.data=D('1e12');
+  for(let z=2;z<=10;z++){e.target(1,z);e.state.reactors[0].discoveryHazard=0;e.step(.1);}
+  e.build(2);e.build(3);e.state.elements[9].inventory=D(50);e.state.elements[9].totalProduced=D(50);e.deposit(10);
+  e.state.modules.feed=true;e.state.modules.reaction=true;e.state.automation.reaction=false;
+  e.state.reactors.forEach(r=>r.active=false);
+  const old=JSON.parse(serialize(e.state));old.saveVersion=1;old.elements=old.elements.slice(0,10);old.reactors=old.reactors.slice(0,3);
+  old.stats.completedAt=old.stats.neonCompletedAt;old.stats.milestones.complete=old.stats.milestones.neonArchive;
+  delete old.stats.neonCompletedAt;delete old.stats.milestones.neonArchive;
+  await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:JSON.stringify(old)});
+  await page.setViewportSize({width:1440,height:1000});await page.goto('/');
+  await expect(page.locator('.route-cell').nth(9)).toHaveClass(/archived/);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.locator('.mission-card').getByRole('button',{name:'建造 IV 级仪器'}).click();
+  await expect(page.getByRole('heading',{name:/离子束反应器/})).toBeVisible();
+  await expect(page.getByRole('dialog')).toContainText('新元素发现 · 钠');
+  await expect(page.getByRole('dialog').locator('.atomic-facts')).toContainText('电子数（中性）11');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('canvas')).toHaveAttribute('aria-label',/展示元素：Na。/);
+  await expect(page.locator('.device-photo')).toHaveCSS('background-image',/reactor-expansion-atlas/);
+  await page.screenshot({path:'artifacts/v02-reactor-iv-desktop.png',fullPage:true,animations:'disabled'});
+});
+
+test('V opens after Ar and reaches Ca; its graphic and representative samples use the new stage',async({page})=>{
+  const e=new Engine(createState(802));e.state.coins=D('1e12');e.state.data=D('1e12');
+  for(let z=2;z<=19;z++){e.target(1,z);e.state.reactors[0].discoveryHazard=0;e.step(.1);}
+  for(let id=2;id<=4;id++)e.build(id);
+  e.state.modules.feed=true;e.state.modules.reaction=true;e.state.automation.reaction=false;
+  e.state.reactors.forEach(r=>r.active=false);e.state.reactors[4].active=true;e.state.reactors[4].discoveryHazard=0;e.state.notices=[];
+  await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(e.state)});
+  await page.setViewportSize({width:1440,height:1000});await page.goto('/');
+  await page.locator('.mission-card').getByRole('button',{name:'建造 V 级仪器'}).click();
+  await expect(page.getByRole('dialog')).toContainText('新元素发现 · 钙');await page.keyboard.press('Escape');
+  await expect(page.getByRole('heading',{name:/回旋加速器/})).toBeVisible();
+  await expect(page.locator('canvas')).toHaveAttribute('aria-label',/展示元素：K、Ca。/);
+  await expect(page.getByLabel('切换反应容器').locator('option')).toHaveCount(5);
+  await page.screenshot({path:'artifacts/v02-reactor-v-desktop.png',fullPage:true,animations:'disabled'});
+});
+
+test('new period fits 320px and 360px screens and reads Ca and P knowledge without overflow',async({page})=>{
+  const e=new Engine(createState(803));e.state.coins=D('1e12');e.state.data=D('1e12');
+  for(let z=2;z<=20;z++){e.target(1,z);e.state.reactors[0].discoveryHazard=0;e.step(.1);}
+  for(let id=2;id<=5;id++)e.build(id);e.state.reactors.forEach(r=>r.active=false);e.state.notices=[];
+  await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(e.state)});
+  await page.setViewportSize({width:360,height:800});await page.goto('/');
+  await page.getByLabel('切换反应容器').selectOption('5');
+  for(const width of [320,360]){await page.setViewportSize({width,height:800});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}
+  await page.screenshot({path:'artifacts/v02-mobile-laboratory.png',fullPage:true,animations:'disabled'});
+  await page.locator('.route-cell').nth(19).click();
+  await expect(page.getByRole('dialog').locator('.electron-shells')).toHaveAttribute('aria-label','电子层由内到外：2、8、8、2');
+  expect(await page.getByRole('dialog').evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
+  await page.getByRole('dialog').screenshot({path:'artifacts/v02-calcium-mobile.png',animations:'disabled'});
+  await page.keyboard.press('Escape');await page.locator('.route-cell').nth(14).click();
+  await page.getByRole('dialog').locator('summary').click();
+  await expect(page.getByRole('dialog').locator('.physical-facts')).toContainText('白磷');
+  await page.keyboard.press('Escape');
+  await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'科研',exact:true}).click();
+  await expect(page.locator('.research-device')).toHaveCount(5);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });

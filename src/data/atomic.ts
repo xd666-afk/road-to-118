@@ -1,3 +1,4 @@
+import { EXPANDED_ATOMS } from './expansion';
 /** Neutral, ground-state atoms. RSC element pages are linked from KNOWLEDGE.
  * The selected isotope is explicit: relative atomic mass is never rounded to
  * manufacture a neutron count. Thermal values are approximate, in Celsius.
@@ -78,4 +79,5 @@ export const ATOMIC_PROFILES: Record<number, AtomicProfile> = {
     isotopes: '氖-20、氖-21、氖-22 都是稳定同位素，中子数分别为 10、11、12。天然氖以氖-20 为主，中性原子的电子数始终由原子序数决定。',
     occurrence: '氖在地球大气中含量很低，约为百万分之 18。工业上通常通过液化空气的分离过程获得，并用于发光及低温等领域。',
   },
+  ...EXPANDED_ATOMS,
 };

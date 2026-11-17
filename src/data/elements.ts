@@ -1,3 +1,4 @@
+import { EXPANDED_COLORS, EXPANDED_KNOWLEDGE, EXPANDED_MASSES, EXPANDED_SPECIMENS } from './expansion';
 /** Static element data. Layout follows an 18-column table with detached La–Lu / Ac–Lr rows. */
 export type ElementCategory =
   | 'nonmetal' | 'noble' | 'alkali' | 'alkaline' | 'metalloid'
@@ -15,7 +16,7 @@ export interface ElementInfo {
   period: number;
   category: ElementCategory;
   color: string;
-  /** Conventional rounded relative atomic mass, supplied for the playable first ten. */
+  /** Conventional rounded relative atomic mass, supplied for the playable first twenty. */
   mass?: string;
   specimenDescription?: string;
 }
@@ -145,8 +146,8 @@ export const ELEMENTS: ElementInfo[] = NAMES.map(([symbol, name, english], i) =>
     z, symbol, name, english, col, row,
     period: row === 9 ? 6 : row === 10 ? 7 : row,
     category: kind,
-    color: PLAYABLE_COLORS[i] ?? CATEGORY_COLORS[kind],
-    ...(i < 10 ? { mass: PLAYABLE_MASSES[i], specimenDescription: SPECIMENS[i] } : {}),
+    color: PLAYABLE_COLORS[i] ?? EXPANDED_COLORS[i - 10] ?? CATEGORY_COLORS[kind],
+    ...(i < 20 ? { mass: i < 10 ? PLAYABLE_MASSES[i] : EXPANDED_MASSES[i - 10], specimenDescription: i < 10 ? SPECIMENS[i] : EXPANDED_SPECIMENS[i - 10] } : {}),
   };
 });
 
@@ -230,19 +231,20 @@ export const KNOWLEDGE: Record<number, KnowledgeCard> = {
     title: '活泼元素与稳定材料',
     fact: '氟是原子序数为9的卤素，单质为很淡的黄绿色气体，反应性很强。含氟化合物的性质可能与单质氟完全不同，不能凭元素名称互相替代。',
     application: '聚四氟乙烯等含氟聚合物可用于不粘涂层和电缆绝缘。牙膏中的氟化物也不是氟气；单质氟具有毒性，样本画面仅为虚拟展示。',
-    unlock: '游戏中：氟之后的唯一新发现目标是氖，接近v0.1的最终里程碑。',
+    unlock: '游戏中：氟之后继续探索氖，首次发现氖可开放 IV 级离子束反应器。',
     source: 'https://periodic-table.rsc.org/element/9/fluorine',
   },
   10: {
     title: '橙红光中的第一座里程碑',
     fact: '氖是原子序数为10的稀有气体，常温下无色、无味。它在低压放电管中发出橙红色光；其他颜色的“霓虹灯”常使用不同气体或发光材料。',
     application: '氖用于发光标识、指示装置及部分激光器。发光来自受激原子的能量变化，并不表示普通氖气在日常条件下会自行持续发光。',
-    unlock: '游戏中：首次发现氖触发里程碑；累计提交50氖完成v0.1，之后可自由收集。',
+    unlock: '游戏中：首次发现氖开放 IV 级离子束反应器；累计提交 50 氖保留第一阶段里程碑，之后继续探索钠。',
     source: 'https://periodic-table.rsc.org/element/10/neon',
   },
+  ...EXPANDED_KNOWLEDGE,
 };
 
-export const SCIENCE_NOTE = '碰撞能资源、合成概率和H→Ne生成顺序均为游戏机制，不代表真实核反应条件或路线。粒子大小、颜色与轨迹为示意，大小不表示真实原子半径；现实中的原子无法肉眼直接看见。';
+export const SCIENCE_NOTE = '碰撞能资源、合成概率和按原子序数推进的生成顺序均为游戏机制，不代表真实核反应条件或路线。粒子大小、颜色与轨迹为示意，大小不表示真实原子半径；现实中的原子无法肉眼直接看见。';
 
 export const TABLE_SOURCES = [
   'https://iupac.org/what-we-do/periodic-table-of-elements/',

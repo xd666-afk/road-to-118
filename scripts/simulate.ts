@@ -3,7 +3,7 @@ import { dirname } from 'node:path';
 import { Engine, createState, discoveredMax, highestReactor, archivedCount } from '../src/game/engine';
 import { D } from '../src/game/numbers';
 import { income, price } from '../src/game/economy';
-import { REACTORS } from '../src/game/config';
+import { FINAL_ELEMENT, PLAYABLE_ELEMENTS, REACTORS } from '../src/game/config';
 import type { Upgrade } from '../src/game/types';
 
 type Strategy = 'balanced' | 'automation' | 'newcomer';
@@ -24,16 +24,16 @@ export function pilot(e: Engine, strategy: Strategy) {
     s.notices = []; return;
   }
   // Newcomers act every 8s and select discoveries manually, including card-reading time.
-  for (const id of [2, 3]) e.build(id);
+  for (const config of REACTORS.slice(1)) e.build(config.id);
   if (!s.modules.feed) e.research('feed');
   if (s.reactors[1].built) e.research('reaction');
   if (max >= 7) e.research('allocation');
   s.automation.feed = s.modules.feed && strategy !== 'balanced';
-  const next = !s.reactors[1].built ? REACTORS[1] : !s.reactors[2].built ? REACTORS[2] : null;
+  const next = REACTORS.slice(1).find(r => !s.reactors[r.id - 1].built);
   s.automation.reserve = D(next?.buildCoins || 100);
   const top = highestReactor(s);
-  if (max < 10) e.target(top.id, max + 1, strategy !== 'newcomer');
-  else if (top.target !== 10 || top.exploring) e.target(top.id, 10, false);
+  if (max < PLAYABLE_ELEMENTS) e.target(top.id, max + 1, strategy !== 'newcomer');
+  else if (top.target !== FINAL_ELEMENT || top.exploring) e.target(top.id, FINAL_ELEMENT, false);
   for (const r of s.reactors.filter(r => r.built)) {
     const reserve = next && max >= next.unlock ? D(next.buildCoins) : D(0);
     const candidates: { key: Upgrade; roi: number; cost: number }[] = [];
@@ -81,7 +81,7 @@ for (const strategy of ['balanced', 'automation', 'newcomer'] as const) {
   const quantiles = (key: string) => { const vals = outcomes.map(o => o.milestones[key]).filter(v => v !== undefined).sort((a, b) => a - b); return { reached: vals.length, p10: vals.length ? +(vals[Math.floor((vals.length - 1) * .1)] / 60).toFixed(2) : null, p50: vals.length ? +(vals[Math.floor((vals.length - 1) * .5)] / 60).toFixed(2) : null, p90: vals.length ? +(vals[Math.floor((vals.length - 1) * .9)] / 60).toFixed(2) : null }; };
   const openingShare = (check: (o: typeof outcomes[number]['opening']) => boolean) => +(outcomes.filter(o => check(o.opening)).length / count * 100).toFixed(1);
   summary.strategies[strategy] = {
-    stages: Object.fromEntries(['firstUpgrade', 'element2', 'element3', 'element4', 'module_feed', 'reactor2', 'module_reaction', 'firstArchive', 'reactor3', 'element10', 'complete'].map(key => [key, quantiles(key)])),
+    stages: Object.fromEntries(['firstUpgrade', 'element2', 'element3', 'element4', 'module_feed', 'reactor2', 'module_reaction', 'firstArchive', 'reactor3', 'element10', 'neonArchive', 'reactor4', 'element11', 'element15', 'element18', 'reactor5', 'element19', 'element20', 'complete'].map(key => [key, quantiles(key)])),
     opening3Minutes: { reactor2Percent: openingShare(o => o.reactor2), automationPercent: openingShare(o => o.feed), parallelProductionPercent: openingShare(o => o.reaction), firstArchivePercent: openingShare(o => o.archived > 0), averageDiscovered: +(outcomes.reduce((sum, o) => sum + o.opening.discovered, 0) / count).toFixed(2) },
     failed: outcomes.filter(o => o.failed).length,
     stalledExamples: outcomes.map((o, i) => ({ ...o, run: i })).filter(o => o.failed).slice(0, 3), examplePurchases: outcomes[0].upgrades, wallSeconds: +((Date.now() - started) / 1000).toFixed(2),
