@@ -7,13 +7,13 @@ export const REACTORS = [
 export const UPGRADES: Record<Upgrade, { name: string; base: number; ratio: number; description: string }> = {
   atoms: { name: '补充氢样本', base: 5, ratio: 1.14, description: '反应样本 +1，氢库存 +1' },
   speed: { name: '粒子加速', base: 20, ratio: 1.35, description: '提高每秒实验次数，达到设备上限后停止增长' },
-  yield: { name: '碰撞收益', base: 60, ratio: 1.55, description: '每次实验所得碰撞能 ×1.35，不增加实验次数' },
+  yield: { name: '单次收益', base: 60, ratio: 1.55, description: '每次实验所得碰撞能 ×1.35，不增加实验次数' },
   capacity: { name: '设备扩容', base: 2500, ratio: 1.85, description: 'II / III 型实验次数上限 ×1.18' },
 };
 export const MODULES: Record<Module, { name: string; description: string; unlock: number; coins: number; data: number }> = {
-  feed: { name: '原料补充', description: '发现 He 后即可研发；按预算自动补样，达到次数上限即暂停，不再空耗建设资金。', unlock: 2, coins: 60, data: 30 },
-  reaction: { name: '自动反应', description: '已发现元素启用并行批量生产：I / II / III 型为 8 / 32 / 32 倍；首次探索保持基础概率。', unlock: 4, coins: 180, data: 80 },
-  allocation: { name: '元素分配', description: '自动分批提交库存；累计 50 单位后停止收录，保留后续产物。', unlock: 7, coins: 3000, data: 500 },
+  feed: { name: '原料补充', description: '自动补充样本，满负荷时停止。', unlock: 2, coins: 60, data: 30 },
+  reaction: { name: '自动反应', description: '批量生产已发现元素。', unlock: 4, coins: 180, data: 80 },
+  allocation: { name: '元素分配', description: '自动提交库存，收录元素。', unlock: 7, coins: 3000, data: 500 },
 };
 export const ACHIEVEMENTS = [
   { id: 'collision', name: '第一道信号', description: '完成第一次有效碰撞', hidden: false },
