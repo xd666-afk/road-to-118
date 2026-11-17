@@ -237,7 +237,7 @@ export const KNOWLEDGE: Record<number, KnowledgeCard> = {
   },
 };
 
-export const SCIENCE_NOTE = '碰撞能资源、合成概率和H→Ne生成顺序均为游戏机制，不代表真实核反应条件或路线。粒子大小、颜色与轨迹为示意；现实中的原子无法肉眼直接看见。';
+export const SCIENCE_NOTE = '碰撞能资源、合成概率和H→Ne生成顺序均为游戏机制，不代表真实核反应条件或路线。粒子大小、颜色与轨迹为示意，大小不表示真实原子半径；现实中的原子无法肉眼直接看见。';
 
 export const TABLE_SOURCES = [
   'https://iupac.org/what-we-do/periodic-table-of-elements/',

@@ -29,6 +29,17 @@ export function maxAffordable(r: ReactorState, key: Upgrade, coins: Amount): num
   for (let i = 0; i < 4 && count < 1e7 - r.upgrades[key] && price(r, key, count + 1).lte(coins); i++) count++;
   return count;
 }
+export function usefulAtomPurchase(r: ReactorState, coins: Amount): number {
+  const current = eventRate(r), cap = capacity(r);
+  if (current.lte(0) || current.gte(cap)) return 0;
+  const affordable = maxAffordable(r, 'atoms', coins);
+  if (!affordable) return 0;
+  const rateAt = (count: number) => eventRate({ ...r, upgrades: { ...r.upgrades, atoms: r.upgrades.atoms + count } });
+  if (rateAt(affordable).lt(cap)) return affordable;
+  let lo = 1, hi = affordable;
+  while (lo < hi) { const mid = Math.floor((lo + hi) / 2); if (rateAt(mid).gte(cap)) hi = mid; else lo = mid + 1; }
+  return lo;
+}
 export function probability(z: number, reactorId: number): number {
   if (z < 1 || z > 10 || reactorId < 1 || reactorId > 3) return 0;
   const t = REACTORS[reactorId - 1];

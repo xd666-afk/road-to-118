@@ -1,6 +1,6 @@
 import { D, Big, finiteNumber } from './numbers';
 import { ACHIEVEMENTS, MODULES, OFFLINE_LIMIT, REACTORS } from './config';
-import { coinPerEvent, eventRate, maxAffordable, price, probability } from './economy';
+import { coinPerEvent, eventRate, maxAffordable, price, probability, usefulAtomPurchase } from './economy';
 import { poisson, random, waitingHazard } from './rng';
 import type { GameState, Module, Notice, ReactorState, Upgrade, WorkMode } from './types';
 import { element } from '../data/elements';
@@ -50,6 +50,7 @@ export class Engine {
     if (!n || n > 1e7 - r.upgrades[key]) return 0;
     const cost = price(r, key, n); if (cost.gt(s.coins)) return 0;
     s.coins = Big.max(0, s.coins.minus(cost)); r.upgrades[key] += n; s.stats.purchases += n;
+    if (s.stats.milestones.firstUpgrade === undefined) s.stats.milestones.firstUpgrade = s.elapsed;
     if (key === 'atoms') { s.elements[0].inventory = s.elements[0].inventory.plus(n); s.elements[0].totalProduced = s.elements[0].totalProduced.plus(n); s.stats.produced = s.stats.produced.plus(n); }
     if (n >= 10) this.award('bulk');
     return n;
@@ -67,6 +68,7 @@ export class Engine {
     const order: Module[] = ['feed', 'reaction', 'allocation'], index = order.indexOf(key);
     if (!c || s.modules[key] || (index > 0 && !s.modules[order[index - 1]]) || !s.elements[c.unlock - 1].discovered || s.coins.lt(c.coins) || s.data.lt(c.data)) return false;
     s.coins = s.coins.minus(c.coins); s.data = s.data.minus(c.data); s.modules[key] = true; s.automation[key] = true;
+    s.stats.milestones[`module_${key}`] = s.elapsed;
     this.award('automation'); this.notify('info', `${c.name}模块已上线`); return true;
   }
   setMode(mode: WorkMode, z = this.state.automation.target) {
@@ -93,6 +95,7 @@ export class Engine {
     e.inventory = Big.max(0, e.inventory.minus(n)); e.deposited += n;
     if (e.deposited === 50) {
       e.archived = true; this.award('archive'); this.notify('archive', `${element(z).name}已正式收录 · 周期表已点亮`, z);
+      if (s.stats.milestones.firstArchive === undefined) s.stats.milestones.firstArchive = s.elapsed;
       if (z === 10 && s.stats.completedAt === null) { s.stats.completedAt = s.elapsed; s.stats.milestones.complete = s.elapsed; this.award('complete'); this.notify('complete', '50 份氖的记录，属于你的第十号里程碑。', 10); }
       if (archivedCount(s) === 10) this.award('collection');
     } else if (!silent) this.notify('info', `已提交 ${n} 单位${element(z).name} · ${e.deposited}/50`);
@@ -161,7 +164,7 @@ export class Engine {
     if (s.modules.feed && s.automation.feed) {
       const r = highestReactor(s), budget = Big.max(0, s.coins.minus(s.automation.reserve));
       // Budgeted, logarithmic batch purchase, never one-operation-per-atom.
-      const n = maxAffordable(r, 'atoms', budget);
+      const n = usefulAtomPurchase(r, budget);
       if (n > 0) this.buy(r.id, 'atoms', n);
     }
     if (s.modules.allocation && s.automation.allocation) for (let z = 1; z <= 10; z++) this.deposit(z, true);

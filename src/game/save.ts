@@ -47,7 +47,7 @@ export function deserialize(text: string): GameState {
   s.stats.builds = num(raw.stats.builds, 3); s.stats.purchases = num(raw.stats.purchases); s.stats.lastEvent = typeof raw.stats.lastEvent === 'string' ? raw.stats.lastEvent.slice(0, 200) : '存档已恢复';
   s.stats.completedAt = raw.stats.completedAt === null ? null : num(raw.stats.completedAt);
   if ((s.stats.completedAt !== null) !== s.elements[9].archived) throw new Error('通关状态与氖收录进度不一致。');
-  s.stats.milestones = {}; for (const [k, v] of Object.entries(raw.stats.milestones || {})) { if (/^(element[2-9]|element10|reactor[23]|complete)$/.test(k)) s.stats.milestones[k] = num(v); }
+  s.stats.milestones = {}; for (const [k, v] of Object.entries(raw.stats.milestones || {})) { if (/^(element[2-9]|element10|reactor[23]|complete|firstUpgrade|firstArchive|module_(feed|reaction|allocation))$/.test(k)) s.stats.milestones[k] = num(v); }
   const valid = new Set<string>(ACHIEVEMENTS.map(a => a.id)); if (!Array.isArray(raw.achievements)) throw new Error('成就数据损坏。');
   s.achievements = [...new Set<string>(raw.achievements.filter((id: unknown) => typeof id === 'string' && valid.has(id)))];
   if (raw.settings && typeof raw.settings === 'object') {
