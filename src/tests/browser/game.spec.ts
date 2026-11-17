@@ -192,3 +192,58 @@ test('tutorial keeps experiments running and defers discovery popups until retur
   await page.getByRole('button',{name:'返回实验',exact:true}).click();
   await expect(page.getByRole('dialog')).toContainText('新元素发现 · 氦');
 });
+
+test('all ten knowledge cards show neutral electrons, isotope-specific neutrons and electronic structure',async({page})=>{
+  const state=createState(68);state.elements.forEach(e=>e.discovered=true);state.reactors[0].active=false;
+  await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(state)});
+  await page.setViewportSize({width:1280,height:1000});await page.goto('/');
+  await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'周期表'}).click();
+  const dialog=page.getByRole('dialog');
+  const value=(label:string)=>dialog.locator('.atomic-facts>div').filter({has:page.getByText(label,{exact:true})}).locator('dd');
+  for(let z=1;z<=10;z++){
+    await page.locator(`[data-z="${z}"]`).click();
+    await expect(value('质子数')).toHaveText(String(z));
+    await expect(value('电子数（中性）')).toHaveText(String(z));
+    await expect(dialog.locator('.electron-configuration')).toContainText('1s');
+    if(z===1)await expect(value('中子数')).toHaveText('0氢-1');
+    if(z===6){
+      await expect(value('中子数')).toHaveText('6碳-12');
+      await expect(dialog.locator('.electron-configuration')).toContainText('1s² 2s² 2p²');
+      await dialog.screenshot({path:'artifacts/knowledge-carbon-desktop.png',animations:'disabled'});
+      await dialog.locator('summary').click();
+      await expect(dialog.locator('.physical-facts')).toContainText('相变特性常压下升华');
+      await expect(dialog.locator('.further-science')).toContainText('碳-14');
+      await expect(dialog.getByText('沸点',{exact:true})).toHaveCount(0);
+    }
+    if(z===2){await dialog.locator('summary').click();await expect(dialog.locator('.physical-facts')).toContainText('常压下不凝固');}
+    await page.keyboard.press('Escape');
+  }
+  await page.locator('[data-z="118"]').click();
+  await expect(value('质子数')).toHaveText('118');
+  await expect(value('电子数（中性）')).toHaveText('118');
+  await expect(dialog.locator('.atomic-facts>div')).toHaveCount(3);
+  await expect(dialog.locator('.electron-configuration')).toHaveCount(0);
+});
+
+test('320px and 360px knowledge cards keep atomic data readable and distinguish fluorine from fluoride',async({page})=>{
+  const state=createState(69);state.elements.forEach(e=>e.discovered=true);state.reactors[0].active=false;
+  await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(state)});
+  await page.setViewportSize({width:360,height:800});await page.goto('/');
+  await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'周期表'}).click();
+  await page.locator('[data-z="9"]').click();
+  const dialog=page.getByRole('dialog');
+  await expect(dialog.locator('.atomic-facts>div').filter({has:page.getByText('电子数（中性）',{exact:true})}).locator('dd')).toHaveText('9');
+  await expect(dialog.locator('.knowledge-body')).toContainText('F⁻ 后会有 10 个电子');
+  for(const width of [320,360]){
+    await page.setViewportSize({width,height:800});
+    expect(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  }
+  await dialog.evaluate(el=>el.scrollTop=0);
+  await dialog.screenshot({path:'artifacts/knowledge-fluorine-mobile.png',animations:'disabled'});
+  await dialog.locator('summary').click();
+  await dialog.locator('.physical-facts').scrollIntoViewIfNeeded();
+  await expect(dialog.locator('.further-science')).toContainText('氟唯一的稳定同位素');
+  await expect(dialog.getByRole('button',{name:'关闭弹窗'})).toBeInViewport();
+  await dialog.screenshot({path:'artifacts/knowledge-fluorine-details-mobile.png',animations:'disabled'});
+});
