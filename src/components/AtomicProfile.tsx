@@ -26,6 +26,5 @@ export function FurtherScience({ info }: { info: ElementInfo }) {
     <p className="physical-note">相变数据为常压近似值；不同压力或物质结构可能改变相变条件。</p>
     <h4>同位素与中子</h4><p>同一种元素的质子数相同，同位素的中子数不同。{atom.isotopes}</p>
     <h4>在自然界中</h4><p>{atom.occurrence}</p>
-    {atom.extraSource && <a className="additional-source" href={atom.extraSource.url} target="_blank" rel="noreferrer">{atom.extraSource.label} ↗</a>}
   </div></details>;
 }

@@ -156,6 +156,11 @@ export function element(z: number): ElementInfo {
   return found;
 }
 
+/** Player-facing reading links; original scientific references stay in the data. */
+export function baikeUrl(topic: string): string {
+  return `https://baike.baidu.com/item/${encodeURIComponent(topic)}`;
+}
+
 export interface KnowledgeCard {
   title: string;
   fact: string;
