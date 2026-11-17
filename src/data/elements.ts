@@ -169,7 +169,7 @@ export const KNOWLEDGE: Record<number, KnowledgeCard> = {
     title: '从最轻的元素出发',
     fact: '氢的原子序数是1，原子核中有1个质子。常温氢气无色、无味，是密度最低的气体；屏幕上的粒子颜色只用于辨认元素。',
     application: '氢可用于燃料电池，也广泛用于化工生产。它与氧反应生成水，但现实中的元素转变涉及原子核，不能靠普通化学碰撞完成。',
-    unlock: '游戏中：两份保底活跃样本维持起步碰撞；可提交库存与活跃样本分离。',
+    unlock: '游戏中：两份保底反应样本维持起步实验；可提交库存与反应样本分开计算。',
     source: 'https://periodic-table.rsc.org/element/1/hydrogen',
   },
   2: {
