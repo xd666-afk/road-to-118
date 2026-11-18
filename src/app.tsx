@@ -44,6 +44,15 @@ export default function App() {
 
   function goToTab(next: string) { setTab(next); history.replaceState(null, '', next === 'guide' ? '#guide' : location.pathname + location.search); window.scrollTo({ top: 0 }); }
 
+  useEffect(() => {
+    const followHash = () => {
+      if (location.hash.startsWith('#guide')) setTab('guide');
+      else if (!location.hash) setTab('lab');
+    };
+    window.addEventListener('hashchange', followHash);
+    return () => window.removeEventListener('hashchange', followHash);
+  }, []);
+
   function collect() {
     const notices = engineRef.current.state.notices.splice(0);
     if (notices.length) {

@@ -6,6 +6,17 @@ import { serialize } from '../../game/save';
 
 const KEY = 'road-to-118.save.v1';
 
+test('same-document tutorial links switch sections without losing laboratory progress', async ({page}) => {
+  await page.goto('/');
+  await page.getByRole('button',{name:'运行中',exact:true}).click();
+  await page.evaluate(()=>{ location.hash='guide'; });
+  await expect(page.getByRole('heading',{name:'实验室教程',exact:true})).toBeVisible();
+  await page.locator('.tutorial-contents a').first().click();
+  await expect(page.getByRole('heading',{name:'实验室教程',exact:true})).toBeVisible();
+  await page.evaluate(()=>{ location.hash=''; });
+  await expect(page.getByRole('button',{name:'已暂停',exact:true})).toBeVisible();
+});
+
 test('clicking inside dialog padding preserves it, while clicking the outside backdrop closes it', async ({page}) => {
   await page.setViewportSize({width:1280,height:900});
   // Starting on the tutorial defers stochastic discovery cards, so this test
