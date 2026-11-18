@@ -12,3 +12,4 @@ artifacts/nexus-run-*/
 *.tsbuildinfo
 .env*
 !.env.example
+artifacts/nexus-playtest-*/

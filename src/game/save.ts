@@ -69,7 +69,8 @@ export function saveLocal(s: GameState): { ok: boolean; message: string } {
   try { localStorage.setItem(KEY, serialize(s)); return { ok: true, message: '存档已保存在此浏览器' }; }
   catch { return { ok: false, message: '浏览器存储不可用。请导出存档以保留进度。' }; }
 }
-export function loadLocal(): { state: GameState; error?: string } {
-  try { const text = localStorage.getItem(KEY); return { state: text ? deserialize(text) : createState() }; }
-  catch (error) { return { state: createState(), error: `旧存档未被覆盖。${error instanceof Error ? error.message : '读取失败'}` }; }
+export function loadLocal(): { state: GameState; error?: string; raw?: string } {
+  let text: string | null = null;
+  try { text = localStorage.getItem(KEY); return { state: text ? deserialize(text) : createState() }; }
+  catch (error) { return { state: createState(), raw: text ?? undefined, error: `旧存档未被覆盖。${error instanceof Error ? error.message : '读取失败'}` }; }
 }

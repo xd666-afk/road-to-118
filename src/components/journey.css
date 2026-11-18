@@ -20,3 +20,34 @@
   .journey-stage small { font-size: 9px; }
   .journey-index, .journey-symbol { display: none; }
 }
+
+/* Mobile: keep the stage symbols, let cards grow with their text, and give
+   lab controls a real 44px touch target. Scoped so the periodic table is untouched. */
+@media (max-width: 620px) {
+  .app-shell .journey-stages { gap: 6px; margin-bottom: 15px; }
+  .app-shell .journey-stage { flex-direction: column; align-items: stretch; gap: 2px; height: auto; min-height: 0; padding: 9px 8px; }
+  .app-shell .journey-index { display: none; }
+  .app-shell .journey-stage > span:nth-child(2) { min-width: 0; }
+  .app-shell .journey-stage strong { font-size: 10px; line-height: 1.5; overflow-wrap: anywhere; }
+  .app-shell .journey-stage small { font-size: 10px; line-height: 1.5; margin-top: 2px; overflow-wrap: anywhere; }
+  .app-shell .journey-symbol { display: block; align-self: flex-end; margin: 1px 0 0; font: 12px/1.4 var(--mono); color: #a9b9a8; }
+  .app-shell .journey-stage.done .journey-symbol { color: #b0d4b8; }
+  .app-shell .journey-stage:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-color: var(--gold); }
+  .app-shell .journey-stage:active { transform: translateY(1px); background: #243230; border-color: #8b7a58; }
+
+  .app-shell .status-pill { min-height: 44px; padding: 8px 10px; font-size: 11px; }
+  .app-shell .reactor-switch > button { min-height: 44px; padding: 0 4px; font-size: 10px; }
+  .app-shell .reactor-switch select { min-height: 44px; padding: 6px 8px; }
+  .app-shell .target-actions { width: 100%; max-width: none; }
+  .app-shell .target-actions select { flex: 1; min-width: 0; max-width: none; min-height: 44px; padding: 6px 8px; }
+  .app-shell .target-actions .text-button { flex-shrink: 0; min-height: 44px; padding: 6px 8px; font-size: 10px; }
+  .app-shell .bulk-control { flex-wrap: wrap; gap: 6px; }
+  .app-shell .bulk-control button { min-width: 44px; min-height: 44px; padding: 0 8px; font-size: 11px; }
+  .app-shell .icon-button { width: 44px; height: 44px; }
+  .app-shell .mission-card button.goal-action { min-height: 44px; }
+}
+
+.recovery-warning { border-color: var(--gold); gap: 12px; }
+.recovery-warning span { min-width: 0; overflow-wrap: anywhere; }
+.recovery-warning button { flex-shrink: 0; min-height: 44px; }
+@media (max-width: 620px) { .app-shell .recovery-warning { flex-wrap: wrap; } }

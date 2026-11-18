@@ -30,12 +30,23 @@ export function recommend(s: GameState): Advice {
     const h = s.elements[0], enough = h.inventory.gte(50 - h.deposited), running = s.reactors[0].target === 1 && s.reactors[0].active;
     return { id: 'first-archive', label: enough ? '提交并点亮 H' : running ? '氢样本正在生产…' : '让 I 型生产氢样本', detail: `档案 ${h.deposited}/50；库存 ${Math.floor(h.inventory.toNumber())}。累计提交 50 单位即可永久点亮。`, enabled: enough || !running, action: enough ? 'deposit' : 'produce', reactor: 1, target: 1 };
   }
+  const ne = s.elements[9], ca = s.elements[19];
+  // Ne is a real stage checkpoint: with Ca still undiscovered, finish this archive
+  // before further exploration. A higher reactor that is already affordable still
+  // gets built first; otherwise keep collecting toward it while Ne is produced.
+  const neStage = ne.discovered && !ne.archived && !ca.discovered;
+  const neProducer = s.reactors.filter(r => r.built && REACTORS[r.id - 1].softMax >= 10).at(-1);
+  if (next && (canBuild || !neStage || !neProducer)) return build();
+  if (neStage) {
+    const suitable = neProducer ?? top;
+    const enough = ne.inventory.gte(50 - ne.deposited), running = suitable.target === 10 && suitable.active;
+    return { id: 'neon', label: enough ? '提交氖的记录' : running ? '氖正在生产…' : '生产氖 · 收录档案', detail: `氖档案 ${ne.deposited}/50；库存 ${Math.floor(ne.inventory.toNumber())}。使用 ${REACTORS[suitable.id - 1].roman} 级仪器真实生产氖，累计提交 50 份完成本阶段。`, enabled: enough || !running, action: enough ? 'deposit' : 'produce', reactor: suitable.id, target: 10 };
+  }
   if (next) return build();
   if (max < PLAYABLE_ELEMENTS) {
     const waiting = top.active && top.exploring && top.target === max + 1;
     return { id: 'explore', label: waiting ? `正在探索 ${element(max + 1).symbol}` : `继续探索 · ${element(max + 1).symbol}`, detail: waiting ? '每次实验都有机会发现新元素。等待期间可升级设备；平均等待并非倒计时。' : '让最高级仪器连续探索新元素，首次发现后自动前往下一种。', enabled: !waiting, action: 'explore', reactor: top.id, target: max + 1 };
   }
-  const ca = s.elements[19];
   if (!ca.archived) {
     const enough = ca.inventory.gte(50 - ca.deposited), running = top.target === 20 && top.active;
     return { id: 'calcium', label: enough ? '提交钙的记录' : running ? '钙正在生产…' : '生产钙 · 完成阶段目标', detail: `钙档案 ${ca.deposited}/50；库存 ${Math.floor(ca.inventory.toNumber())}。生产后提交，完成本版阶段目标。`, enabled: enough || !running, action: enough ? 'deposit' : 'produce', reactor: top.id, target: 20 };
