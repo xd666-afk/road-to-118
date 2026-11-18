@@ -6,6 +6,7 @@ artifacts/*.png
 artifacts/*.webm
 artifacts/browser-*.json
 artifacts/cpu-profile.json
+artifacts/nexus-run-*/
 *.tar.gz
 *.log
 *.tsbuildinfo

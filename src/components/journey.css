@@ -1,0 +1,22 @@
+.nexus-coach { margin-bottom: 18px; border-radius: 6px; }
+.journey-stages { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 0 0 22px; }
+.journey-stage { display: flex; align-items: center; gap: 12px; padding: 14px 16px; min-width: 0; text-align: left; background: #172023; border: 1px solid #36433f; border-radius: 5px; }
+.journey-stage:hover { border-color: var(--gold); background: #1c2828; }
+.journey-index { font: 12px var(--mono); color: #acb9b0; width: 24px; flex-shrink: 0; }
+.journey-stage strong { font-size: 12px; font-weight: 500; display: block; }
+.journey-stage small { color: #a6b2ac; font-size: 11px; display: block; margin-top: 3px; }
+.journey-symbol { margin-left: auto; font: 24px var(--mono); color: #819388; }
+.journey-stage.done { border-color: #667b68; background: #1d2e29; }
+.journey-stage.done .journey-index, .journey-stage.done small { color: #b0d4b8; }
+.goal-detail { font-size: 11px; color: #adb8af; margin: 12px 0; line-height: 1.8; overflow-wrap: anywhere; }
+.guide-replay { display: flex; justify-content: flex-end; margin-bottom: 12px; }
+@media (max-width: 600px) {
+  .nexus-coach__actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .nexus-coach__actions .nexus-coach__btn--primary { grid-column: 1 / -1; }
+  .nexus-coach__actions .nexus-coach__btn { padding: 0 8px; }
+  .journey-stages { gap: 6px; margin-bottom: 15px; }
+  .journey-stage { padding: 10px 7px; min-height: 64px; }
+  .journey-stage strong { font-size: 10px; }
+  .journey-stage small { font-size: 9px; }
+  .journey-index, .journey-symbol { display: none; }
+}

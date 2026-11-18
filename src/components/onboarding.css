@@ -1,0 +1,218 @@
+.nexus-coach {
+  --nc-bg: #172023;
+  --nc-surface: #1c2b2d;
+  --nc-accent: #d9b17b;
+  --nc-text: #e7e6df;
+  --nc-muted: #a6b2ac;
+  --nc-border: rgba(217, 177, 123, 0.22);
+  --nc-border-soft: rgba(231, 230, 223, 0.1);
+
+  box-sizing: border-box;
+  max-width: 100%;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--nc-border);
+  border-radius: 12px;
+  background: var(--nc-bg);
+  color: var(--nc-text);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.nexus-coach,
+.nexus-coach * {
+  box-sizing: border-box;
+}
+
+.nexus-coach__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.nexus-coach__eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.nexus-coach__eyebrow-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--nc-accent);
+}
+
+.nexus-coach__counter {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--nc-muted);
+}
+
+.nexus-coach__track {
+  flex: 1 1 120px;
+  min-width: 90px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--nc-border-soft);
+  overflow: hidden;
+}
+
+.nexus-coach__fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--nc-accent);
+  transition: width 220ms ease-out;
+}
+
+.nexus-coach__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.nexus-coach__text {
+  min-width: 0;
+}
+
+.nexus-coach__title {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--nc-text);
+  overflow-wrap: anywhere;
+}
+
+.nexus-coach__detail {
+  margin: 0;
+  font-size: 13px;
+  color: var(--nc-muted);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.nexus-coach__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.nexus-coach__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  min-width: 0;
+  padding: 0 14px;
+  border-radius: 9px;
+  border: 1px solid var(--nc-border-soft);
+  background: var(--nc-surface);
+  color: var(--nc-text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 160ms ease-out, border-color 160ms ease-out,
+    color 160ms ease-out;
+}
+
+.nexus-coach__btn-label {
+  overflow-wrap: anywhere;
+}
+
+.nexus-coach__icon {
+  flex: 0 0 auto;
+}
+
+.nexus-coach__btn--primary {
+  flex: 1 1 160px;
+  border-color: var(--nc-accent);
+  background: rgba(217, 177, 123, 0.16);
+  color: var(--nc-accent);
+  font-weight: 600;
+}
+
+.nexus-coach__btn--primary:hover:not(:disabled) {
+  background: rgba(217, 177, 123, 0.24);
+}
+
+.nexus-coach__btn--primary:disabled {
+  cursor: not-allowed;
+  border-color: var(--nc-border-soft);
+  background: rgba(231, 230, 223, 0.06);
+  color: var(--nc-muted);
+  opacity: 0.7;
+}
+
+.nexus-coach__btn--ghost:hover {
+  border-color: var(--nc-border);
+  background: #1b3040;
+}
+
+.nexus-coach__btn--skip {
+  background: transparent;
+  border-color: transparent;
+  color: var(--nc-muted);
+}
+
+.nexus-coach__btn--skip:hover {
+  color: var(--nc-text);
+  border-color: var(--nc-border-soft);
+}
+
+.nexus-coach__btn:focus-visible,
+.nexus-coach__btn--primary:focus-visible {
+  outline: 2px solid var(--nc-accent);
+  outline-offset: 2px;
+}
+
+@media (min-width: 360px) and (max-width: 375px) {
+  .nexus-coach {
+    padding: 12px;
+  }
+
+  .nexus-coach__btn {
+    flex: 1 1 100%;
+    padding: 0 12px;
+  }
+}
+
+@media (min-width: 720px) {
+  .nexus-coach {
+    padding: 14px 18px;
+  }
+
+  .nexus-coach__body {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 18px;
+    margin-top: 12px;
+  }
+
+  .nexus-coach__actions {
+    justify-content: flex-end;
+  }
+
+  .nexus-coach__btn--primary {
+    flex: 0 1 auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nexus-coach,
+  .nexus-coach * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
