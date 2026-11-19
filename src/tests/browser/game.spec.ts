@@ -216,7 +216,7 @@ test('tutorial keeps experiments running and defers discovery popups until retur
   await expect(page.getByRole('dialog')).toContainText('新元素发现 · 氦');
 });
 
-test('H–Xe cards show neutral electrons, isotope-specific neutrons and the new atomic schematics',async({page})=>{
+test('H–Xe cards show specimen art, neutral electrons and isotope-specific neutrons',async({page})=>{
   const state=createState(68);state.elements.forEach(e=>e.discovered=true);state.reactors[0].active=false;
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(state)});
   await page.setViewportSize({width:1280,height:1000});await page.goto('/');
@@ -246,12 +246,19 @@ test('H–Xe cards show neutral electrons, isotope-specific neutrons and the new
   await page.locator('[data-z="30"]').click();
   await expect(value('质子数')).toHaveText('30');
   await expect(dialog.locator('.electron-configuration')).toContainText('3d¹⁰');
+  await expect(dialog.locator('.specimen')).toHaveCSS('background-image', /specimens-sc-ge\.webp/);
+  await page.keyboard.press('Escape');
+  await page.locator('[data-z="35"]').click();
+  await expect(dialog.locator('.specimen')).toHaveCSS('background-image', /specimens-as-ru\.webp/);
   await page.keyboard.press('Escape');
   await page.locator('[data-z="54"]').click();
   await expect(value('质子数')).toHaveText('54');
   await expect(dialog.locator('.electron-configuration')).toContainText('5p⁶');
+  await expect(dialog.locator('.specimen')).toHaveCSS('background-image', /specimens-rh-xe\.webp/);
+  await expect(dialog.locator('.specimen')).toHaveCSS('background-position', '100% 100%');
+  await expect(dialog.locator('.atomic-specimen')).toBeHidden();
+  await dialog.locator('summary').click();
   await expect(dialog.locator('.atomic-specimen')).toBeVisible();
-  await expect(dialog.locator('.specimen')).toHaveCount(0);
   await expect(dialog).toContainText('第五十四号');
   await page.keyboard.press('Escape');
   await expect(page.locator('[data-z="55"]')).toHaveClass(/version-locked/);
@@ -260,6 +267,35 @@ test('H–Xe cards show neutral electrons, isotope-specific neutrons and the new
   await expect(value('电子数（中性）')).toHaveText('118');
   await expect(dialog.locator('.atomic-facts>div')).toHaveCount(3);
   await expect(dialog.locator('.electron-configuration')).toHaveCount(0);
+});
+
+test('VI–VIII each load distinct art and support a manual pulse through the viewport', async ({ page }) => {
+  const state = createState(810);
+  state.settings.guideDismissed = true;
+  state.elements.forEach(element => { element.discovered = true; });
+  state.reactors.forEach(reactor => { reactor.built = true; });
+  await page.addInitScript(save => localStorage.setItem('road-to-118.save.v1', save), serialize(state));
+  await page.goto('/');
+  const selector = page.getByRole('combobox', { name: '切换反应容器' });
+  const device = page.locator('.device-illustrated');
+  for (const [index, roman] of ['vi', 'vii', 'viii'].entries()) {
+    await page.setViewportSize({ width: index === 1 ? 360 : 1440, height: 800 });
+    await selector.selectOption(String(index + 6));
+    const photo = device.locator('.device-photo');
+    await expect(photo).toHaveCSS('background-image', new RegExp(`reactor-${roman}\\.webp`));
+    const image = await page.request.get(`/assets/reactor-${roman}.webp`);
+    expect(image.headers()['content-type']).toContain('image/webp');
+    const pulse = photo.getByRole('button', { name: '手动碰撞' });
+    const artBox = (await photo.boundingBox())!;
+    const area = (await pulse.boundingBox())!;
+    expect(artBox.width).toBeCloseTo(artBox.height, 0);
+    expect((area.x + area.width / 2 - artBox.x) / artBox.width).toBeCloseTo(.5);
+    expect(area.width).toBeGreaterThan(44);
+    await pulse.click();
+    await expect(photo.locator('.mp-fx-group.is-latest')).toContainText('碰撞能');
+  }
+  await page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '科研' }).click();
+  await expect(page.locator('.research-device-art.advanced-art')).toHaveCount(3);
 });
 
 test('320px and 360px knowledge cards keep atomic data readable and distinguish fluorine from fluoride',async({page})=>{

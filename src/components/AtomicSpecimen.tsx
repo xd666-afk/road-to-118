@@ -2,12 +2,7 @@ import type { CSSProperties } from 'react';
 import { ATOMIC_PROFILES } from '../data/atomic';
 import type { ElementInfo } from '../data/elements';
 
-/**
- * Original CSS atom schematic for elements 21–54. These rows have no matching
- * specimen photograph in the released atlases, so we intentionally avoid
- * reusing an unrelated Na–Ca tile. Electron shells are illustrative, not a
- * scale model of an atom.
- */
+/** Illustrative electron shells shown with the expanded science details. */
 export default function AtomicSpecimen({ info }: { info: ElementInfo }) {
   const atom = ATOMIC_PROFILES[info.z];
   const shells = atom?.shells ?? [2, 8, 8, 2];

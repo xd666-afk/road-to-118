@@ -52,6 +52,87 @@
       "generator": "Built-in image generation",
       "prompt": "Use case: scientific-educational / realistic game specimen photography. Generate ONE exact 5-column by 2-row sprite atlas, overall aspect ratio 2.5:1, TEN equal SQUARE panels without gutters or drawn borders. Identical dark charcoal studio laboratory background #12191c, premium realistic glass and brushed-metal sample holders, sharp macro product photography with neutral-white rim light. Every item centered, occupies about 65% panel width and 70% panel height; nothing crosses panel boundaries. Exact left-to-right reading order: TOP row panel 1 SODIUM: small clean silvery metal fragments visibly immersed in clear colorless oil inside a fully sealed clear specimen vial; panel 2 MAGNESIUM: silver-grey metallic ribbon and small metal chips in a sealed transparent specimen capsule; panel 3 ALUMINIUM: small bright silver metal sheet and folded foil fragments in a glass specimen dish; panel 4 SILICON: dark metallic-grey glossy crystalline chunks in a glass sample dish; panel 5 PHOSPHORUS: deep brick-red red-phosphorus powder in a fully sealed small clear glass capsule with metal ends, never white phosphorus. BOTTOM row panel 6 SULFUR: distinct vivid but natural yellow crystalline chunks in a glass sample dish; panel 7 CHLORINE: specialist corrosion-resistant sealed metal-and-transparent observation cell containing a VERY pale yellow-green gas, no escaping cloud or exaggerated glow; panel 8 ARGON: clear COLORLESS gas represented by an empty-looking sealed clear glass cylindrical sample vessel on a small metal base, no colored gas, no electrical discharge; panel 9 POTASSIUM: small silvery metallic fragments immersed in transparent colorless oil in a sealed glass vial, visually separate from sodium with different vial proportions; panel 10 CALCIUM: small silver-grey metallic solid pieces in a sealed transparent specimen capsule. Realistic physical material textures, no cartoon or fantasy coloring. Elements and samples are illustrative educational exhibits, not instructions for handling. No text, labels, letters, symbols, logos, people, plasma, watermarks or decorative graphics anywhere. Output only the atlas.",
       "note": "Room-temperature illustrative exhibits. Na and K immersed in transparent oil; phosphorus shown as red phosphorus; chlorine pale yellow-green; argon colorless, without discharge."
+    },
+    {
+      "file": "specimens-sc-ge.webp",
+      "layout": "4 × 3; Sc Ti V Cr / Mn Fe Co Ni / Cu Zn Ga Ge",
+      "dimensions": [
+        1448,
+        1086
+      ],
+      "generator": "Built-in image generation",
+      "prompt": "Scientific-educational game asset atlas. Strict equal square tiles, regular evenly spaced grid, no gutters or borders, object centered in every tile with 15% safe clearance on each side, every tile isolated on identical near-black charcoal laboratory backdrop. Premium physically based macro photography, stainless specimen trays or clear sealed glass where specified, authentic textures, neutral white lighting with very subtle amber reflections. Make each object visually distinct by supplied cut/form. No text, lettering, logos, symbols, labels, captions or watermarks. Colors must be plausible; these are elemental forms, not ores, gemstones, or alloys. EXACTLY 4 columns × 3 rows (landscape 4:3). Reading order. Row 1: scandium matte silvery small machined coupon; titanium cool metallic rough chunky angular crystal; vanadium dull steel-grey irregular heavy bar; chromium brilliant mirror-silver facets. Row 2: manganese dark grey brittle coarse chunks; iron silver-grey forged rectangular ingot; cobalt silver-grey with subtle cool blue tint, broken shot; nickel pale lustrous silver rounded pellets. Row 3: copper distinctly warm copper-orange polished sheet curl plus ingot; zinc bluish silver stepped crystallized ingot; gallium silver reflective droplet beside a small solid piece in low clear sealed vial; germanium dark silvery grey faceted brittle crystal."
+    },
+    {
+      "file": "specimens-as-ru.webp",
+      "layout": "4 × 3; As Se Br Kr / Rb Sr Y Zr / Nb Mo Tc Ru",
+      "dimensions": [
+        1448,
+        1086
+      ],
+      "generator": "Built-in image generation",
+      "prompt": "Scientific-educational game asset atlas. Strict equal square tiles, regular evenly spaced grid, no gutters or borders, object centered in every tile with 15% safe clearance on each side, every tile isolated on identical near-black charcoal laboratory backdrop. Premium physically based macro photography, stainless specimen trays or clear sealed glass where specified, authentic textures, neutral white lighting with very subtle amber reflections. Make each object visually distinct by supplied cut/form. No text, lettering, logos, symbols, labels, captions or watermarks. Colors must be plausible; these are elemental forms, not ores, gemstones, or alloys. EXACTLY 4 columns × 3 rows (landscape 4:3). Reading order. Row 1: grey arsenic dark metallic rhombohedral chips in a closed display capsule; grey selenium metallic slate crystalline needles under clear glass; deep reddish-brown bromine liquid with subtle brown headspace in a completely sealed short glass ampoule; krypton colorless gas in completely transparent sealed cylindrical gas cell, pure clear interior, no glowing gas. Row 2: rubidium soft silver-white metal pellet under clear storage oil in sealed small vial; strontium pale silvery metal lump with faint warm sheen in sealed vial; yttrium silver-grey brushed cut wedge; zirconium cool silver metal physically machined disk. Row 3: niobium metallic light grey rough tessellated chunk; molybdenum steely blue-grey rectangular plate with tiny textures; technetium a small silvery-gray metal foil inside a closed clear thick-wall display capsule within protective brushed steel outer holder; ruthenium dark silver-grey metallic crystalline granules in shallow glass dish."
+    },
+    {
+      "file": "specimens-rh-xe.webp",
+      "layout": "5 × 2; Rh Pd Ag Cd In / Sn Sb Te I Xe",
+      "dimensions": [
+        1983,
+        793
+      ],
+      "generator": "Built-in image generation",
+      "prompt": "Scientific-educational game asset atlas. Strict equal square tiles, regular evenly spaced grid, no gutters or borders, object centered in every tile with 15% safe clearance on each side, every tile isolated on identical near-black charcoal laboratory backdrop. Premium physically based macro photography, stainless specimen trays or clear sealed glass where specified, authentic textures, neutral white lighting with very subtle amber reflections. Make each object visually distinct by supplied cut/form. No text, lettering, logos, symbols, labels, captions or watermarks. Colors must be plausible; these are elemental forms, not ores, gemstones, or alloys. EXACTLY 5 columns × 2 rows (landscape 2.5:1). Reading order. Row 1: rhodium bright white-silver fine polished angular bead; palladium pale silver metal nugget with satin sheen; silver brilliant whitish mirror-silver low cast ingot with no marks; cadmium bluish silver soft rectangular cut sample in a sealed clear display capsule; indium shiny soft silver metallic button with a stamped-in rounded dent but absolutely no writing. Row 2: tin white-silver cast strip with grey granular end; antimony brittle bright silver-gray crystalline cleavage pieces; tellurium smoky silvery gray elongated metallic crystals; iodine lustrous dark black-gray flat crystalline flakes with only subtle violet reflections in a sealed glass dish; xenon colorless gas in a clear sealed cylindrical glass cell on a low steel stand, transparent completely colorless interior without glow."
+    },
+    {
+      "file": "reactor-vi.webp",
+      "layout": "VI synchrotron research ring",
+      "dimensions": [
+        1254,
+        1254
+      ],
+      "viewport": {
+        "center": [
+          0.5,
+          0.424
+        ],
+        "usableDiameter": 0.275
+      },
+      "generator": "Built-in image generation",
+      "prompt": "Product-mockup game asset for Road to 118. The reference atlas is only for lighting, materials and visual tone. Generate ONE new square frontal apparatus as physically based premium realistic lab product photography, near orthographic, visibly distinct silhouette, one central opening. Dark near-black studio background #101719. Brushed machined steel, heavy dark gunmetal, copper coil detail, subtle wear, sparse status lamps, intriguing credible scientific form. Apparatus fits almost entire frame with its base fully visible, safe margins sides. Critical coordinate for animated particle and click overlay: one circular, front-facing jet-black interior observation port centered EXACTLY at x=50%, y=44% of the full square, 30% of image width in inner diameter, perfectly round, sharp clean inside edge. Keep this dark interior empty, no highlights, reticles, glows, window grids, particles, text, labels, numbers, humans, logos or watermarks. Professional educational game concept apparatus. Generation VI synchrotron research ring. Broad twin wings and visible steel segmented magnet modules expanding horizontally around the rim, horizontal toroidal beam loops, copper windings interrupted by brushed steel, precision cooling feeds, understated teal instrument lamps. Base is wide and low like precision lab equipment, contrast to the previous examples."
+    },
+    {
+      "file": "reactor-vii.webp",
+      "layout": "VII heavy-ion storage ring",
+      "dimensions": [
+        1254,
+        1254
+      ],
+      "viewport": {
+        "center": [
+          0.5,
+          0.398
+        ],
+        "usableDiameter": 0.267
+      },
+      "generator": "Built-in image generation",
+      "prompt": "Product-mockup game asset for Road to 118. The reference atlas is only for lighting, materials and visual tone. Generate ONE new square frontal apparatus as physically based premium realistic lab product photography, near orthographic, visibly distinct silhouette, one central opening. Dark near-black studio background #101719. Brushed machined steel, heavy dark gunmetal, copper coil detail, subtle wear, sparse status lamps, intriguing credible scientific form. Apparatus fits almost entire frame with its base fully visible, safe margins sides. Critical coordinate for animated particle and click overlay: one circular, front-facing jet-black interior observation port centered EXACTLY at x=50%, y=44% of the full square, 30% of image width in inner diameter, perfectly round, sharp clean inside edge. Keep this dark interior empty, no highlights, reticles, glows, window grids, particles, text, labels, numbers, humans, logos or watermarks. Professional educational game concept apparatus. Generation VII heavy-ion storage ring. Thick double-layered round containment surrounding the central port, two massive vertical dark cold-metal cryogenic side pylons, paired cylindrical reservoirs and tidy curved silver lines, muted blue instrument lamps. Strong vertical silhouette, taller and more massive than a compact cyclotron, deep bevels and clean controlled studio lighting."
+    },
+    {
+      "file": "reactor-viii.webp",
+      "layout": "VIII hadron collider ring",
+      "dimensions": [
+        1254,
+        1254
+      ],
+      "viewport": {
+        "center": [
+          0.5,
+          0.408
+        ],
+        "usableDiameter": 0.285
+      },
+      "generator": "Built-in image generation",
+      "prompt": "Product-mockup game asset for Road to 118. The reference atlas is only for lighting, materials and visual tone. Generate ONE new square frontal apparatus as physically based premium realistic lab product photography, near orthographic, visibly distinct silhouette, one central opening. Dark near-black studio background #101719. Brushed machined steel, heavy dark gunmetal, copper coil detail, subtle wear, sparse status lamps, intriguing credible scientific form. Apparatus fits almost entire frame with its base fully visible, safe margins sides. Critical coordinate for animated particle and click overlay: one circular, front-facing jet-black interior observation port centered EXACTLY at x=50%, y=44% of the full square, 30% of image width in inner diameter, perfectly round, sharp clean inside edge. Keep this dark interior empty, no highlights, reticles, glows, window grids, particles, text, labels, numbers, humans, logos or watermarks. Professional educational game concept apparatus. Generation VIII hadron collider ring. Distinct large OCTAGONAL external assembly of eight bulky radial magnet sectors in dark machined metal, a circular empty glass center at the precise specified coordinate, substantial diagonal access struts, muted warm gold status lights, two squat paired cooling stacks and heavy wide vented platform. Premium dense climactic machine with quiet highlights, clean front silhouette, grounded rather than neon science fiction."
     }
   ],
   "note": "Concept instrument and specimen imagery for an educational game. Not a real nuclear apparatus. Neon panel depicts discharge, not ordinary color."
