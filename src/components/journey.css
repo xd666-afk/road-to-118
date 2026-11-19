@@ -51,3 +51,14 @@
 .recovery-warning span { min-width: 0; overflow-wrap: anywhere; }
 .recovery-warning button { flex-shrink: 0; min-height: 44px; }
 @media (max-width: 620px) { .app-shell .recovery-warning { flex-wrap: wrap; } }
+
+/* Discovery queue and single-level fallback stay explicit instead of silently
+   changing the selected bulk amount. */
+.discovery-queue { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; padding: 12px 14px; border: 1px solid #5f5037; border-radius: 4px; background: #282a24; }
+.discovery-queue span { font-size: 11px; color: #d6bc87; }
+.discovery-queue button { flex-shrink: 0; min-height: 36px; padding: 0 12px; font-size: 10px; }
+.buy-button.single-buy { border-color: #b29367; background: linear-gradient(120deg, #4a402d, #353027); }
+@media (max-width: 620px) {
+  .discovery-queue { align-items: stretch; flex-direction: column; }
+  .discovery-queue button { min-height: 44px; }
+}

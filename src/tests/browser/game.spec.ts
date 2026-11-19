@@ -159,7 +159,7 @@ test('total speed sums devices; switching the device only changes its own speed 
   await expect(page.getByTestId('current-rate')).toHaveText('42 次/秒');
   await expect(page.locator('.upgrade').filter({hasText:'单次收益'})).toContainText('每次 6 → 8.1 碰撞能');
   await expect(page.locator('.chamber-footer')).toContainText('批量生产 ×32');
-  await expect(page.locator('.target-copy')).toContainText('平均约');
+  await expect(page.locator('.target-copy')).toContainText('平均等待约');
   await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'科研',exact:true}).click();
   await expect(page.locator('#production-target')).toHaveCount(0);
   await page.locator('#work-mode').selectOption('produce');

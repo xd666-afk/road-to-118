@@ -20,7 +20,7 @@ test('Ne advice archives with a real deposit, then returns the top instrument to
   await page.goto('/');
 
   await expect(page.getByRole('region', { name: '新手实验引导' })).toHaveCount(0);
-  await expect(page.locator('.journey-stage').nth(1).locator('small')).toHaveText('38/50 提交');
+  await expect(page.locator('.journey-stage').nth(1).locator('small')).toHaveText('已提交 38/50 份');
   await page.locator('.mission-card').getByRole('button', { name: '提交氖的记录' }).click();
   await expect(page.locator('.journey-stage').nth(1)).toHaveClass(/done/);
   await expect(page.locator('.journey-stage').nth(1)).toContainText('已完成');
