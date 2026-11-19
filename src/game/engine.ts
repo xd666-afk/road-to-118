@@ -22,6 +22,15 @@ export function createState(seed = Date.now() >>> 0, now = Date.now()): GameStat
 export const discoveredMax = (s: GameState) => s.elements.filter(e => e.discovered).length;
 export const archivedCount = (s: GameState) => s.elements.filter(e => e.archived).length;
 export const highestReactor = (s: GameState) => s.reactors.filter(r => r.built).at(-1)!;
+export const FIRST_HELIUM_SECONDS = 5;
+
+export function createFirstRun(): GameState {
+  const s = createState();
+  s.firstRun = { step: 'start' };
+  s.reactors[0].active = false;
+  s.reactors[0].target = 1;
+  return s;
+}
 
 export class Engine {
   state: GameState;
@@ -37,10 +46,33 @@ export class Engine {
     if (s.achievements.includes(id)) return;
     s.achievements.push(id); this.notify('achievement', `成就解锁 · ${ACHIEVEMENTS.find(a => a.id === id)?.name}`);
   }
-  target(id: number, z: number, exploring = false): boolean {
+  toggleReactor(id: number) {
     const r = this.state.reactors[id - 1];
-    if (!r?.built || !Number.isInteger(z) || z < 1 || z > Math.min(PLAYABLE_ELEMENTS, discoveredMax(this.state) + 1)) return false;
-    if (r.target !== z) { r.discoveryHazard = waitingHazard(this.state); r.productionRemainder = D(0); }
+    if (!r?.built) return;
+    r.active = !r.active;
+    if (id === 1 && r.active && this.state.firstRun?.step === 'start') this.state.firstRun = { step: 'sample' };
+  }
+
+  skipOpening() {
+    const s = this.state;
+    if (!s.firstRun || s.firstRun.step === 'helium') return;
+    if (s.firstRun.step === 'start') s.reactors[0].active = true;
+    s.firstRun = { step: 'free' };
+    s.settings.guideDismissed = true;
+  }
+
+  target(id: number, z: number, exploring = false): boolean {
+    const s = this.state, r = s.reactors[id - 1];
+    if (!r?.built || !Number.isInteger(z) || z < 1 || z > Math.min(PLAYABLE_ELEMENTS, discoveredMax(s) + 1)) return false;
+    if (id === 1 && z === 2 && s.firstRun) {
+      if (s.firstRun.step === 'start' || s.firstRun.step === 'sample') return false;
+      if (s.firstRun.step !== 'helium') {
+        s.firstRun = { step: 'helium', remaining: FIRST_HELIUM_SECONDS };
+        s.settings.guideDismissed = true;
+      }
+      exploring = false;
+    }
+    if (r.target !== z) { r.discoveryHazard = waitingHazard(s); r.productionRemainder = D(0); }
     r.target = z; r.exploring = exploring; return true;
   }
   buy(id: number, key: Upgrade, count: number | 'max'): number {
@@ -52,6 +84,7 @@ export class Engine {
     s.coins = Big.max(0, s.coins.minus(cost)); r.upgrades[key] += n; s.stats.purchases += n;
     if (s.stats.milestones.firstUpgrade === undefined) s.stats.milestones.firstUpgrade = s.elapsed;
     if (key === 'atoms') { s.elements[0].inventory = s.elements[0].inventory.plus(n); s.elements[0].totalProduced = s.elements[0].totalProduced.plus(n); s.stats.produced = s.stats.produced.plus(n); }
+    if (id === 1 && key === 'atoms' && s.firstRun?.step === 'sample') s.firstRun = { step: 'explore' };
     if (n >= 10) this.award('bulk');
     return n;
   }
@@ -140,6 +173,17 @@ export class Engine {
       const e = s.elements[r.target - 1], p = probability(r.target, r.id);
       if (!e.discovered) {
         if (!online || r.target !== discoveredMax(s) + 1) continue;
+        if (r.id === 1 && r.target === 2 && s.firstRun) {
+          if (s.firstRun.step === 'helium') {
+            s.firstRun.remaining = Math.max(0, s.firstRun.remaining - seconds);
+            if (s.firstRun.remaining <= 1e-9) {
+              r.exploring = false;
+              this.produce(r, D(1), true);
+              delete s.firstRun;
+            }
+          }
+          continue;
+        }
         // Exponential survival clock: genuine online probability, independent of visual frames.
         const hazard = events.mul(-Math.log1p(-p));
         if (hazard.gte(r.discoveryHazard)) { this.produce(r, D(1), true); r.discoveryHazard = waitingHazard(s); }

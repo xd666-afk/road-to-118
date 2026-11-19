@@ -1,35 +1,49 @@
 import { expect, test } from '@playwright/test';
 import { writeFileSync } from 'node:fs';
 
-test('player review: natural opening earns first upgrade, persists it, and exposes tutorial', async ({page}) => {
-  const errors: string[] = [];
-  page.on('pageerror', e => errors.push(e.message));
-  // A real first discovery may happen before the player can afford the first
-  // upgrade. Dismiss that knowledge card just as a player would, including when
-  // it appears between an enabled assertion and the subsequent purchase click.
-  await page.addLocatorHandler(page.getByRole('dialog',{name:/新元素发现/}), async dialog => {
-    await dialog.getByRole('button',{name:'关闭弹窗'}).click();
-  });
-  await page.setViewportSize({width:360,height:800});
+test('fresh mobile game restricts clicks to the highlighted control and synthesizes He afterward', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  const now = Date.now();
+  await page.clock.install({ time: now });
+  await page.clock.pauseAt(now + 1000);
   await page.goto('/');
-  const coach = page.getByRole('region',{name:'新手实验引导'});
-  const buy = coach.getByRole('button',{name:'引导操作：补充第一份氢样本'});
+  const guide = page.getByRole('region', { name: '开局操作引导' });
+  const start = page.getByRole('button', { name: '开始实验', exact: true });
+  await expect(guide).toContainText('第 1 步');
+  await expect(start).toBeInViewport();
+  const nav = page.locator('.main-nav');
+  await expect(nav).toHaveAttribute('inert', '');
+  await page.evaluate(() => document.querySelector<HTMLButtonElement>('.main-nav button:nth-child(2)')?.click());
+  await expect(start).toBeVisible();
+  await page.clock.runFor(10_000);
+  await expect(page.locator('.progress-resource strong')).toContainText('1/20 发现');
+
+  await start.click();
+  await expect(guide).toContainText('第 2 步');
+  const buy = page.getByRole('button', { name: '购买补充氢样本' });
+  await expect(buy).toBeInViewport();
   await expect(buy).toBeDisabled();
-  await expect(buy).toBeEnabled({timeout:10000});
-  await page.screenshot({path:'artifacts/nexus-playtest-20261118/mobile-natural-opening.png',fullPage:true,animations:'disabled'});
+  await page.clock.runFor(10_000);
+  await expect(buy).toBeEnabled();
+  await expect(page.locator('.progress-resource strong')).toContainText('1/20 发现');
   await buy.click();
-  const modal = page.getByRole('dialog');
-  if(await modal.count()) await page.keyboard.press('Escape');
-  await coach.getByRole('button',{name:'跳过引导'}).click();
+
+  await expect(guide).toContainText('第 3 步');
   await page.reload();
-  await expect(coach).toHaveCount(0);
-  await expect(page.getByText('等级 1',{exact:true})).toBeVisible();
-  await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'教程'}).click();
-  await expect(page.getByRole('heading',{name:'实验室教程',exact:true})).toBeVisible();
-  await page.screenshot({path:'artifacts/nexus-playtest-20261118/mobile-tutorial.png',fullPage:true,animations:'disabled'});
-  await page.getByRole('button',{name:'返回实验',exact:true}).click();
-  await expect(page.getByText('等级 1',{exact:true})).toBeVisible();
-  expect(errors).toEqual([]);
+  await expect(guide).toContainText('第 3 步');
+  await page.clock.runFor(10_000);
+  await expect(page.locator('.progress-resource strong')).toContainText('1/20 发现');
+  await page.getByRole('button', { name: '探索 He' }).click();
+  await expect(guide).toHaveCount(0);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.clock.runFor(4750);
+  await expect(page.locator('.progress-resource strong')).toContainText('1/20 发现');
+  await page.clock.runFor(250);
+  const card = page.getByRole('dialog', { name: '新元素发现 · 氦' });
+  await expect(card).toBeVisible();
+  await expect(card.getByRole('button', { name: '提交 1 单位至档案' })).toBeEnabled();
+  await card.getByRole('button', { name: '关闭弹窗' }).click();
+  await expect(page.locator('#target')).toHaveValue('2');
 });
 
 test('player review: all six sections fit phone widths; pause survives reload', async ({page}) => {
@@ -37,10 +51,11 @@ test('player review: all six sections fit phone widths; pause survives reload', 
     await dialog.getByRole('button',{name:'关闭弹窗'}).click();
   });
   await page.goto('/');
-  // Pause the fresh run through the normal control, closing any discovery card first.
+  await expect(page.getByRole('region',{name:'开局操作引导'})).toBeVisible();
+  await page.keyboard.press('Escape');
+  // Pause the fresh run through the normal control.
   await page.getByRole('button',{name:'运行中',exact:true}).click();
   await expect(page.getByTestId('current-rate')).toHaveText('0 次/秒');
-  await page.getByRole('region',{name:'新手实验引导'}).getByRole('button',{name:'跳过引导'}).click();
   const measurements: unknown[] = [];
   for(const width of [320,360,768,1440]) {
     await page.setViewportSize({width,height:900});

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Engine, archivedCount, createState, discoveredMax } from '../game/engine';
+import { Engine, archivedCount, createFirstRun, createState, discoveredMax } from '../game/engine';
 import { D, format } from '../game/numbers';
 import { activeAtoms, eventRate, income, maxAffordable, price, probability } from '../game/economy';
 import { deserialize, serialize } from '../game/save';
@@ -9,6 +9,30 @@ const rich = () => { const e = new Engine(createState(123, 100000)); e.state.coi
 function discoverThrough(e: Engine, z: number) { for (let next = discoveredMax(e.state) + 1; next <= z; next++) { e.target(1, next); e.state.reactors[0].discoveryHazard = 0; e.step(.1); } }
 
 describe('authoritative progression', () => {
+  it('first He synthesis waits for the player and resumes after save, offline time, and pause', () => {
+    const e = new Engine(createFirstRun());
+    expect(e.target(1, 2, true)).toBe(false);
+    e.toggleReactor(1);
+    e.advance(20);
+    expect(e.target(1, 2, true)).toBe(false);
+    expect(e.state.elements[1].discovered).toBe(false);
+    expect(e.buy(1, 'atoms', 1)).toBe(1);
+    expect(e.target(1, 2, true)).toBe(true);
+    e.advance(2);
+
+    const resumed = new Engine(deserialize(serialize(e.state, 1000)));
+    resumed.offline(31_000);
+    resumed.toggleReactor(1);
+    resumed.advance(10);
+    expect(resumed.state.elements[1].discovered).toBe(false);
+    resumed.toggleReactor(1);
+    resumed.advance(2.75);
+    expect(resumed.state.elements[1].discovered).toBe(false);
+    resumed.advance(.25);
+    expect(resumed.state.elements[1].inventory.eq(1)).toBe(true);
+    expect(resumed.state.notices.filter(notice => notice.kind === 'discovery').map(notice => notice.z)).toEqual([2]);
+    expect(resumed.state.reactors[0].target).toBe(2);
+  });
   it('starts with exactly two H active samples, no coins; time yields money', () => { const e = new Engine(createState(1)); expect(activeAtoms(e.state.reactors[0]).eq(2)).toBe(true); expect(e.state.coins.eq(0)).toBe(true); expect(discoveredMax(e.state)).toBe(1); e.step(1); expect(e.state.coins.gt(0)).toBe(true); });
   it('rejects skipped or version-locked targets; discovers ordered elements exactly once', () => { const e = rich(); expect(e.target(1, 3)).toBe(false); discoverThrough(e, 20); expect(discoveredMax(e.state)).toBe(20); expect(e.target(1, 21)).toBe(false); expect(e.state.notices.filter(n => n.kind === 'discovery').map(n => n.z)).toEqual(Array.from({length:19},(_,i)=>i+2)); e.step(100); expect(e.state.notices.filter(n => n.kind === 'discovery')).toHaveLength(19); });
   it('allows discovery independently of archiving, and gates construction at Be / N', () => { const e = rich(); expect(e.build(2)).toBe(false); discoverThrough(e, 4); expect(archivedCount(e.state)).toBe(0); expect(e.build(2)).toBe(true); expect(e.build(2)).toBe(false); expect(e.build(3)).toBe(false); discoverThrough(e, 7); expect(e.build(3)).toBe(true); expect(e.state.reactors.slice(0,3).every(r => r.built)).toBe(true); expect(e.state.reactors.slice(3).every(r=>!r.built)).toBe(true); });

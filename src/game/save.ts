@@ -1,5 +1,5 @@
 import { D } from './numbers';
-import { createState } from './engine';
+import { createFirstRun, createState, FIRST_HELIUM_SECONDS } from './engine';
 import { ACHIEVEMENTS, PLAYABLE_ELEMENTS, REACTORS } from './config';
 import type { GameState } from './types';
 const KEY = 'road-to-118.save.v1';
@@ -63,6 +63,13 @@ export function deserialize(text: string): GameState {
     if (!s.settings.mix.length) s.settings.mix = [1];
   }
   s.noticeSeq = raw.noticeSeq === undefined ? 0 : num(raw.noticeSeq);
+  if (max === 1 && raw.firstRun) {
+    const { step, remaining } = raw.firstRun;
+    if (step === 'start' || step === 'sample' || step === 'explore' || step === 'free') s.firstRun = { step };
+    if (step === 'helium' && typeof remaining === 'number' && remaining > 0 && remaining <= FIRST_HELIUM_SECONDS) {
+      s.firstRun = { step, remaining };
+    }
+  }
   s.saveVersion = 2; s.notices = []; return s;
 }
 export function saveLocal(s: GameState): { ok: boolean; message: string } {
@@ -71,6 +78,6 @@ export function saveLocal(s: GameState): { ok: boolean; message: string } {
 }
 export function loadLocal(): { state: GameState; error?: string; raw?: string } {
   let text: string | null = null;
-  try { text = localStorage.getItem(KEY); return { state: text ? deserialize(text) : createState() }; }
+  try { text = localStorage.getItem(KEY); return { state: text ? deserialize(text) : createFirstRun() }; }
   catch (error) { return { state: createState(), raw: text ?? undefined, error: `旧存档未被覆盖。${error instanceof Error ? error.message : '读取失败'}` }; }
 }

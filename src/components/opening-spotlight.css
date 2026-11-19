@@ -1,0 +1,42 @@
+html:has(.opening-spotlight) { overflow: hidden; }
+
+.opening-spotlight {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.opening-spotlight__ring {
+  position: absolute;
+  left: calc(var(--opening-x) - 5px);
+  top: calc(var(--opening-y) - 5px);
+  width: calc(var(--opening-width) + 10px);
+  height: calc(var(--opening-height) + 10px);
+  border: 2px solid #eac28a;
+  border-radius: 9px;
+  box-shadow: 0 0 0 200vmax rgb(5 11 12 / 86%);
+}
+
+.opening-spotlight__note {
+  --note-half-width: min(158px, calc(50vw - 12px));
+  position: absolute;
+  bottom: max(0px, calc(100% - var(--opening-y) + 17px));
+  left: clamp(12px, calc(var(--opening-center) - var(--note-half-width)), calc(100% - 12px - 2 * var(--note-half-width)));
+  width: calc(2 * var(--note-half-width));
+  padding: 13px 16px;
+  border: 1px solid #9c7e55;
+  border-radius: 7px;
+  background: #1a2526;
+  box-shadow: 0 8px 24px #0007;
+  color: #f2e8d9;
+}
+
+.opening-spotlight__note span { color: #e2bd8b; font-size: 12px; }
+.opening-spotlight__note h2 { margin: 2px 0; font-size: 18px; }
+.opening-spotlight__note p { font-size: 13px; }
+.opening-spotlight__note--below {
+  bottom: auto;
+  top: calc(var(--opening-y) + var(--opening-height) + 17px);
+}

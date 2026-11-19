@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Activity, ArrowDownToLine, ArrowRight, Atom, BookOpen, Check, ChevronRight, CirclePause, CirclePlay, Cpu, Download, FlaskConical, Gauge, Layers3, LockKeyhole, Microscope, Plus, RotateCcw, Settings2, ShieldCheck, Sparkles, Table2, Trophy, Upload, Zap } from 'lucide-react';
 import { Engine, archivedCount, discoveredMax } from './game/engine';
 import { D, format } from './game/numbers';
@@ -12,6 +12,7 @@ import Particles from './components/Particles';
 import Modal from './components/Modal';
 import Tutorial from './components/Tutorial';
 import Onboarding from './components/Onboarding';
+import OpeningSpotlight from './components/OpeningSpotlight';
 import { recommend, applyAdvice, openingStep } from './game/advisor';
 import './components/journey.css';
 import { AtomicFacts, FurtherScience } from './components/AtomicProfile';
@@ -34,6 +35,8 @@ export default function App() {
   const [offline, setOffline] = useState(boot.offline && boot.offline.seconds > 30 ? boot.offline : null);
   const tableScroll = useRef<HTMLDivElement>(null), importInput = useRef<HTMLInputElement>(null);
   const engine = engineRef.current, s = engine.state, r = s.reactors[focus - 1], c = REACTORS[focus - 1];
+  const opening = s.firstRun?.step;
+  const spotlight = tab === 'lab' && (opening === 'start' || opening === 'sample' || opening === 'explore');
   const visualPool = reactorDisplayPool(s, r);
   const max = discoveredMax(s), archived = archivedCount(s), scientific = s.settings.scientific;
   const fmt = (v: Parameters<typeof format>[0]) => format(v, scientific);
@@ -63,7 +66,25 @@ export default function App() {
     }
     rerender(v => v + 1);
   }
-  function act(fn: (e: Engine) => void) { fn(engineRef.current); collect(); }
+  function act(fn: (e: Engine) => void) {
+    const e = engineRef.current;
+    const priorStep = e.state.firstRun?.step;
+    fn(e);
+    if (priorStep !== e.state.firstRun?.step && !saveBlocked) {
+      const result = saveLocal(e.state);
+      if (!result.ok) setMessage(result.message);
+    }
+    collect();
+  }
+  const skipOpening = useCallback(() => {
+    const e = engineRef.current;
+    e.skipOpening();
+    if (!saveBlocked) {
+      const result = saveLocal(e.state);
+      if (!result.ok) setMessage(result.message);
+    }
+    rerender(v => v + 1);
+  }, [saveBlocked]);
   const persistent = useRef({ saveBlocked }); persistent.current = { saveBlocked };
   useEffect(() => {
     let last = Date.now(), lastSave = last;
@@ -126,7 +147,11 @@ export default function App() {
     if (!saveBlocked) { const result = saveLocal(engineRef.current.state); if (!result.ok) setMessage(result.message); }
   }
   function replayTutorial() {
-    act(e => { e.state.settings.guideDismissed = false; }); setReplayGuide(true); goToTab('lab');
+    if (!engineRef.current.state.firstRun) {
+      act(e => { e.state.settings.guideDismissed = false; });
+      setReplayGuide(true);
+    }
+    goToTab('lab');
   }
   const lessonTitles = ['从第一份样本开始', '发现第二种元素', '让样本自动补充', '建造第二代仪器', '开启批量生产', '点亮第一格档案'];
   function upgradeCard(key: Upgrade) {
@@ -145,7 +170,7 @@ export default function App() {
         <div className="upgrade-title">{u.name}<small>等级 {r.upgrades[key]}</small></div>
         <p className="upgrade-effect">{effect}</p>
       </div>
-      <button className="buy-button" disabled={cappedSpeed || !affordable} onClick={() => act(e => { e.buy(focus, key, levels); })} aria-label={`购买${u.name}`}>
+      <button className="buy-button" data-opening-target={focus === 1 && key === 'atoms' ? 'sample' : undefined} disabled={cappedSpeed || !affordable} onClick={() => act(e => { e.buy(focus, key, levels); })} aria-label={`购买${u.name}`}>
         <span><Plus size={12}/>{bulk === 'max' ? `MAX ${levels}` : `×${levels}`}</span>
         <strong>{cappedSpeed ? '满负荷' : levels === 0 ? '余额不足' : fmt(cost)}</strong>
         {!cappedSpeed && levels > 0 && <small>{affordable ? '碰撞能' : '碰撞能不足'}</small>}
@@ -153,14 +178,15 @@ export default function App() {
     </div>;
   }
   const lab = () => <>
+    {spotlight && <OpeningSpotlight step={opening} onSkip={skipOpening}/>}
     <div className="section-heading"><div><div className="eyebrow">LABORATORY / 实验日志 {clock(s.elapsed)}</div><h1>每一次碰撞，<span>离未知更近一步。</span></h1></div></div>
-    {((!s.settings.guideDismissed && lesson < 6) || replayGuide) && <Onboarding step={Math.min(lesson, 5)} total={6} title={lesson >= 6 ? '你已掌握实验室的基本操作' : lessonTitles[lesson]} detail={lesson >= 6 ? '继续探索 H—Ca，收录 50 单位钙，完成当前阶段。完整教程随时可查。' : advice.detail} actionLabel={lesson >= 6 ? '完成引导' : goal.label} canAct={lesson >= 6 || goal.enabled} onAction={lesson >= 6 ? dismissGuide : () => act(goal.run)} onDismiss={dismissGuide} onGuide={() => goToTab('guide')}/>}
+    {!s.firstRun && ((!s.settings.guideDismissed && lesson < 6) || replayGuide) && <Onboarding step={Math.min(lesson, 5)} total={6} title={lesson >= 6 ? '你已掌握实验室的基本操作' : lessonTitles[lesson]} detail={lesson >= 6 ? '继续探索 H—Ca，收录 50 单位钙，完成当前阶段。完整教程随时可查。' : advice.detail} actionLabel={lesson >= 6 ? '完成引导' : goal.label} canAct={lesson >= 6 || goal.enabled} onAction={lesson >= 6 ? dismissGuide : () => act(goal.run)} onDismiss={dismissGuide} onGuide={() => goToTab('guide')}/>}
     <div className="journey-stages" aria-label="阶段目标">{[{ name: '发现氖', symbol: 'Ne', done: max >= 10, progress: `已发现 ${Math.min(max, 10)}/10 种` }, { name: '氖档案', symbol: 'Ne', done: s.elements[9].archived, progress: `已提交 ${s.elements[9].deposited}/50 份` }, { name: '钙档案 · 本版终点', symbol: 'Ca', done: s.elements[19].archived, progress: `已提交 ${s.elements[19].deposited}/50 份` }].map((stage, i) => <button key={stage.name} className={`journey-stage ${stage.done ? 'done' : ''}`} onClick={() => openElement(i < 2 ? 10 : 20)}><span className="journey-index">{stage.done ? <Check size={16}/> : `0${i + 1}`}</span><span><strong>{stage.name}</strong><small>{stage.done ? '已完成' : stage.progress}</small></span><span className="journey-symbol">{stage.symbol}</span></button>)}</div>
     <div className="lab-grid">
-      <section className="panel reactor-panel"><div className="panel-heading"><div><span className="eyebrow">REACTION CHAMBER</span><h2>{c.name}<span className="tiny-label">{c.roman} 级</span></h2></div><button className={`status-pill ${r.active ? '' : 'paused'}`} onClick={() => act(() => { r.active = !r.active; })}>{r.active ? <><i/>运行中 <CirclePause size={13}/></> : <><CirclePlay size={13}/> 已暂停</>}</button></div>
+      <section className="panel reactor-panel"><div className="panel-heading"><div><span className="eyebrow">REACTION CHAMBER</span><h2>{c.name}<span className="tiny-label">{c.roman} 级</span></h2></div><button className={`status-pill ${r.active ? '' : 'paused'}`} data-opening-target={focus === 1 ? "start" : undefined} onClick={() => act(e => e.toggleReactor(focus))}>{r.active ? <><i/>运行中 <CirclePause size={13}/></> : <><CirclePlay size={13}/>{opening === "start" ? "开始实验" : "已暂停"}</>}</button></div>
         <div className="reactor-switch"><label htmlFor="reactor-selector">仪器</label><select id="reactor-selector" aria-label="切换反应容器" value={focus} onChange={e => setFocus(+e.target.value)}>{REACTORS.filter(t => s.reactors[t.id - 1].built).map(t => <option key={t.id} value={t.id}>{t.roman} 级 · {t.name}{!s.reactors[t.id - 1].active && ' · 已暂停'}</option>)}</select><button className="text-button" onClick={() => goToTab('research')}>研发仪器<ArrowRight size={13}/></button></div>
         <div className={`device device-${focus}`}><div className="device-photo" style={{ backgroundPosition: `${focus <= 3 ? (focus - 1) * 50 : (focus - 4) * 100}% center` }}/><div className="device-readout readout-left"><span>CHAMBER {c.roman}</span><strong>{fmt(activeAtoms(r))}</strong><small>样本</small></div><div className="device-readout readout-right"><span>THROUGHPUT</span><strong>{fmt(eventRate(r))}<small>次/秒</small></strong><small>实验速度</small></div><div className="viewport"><Particles count={Math.min(60, activeAtoms(r).toNumber())} mix={visualPool} speed={r.upgrades.speed} reduced={s.settings.reducedMotion} active={r.active} flash={flash}/></div><span className="visual-note">粒子示意</span><span className="device-id">R118 — {String(focus).padStart(3, '0')}</span></div>
-        <div className="target-control"><div className="target-element" style={{ '--element': element(r.target).color } as CSSProperties}><small>{r.target}</small><strong>{element(r.target).symbol}</strong></div><div className="target-copy"><span className="eyebrow">{s.elements[r.target - 1].discovered ? '重复生产' : '正在探索'}</span><h3>{element(r.target).name}<span>{element(r.target).english}</span></h3><p>{r.active ? `平均等待${intervalLabel(1 / (eventRate(r).toNumber() * probability(r.target, r.id) * parallel)).replace(' / 次', '')} · 随机触发` : '已暂停'}</p></div><div className="target-actions"><label className="sr-only" htmlFor="target">选择实验目标</label><select id="target" value={r.target} onChange={e => act(engine => { engine.target(focus, +e.target.value); })}>{ELEMENTS.slice(0, Math.min(PLAYABLE_ELEMENTS, max + 1)).map(e => <option key={e.z} value={e.z}>{e.symbol} · {e.name}{e.z > max ? ' · 下一发现' : ''}</option>)}</select>{max < PLAYABLE_ELEMENTS && <button className="text-button accent" onClick={() => act(e => { e.target(focus, max + 1, true); })}>探索 {element(max + 1).symbol}<ArrowRight size={14}/></button>}</div></div>
+        <div className="target-control"><div className="target-element" style={{ '--element': element(r.target).color } as CSSProperties}><small>{r.target}</small><strong>{element(r.target).symbol}</strong></div><div className="target-copy"><span className="eyebrow">{s.elements[r.target - 1].discovered ? '重复生产' : '正在探索'}</span><h3>{element(r.target).name}<span>{element(r.target).english}</span></h3><p>{r.active && r.target === 2 && s.firstRun?.step === "helium" ? `首次合成 · 约 ${Math.ceil(s.firstRun.remaining)} 秒` : r.active ? `平均等待${intervalLabel(1 / (eventRate(r).toNumber() * probability(r.target, r.id) * parallel)).replace(' / 次', '')} · 随机触发` : '已暂停'}</p></div><div className="target-actions"><label className="sr-only" htmlFor="target">选择实验目标</label><select id="target" value={r.target} onChange={e => act(engine => { engine.target(focus, +e.target.value); })}>{ELEMENTS.slice(0, Math.min(PLAYABLE_ELEMENTS, max + 1)).map(e => <option key={e.z} value={e.z}>{e.symbol} · {e.name}{e.z > max ? ' · 下一发现' : ''}</option>)}</select>{max < PLAYABLE_ELEMENTS && <button className="text-button accent" data-opening-target={focus === 1 && max === 1 ? "explore" : undefined} onClick={() => act(e => { e.target(focus, max + 1, true); })}>探索 {element(max + 1).symbol}<ArrowRight size={14}/></button>}</div></div>
         <div className="chamber-footer"><span>单次成功率 {(probability(r.target, focus) * 100).toPrecision(3)}%</span><span>{parallel > 1 ? `批量生产 ×${parallel}` : ''}</span></div>
       </section>
       <aside className="control-column"><section className="panel upgrades-panel"><div className="panel-heading"><div><span className="eyebrow">EXPERIMENT CONTROL</span><h2>实验控制</h2></div><Settings2 size={18} className="muted"/></div><div className="bulk-control"><span title="仅影响升级购买数量，不影响探索次数、实验样本或成功率">升级数量</span><div role="group" aria-label="升级数量（仅影响升级，不影响探索次数与实验样本）">{([1, 10, 100, 'max'] as const).map(n => <button className={bulk === n ? 'selected' : ''} onClick={() => setBulk(n)} key={n}>{n === 'max' ? 'MAX' : `×${n}`}</button>)}</div></div>{(['atoms', 'speed', 'yield'] as Upgrade[]).map(upgradeCard)}{focus > 1 && upgradeCard('capacity')}<div className="capacity-meter"><div className="capacity-values"><div><span>本机速度</span><strong data-testid="current-rate">{fmt(eventRate(r))}<small> 次/秒</small></strong></div><div><span>速度上限</span><strong>{fmt(capacity(r))}<small> 次/秒</small></strong></div></div><div className="progress" role="progressbar" aria-label="当前速度占上限" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, Math.round(eventRate(r).div(capacity(r)).mul(100).toNumber()))}><i style={{ width: `${Math.min(100, eventRate(r).div(capacity(r)).mul(100).toNumber())}%` }}/></div>{(!r.active || eventRate(r).gte(capacity(r).mul(.99))) && <p>{r.active ? '满负荷' : '已暂停'}</p>}</div></section>

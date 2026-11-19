@@ -1,5 +1,5 @@
 import type { Module, Upgrade } from './types';
-export const GAME_VERSION = '0.2.4';
+export const GAME_VERSION = '0.2.5';
 export const PLAYABLE_ELEMENTS = 20;
 export const FINAL_ELEMENT = 20;
 export const REACTORS = [
