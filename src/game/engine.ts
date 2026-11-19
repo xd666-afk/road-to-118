@@ -1,4 +1,5 @@
 import { D, Big, finiteNumber } from './numbers';
+import type { Amount } from './numbers';
 import { abilityBonuses } from './abilityProgress';
 import { ACHIEVEMENTS, CALCIUM_ELEMENT, FINAL_ELEMENT, MODULES, OFFLINE_LIMIT, PLAYABLE_ELEMENTS, REACTORS, SAVE_VERSION, XENON_ELEMENT, productionParallel } from './config';
 import { coinPerEvent, eventRate, firstDiscoveryRate, maxAffordable, price, probability, usefulAtomPurchase } from './economy';
@@ -51,7 +52,7 @@ export class Engine {
     const r = this.state.reactors[id - 1];
     if (!r?.built) return;
     r.active = !r.active;
-    if (id === 1 && r.active && this.state.firstRun?.step === 'start') this.state.firstRun = { step: 'sample' };
+    if (id === 1 && r.active && this.state.firstRun?.step === 'start') this.state.firstRun = { step: 'charge' };
   }
 
   beginOpening() {
@@ -70,7 +71,7 @@ export class Engine {
     const s = this.state, r = s.reactors[id - 1];
     if (!r?.built || !Number.isInteger(z) || z < 1 || z > Math.min(PLAYABLE_ELEMENTS, discoveredMax(s) + 1)) return false;
     if (id === 1 && z === 2 && s.firstRun) {
-      if (s.firstRun.step === 'welcome' || s.firstRun.step === 'start' || s.firstRun.step === 'sample') return false;
+      if (s.firstRun.step === 'welcome' || s.firstRun.step === 'start' || s.firstRun.step === 'charge' || s.firstRun.step === 'sample') return false;
       if (s.firstRun.step !== 'helium') {
         s.firstRun = { step: 'helium', remaining: FIRST_HELIUM_SECONDS };
         s.settings.guideDismissed = true;
@@ -82,6 +83,7 @@ export class Engine {
   }
   buy(id: number, key: Upgrade, count: number | 'max'): number {
     const s = this.state, r = s.reactors[id - 1];
+    if (s.firstRun?.step === 'charge') return 0;
     if (!r?.built || !(key in r.upgrades) || (key === 'capacity' && id === 1)) return 0;
     const n = count === 'max' ? maxAffordable(r, key, s.coins) : Math.max(0, Math.floor(count));
     if (!n || n > 1e7 - r.upgrades[key]) return 0;
@@ -198,7 +200,36 @@ export class Engine {
     }
     if (online && r.exploring && z < PLAYABLE_ELEMENTS) this.target(r.id, Math.min(PLAYABLE_ELEMENTS, discoveredMax(s) + 1), true);
   }
-  /** The sole authority for all income. Canvas never calls this method. */
+  canManualPulse(reactorId: number): boolean {
+    const r = this.state.reactors[reactorId - 1];
+    const step = this.state.firstRun?.step;
+    return Number.isInteger(reactorId) && !!r?.built && r.active
+      && (step === undefined || step === 'free' || (step === 'charge' && reactorId === 1));
+  }
+
+  /** Immediate collision energy and research data, independent of simulation time. */
+  manualPulse(reactorId: number): { energy: Amount; data: Amount } | null {
+    if (!this.canManualPulse(reactorId)) return null;
+    const s = this.state;
+    const r = s.reactors[reactorId - 1];
+    const bonuses = s.activeAbilities?.length ? abilityBonuses(s) : null;
+    const energyMultiplier = bonuses?.energy ? D(100 + bonuses.energy).div(100) : null;
+    const dataMultiplier = bonuses?.data ? D(100 + bonuses.data).div(100) : null;
+    const events = Big.max(D(2), eventRate(r).mul(D('0.055')).floor());
+    const baseGain = events.mul(coinPerEvent(r));
+    const energy = energyMultiplier ? baseGain.mul(energyMultiplier) : baseGain;
+    const data = dataMultiplier ? events.mul(dataMultiplier) : events;
+    r.events = r.events.plus(events);
+    s.stats.events = s.stats.events.plus(events);
+    s.coins = s.coins.plus(energy);
+    s.stats.earned = s.stats.earned.plus(energy);
+    s.data = s.data.plus(data);
+    s.stats.peak = Big.max(s.stats.peak, s.coins);
+    if (s.stats.events.gte(1)) this.award('collision');
+    if (s.firstRun?.step === 'charge' && s.coins.gte(price(r, 'atoms'))) s.firstRun = { step: 'sample' };
+    return { energy, data };
+  }
+  /** The sole authority for automatic income. Canvas never calls this method. */
   step(seconds: number, online = true) {
     if (!Number.isFinite(seconds) || seconds <= 0) return;
     const s = this.state; s.elapsed += seconds;

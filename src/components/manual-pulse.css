@@ -1,0 +1,304 @@
+/* 手动碰撞层：覆盖观察窗的透明交互层，特效全部 pointer-events:none。 */
+.manual-pulse{
+  position:absolute;
+  inset:0;
+  z-index:4;
+  overflow:hidden;
+  isolation:isolate;
+  border-radius:2px;
+  pointer-events:none;
+  user-select:none;
+  --mp-gold:#e0b879;
+  --mp-cold:#f1f5ee;
+  --mp-ion:#86cfe8;
+}
+
+/* 整块观察窗就是一个原生按钮，背景透明，始终露出底层旧素材。 */
+.manual-pulse__hit{
+  position:absolute;
+  inset:0;
+  z-index:1;
+  display:block;
+  width:100%;
+  height:100%;
+  margin:0;
+  padding:0;
+  border:0;
+  border-radius:2px;
+  background:transparent;
+  color:inherit;
+  font:inherit;
+  cursor:crosshair;
+  pointer-events:auto;
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+  appearance:none;
+}
+.manual-pulse__hit:focus{outline:none}
+.manual-pulse__hit:focus-visible{
+  outline:1px solid color-mix(in srgb,var(--mp-gold) 78%,transparent);
+  outline-offset:-5px;
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--mp-ion) 22%,transparent);
+}
+.manual-pulse.is-disabled .manual-pulse__hit{cursor:not-allowed}
+
+/* 中央准星：细线、暗金 + 冷白，不遮挡仪器照片。 */
+.mp-reticle{
+  position:absolute;
+  left:50%;
+  top:45%;
+  width:48%;
+  aspect-ratio:1;
+  transform:translate(-50%,-50%);
+  opacity:.42;
+  transition:opacity .18s ease,transform .12s ease-out;
+  pointer-events:none;
+}
+.mp-reticle-ring{
+  position:absolute;
+  inset:0;
+  border:1px solid color-mix(in srgb,var(--mp-gold) 52%,transparent);
+  border-radius:50%;
+  box-shadow:inset 0 0 18px color-mix(in srgb,var(--mp-ion) 11%,transparent),0 0 16px rgba(0,0,0,.28);
+}
+.mp-reticle-ring::after{
+  content:'';
+  position:absolute;
+  inset:21%;
+  border:1px solid color-mix(in srgb,var(--mp-ion) 34%,transparent);
+  border-radius:50%;
+}
+.mp-reticle-core{
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:13%;
+  aspect-ratio:1;
+  transform:translate(-50%,-50%);
+  border:1px solid color-mix(in srgb,var(--mp-gold) 66%,transparent);
+  border-radius:50%;
+  background:radial-gradient(circle,color-mix(in srgb,var(--mp-ion) 20%,transparent),transparent 72%);
+}
+.mp-reticle-core::before,
+.mp-reticle-core::after{
+  content:'';
+  position:absolute;
+  left:50%;
+  top:50%;
+  background:color-mix(in srgb,var(--mp-gold) 62%,transparent);
+}
+.mp-reticle-core::before{width:1px;height:190%;transform:translate(-50%,-50%)}
+.mp-reticle-core::after{width:190%;height:1px;transform:translate(-50%,-50%)}
+.mp-tick{
+  position:absolute;
+  background:color-mix(in srgb,var(--mp-gold) 56%,transparent);
+}
+.mp-tick--n{left:50%;top:-4px;width:1px;height:9px;transform:translateX(-50%)}
+.mp-tick--s{left:50%;bottom:-4px;width:1px;height:9px;transform:translateX(-50%)}
+.mp-tick--e{right:-4px;top:50%;width:9px;height:1px;transform:translateY(-50%)}
+.mp-tick--w{left:-4px;top:50%;width:9px;height:1px;transform:translateY(-50%)}
+
+.manual-pulse__hit:hover .mp-reticle,
+.manual-pulse__hit:focus-visible .mp-reticle{opacity:.86}
+.manual-pulse__hit:enabled:active .mp-reticle{opacity:1;transform:translate(-50%,-50%) scale(.91)}
+.manual-pulse__hit:hover .mp-reticle-ring,
+.manual-pulse__hit:focus-visible .mp-reticle-ring{
+  border-color:color-mix(in srgb,var(--mp-gold) 76%,transparent);
+  box-shadow:inset 0 0 22px color-mix(in srgb,var(--mp-ion) 16%,transparent),0 0 22px rgba(0,0,0,.32);
+}
+.manual-pulse.is-disabled .mp-reticle{opacity:.18}
+.manual-pulse.is-disabled .mp-reticle-ring,
+.manual-pulse.is-disabled .mp-reticle-core{border-color:#6b756f}
+
+/* 底部短提示。 */
+.mp-hint{
+  position:absolute;
+  left:50%;
+  bottom:4.5%;
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  max-width:90%;
+  padding:3px 8px;
+  transform:translateX(-50%);
+  border:1px solid color-mix(in srgb,var(--mp-gold) 26%,transparent);
+  border-radius:999px;
+  background:rgba(6,13,15,.62);
+  box-shadow:0 4px 14px rgba(0,0,0,.34);
+  color:#dcd2bc;
+  font:10px/1.35 var(--mono);
+  letter-spacing:.7px;
+  white-space:nowrap;
+  pointer-events:none;
+}
+.mp-hint-dot{
+  flex:none;
+  width:4px;
+  height:4px;
+  border-radius:50%;
+  background:var(--mp-gold);
+  box-shadow:0 0 6px color-mix(in srgb,var(--mp-gold) 80%,transparent);
+}
+.mp-hint-label{overflow:hidden;text-overflow:ellipsis}
+.mp-combo{
+  flex:none;
+  color:var(--mp-ion);
+  font:600 9px/1 var(--mono);
+  letter-spacing:.5px;
+  opacity:0;
+  transition:opacity .12s linear;
+}
+.mp-combo.is-on{opacity:1}
+.manual-pulse.is-disabled .mp-hint{opacity:.62}
+.manual-pulse.is-disabled .mp-hint-dot{background:#77807a;box-shadow:none}
+
+/* 特效层：不接收指针事件，点击全部落到原生按钮上。 */
+.mp-fx{
+  position:absolute;
+  inset:0;
+  z-index:2;
+  pointer-events:none;
+}
+.mp-fx-group{
+  position:absolute;
+  width:0;
+  height:0;
+  pointer-events:none;
+  will-change:transform;
+}
+
+.mp-core{
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:62px;
+  height:62px;
+  margin:-31px 0 0 -31px;
+  border-radius:50%;
+  background:radial-gradient(circle,#fff 0 10%,color-mix(in srgb,var(--mp-gold) 82%,transparent) 26%,color-mix(in srgb,var(--mp-ion) 34%,transparent) 54%,transparent 72%);
+  opacity:0;
+  animation:mp-core .34s cubic-bezier(.2,.72,.3,1) forwards;
+}
+.mp-ring,
+.mp-ring--echo{
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:26px;
+  height:26px;
+  margin:-13px 0 0 -13px;
+  border:1px solid color-mix(in srgb,var(--mp-gold) 72%,transparent);
+  border-radius:50%;
+  box-shadow:0 0 12px color-mix(in srgb,var(--mp-gold) 32%,transparent),inset 0 0 10px color-mix(in srgb,var(--mp-ion) 24%,transparent);
+  opacity:0;
+  animation:mp-ring .56s cubic-bezier(.16,.62,.28,1) forwards;
+}
+.mp-ring--echo{
+  border-color:color-mix(in srgb,var(--mp-ion) 68%,transparent);
+  box-shadow:0 0 10px color-mix(in srgb,var(--mp-ion) 30%,transparent);
+  animation:mp-ring-echo .64s cubic-bezier(.16,.62,.28,1) .06s both;
+}
+
+.mp-sparks{
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:0;
+  height:0;
+}
+.mp-sparks i{
+  position:absolute;
+  left:-1px;
+  top:-5px;
+  width:2px;
+  height:11px;
+  background:linear-gradient(to top,transparent,var(--mp-cold));
+  opacity:0;
+  transform-origin:50% 50%;
+  animation:mp-spark .42s ease-out forwards;
+}
+.mp-sparks i:nth-child(3n){background:linear-gradient(to top,transparent,var(--mp-gold))}
+.mp-sparks i:nth-child(3n+1){background:linear-gradient(to top,transparent,var(--mp-ion))}
+
+.mp-gains{
+  position:absolute;
+  left:var(--mp-text-x,0px);
+  top:calc(11px + var(--mp-text-y,0px));
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:1px;
+  transform:translate(-50%,0);
+  white-space:nowrap;
+  opacity:0;
+  text-shadow:0 1px 4px rgba(0,0,0,.8),0 0 14px rgba(0,0,0,.5);
+  animation:mp-gain .86s cubic-bezier(.2,.75,.3,1) forwards;
+}
+.mp-gain{
+  font:700 12px/1.35 var(--mono);
+  letter-spacing:.4px;
+}
+.mp-gain--energy{color:#f2d39c}
+.mp-gain--data{color:#a6e2f6;font-size:11px}
+.mp-fx-group:not(.is-latest) .mp-gains{display:none}
+
+/* 减少动态效果：只保留静态亮核与结果文字，不做位移、扩散或全屏闪烁。 */
+.mp-fx-group.is-reduced .mp-core{
+  opacity:.9;
+  transform:scale(1.05);
+  animation:none;
+}
+.mp-fx-group.is-reduced .mp-ring{
+  opacity:.62;
+  transform:scale(2.1);
+  animation:none;
+}
+.mp-fx-group.is-reduced .mp-ring--echo{display:none}
+.mp-fx-group.is-reduced .mp-sparks{display:none}
+.mp-fx-group.is-reduced .mp-gains{
+  opacity:1;
+  transform:translate(-50%,0);
+  animation:none;
+}
+.manual-pulse.is-reduced .mp-reticle,
+.manual-pulse.is-reduced .mp-combo{animation:none;transition:none}
+.manual-pulse.is-reduced .manual-pulse__hit:enabled:active .mp-reticle{transform:translate(-50%,-50%)}
+@keyframes mp-core{
+  0%{opacity:0;transform:scale(.18)}
+  16%{opacity:1}
+  100%{opacity:0;transform:scale(calc(1.15 + var(--mp-combo,0) * .16))}
+}
+@keyframes mp-ring{
+  0%{opacity:.95;transform:scale(.32)}
+  68%{opacity:.5}
+  100%{opacity:0;transform:scale(calc(4 + var(--mp-combo,0) * .45))}
+}
+@keyframes mp-ring-echo{
+  0%{opacity:0;transform:scale(.4)}
+  14%{opacity:.7}
+  100%{opacity:0;transform:scale(calc(5.2 + var(--mp-combo,0) * .5))}
+}
+@keyframes mp-spark{
+  0%{opacity:0;transform:rotate(var(--a)) translateY(-7px) scaleY(.55)}
+  18%{opacity:.95}
+  100%{opacity:0;transform:rotate(var(--a)) translateY(-31px) scaleY(.15)}
+}
+@keyframes mp-gain{
+  0%{opacity:1;transform:translate(-50%,6px)}
+  72%{opacity:1}
+  100%{opacity:0;transform:translate(-50%,-31px)}
+}
+
+/* 屏幕阅读器专用文本。 */
+.mp-sr{
+  position:absolute!important;
+  width:1px;
+  height:1px;
+  margin:-1px;
+  padding:0;
+  overflow:hidden;
+  clip:rect(0 0 0 0);
+  clip-path:inset(50%);
+  white-space:nowrap;
+  border:0;
+}

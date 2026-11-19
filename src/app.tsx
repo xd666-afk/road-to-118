@@ -9,6 +9,7 @@ import { deserialize, loadLocal, saveLocal, serialize } from './game/save';
 import type { GameState, Module, Upgrade, WorkMode } from './game/types';
 import { ELEMENTS, KNOWLEDGE, SCIENCE_NOTE, baikeUrl, element } from './data/elements';
 import Particles from './components/Particles';
+import ManualPulse from './components/ManualPulse';
 import Modal from './components/Modal';
 import Tutorial from './components/Tutorial';
 import Onboarding from './components/Onboarding';
@@ -42,7 +43,7 @@ export default function App() {
   const archiveSection = useRef<HTMLElement>(null), tableScroll = useRef<HTMLDivElement>(null), importInput = useRef<HTMLInputElement>(null);
   const engine = engineRef.current, s = engine.state, r = s.reactors[focus - 1], c = REACTORS[focus - 1];
   const opening = s.firstRun?.step;
-  const spotlight = opening === 'welcome' || opening === 'start' || opening === 'sample' || opening === 'explore';
+  const spotlight = opening === 'welcome' || opening === 'start' || opening === 'charge' || opening === 'sample' || opening === 'explore';
   const visualPool = reactorDisplayPool(s, r);
   const max = discoveredMax(s), archived = archivedCount(s), scientific = s.settings.scientific;
   const fmt = (v: Parameters<typeof format>[0]) => format(v, scientific);
@@ -103,15 +104,16 @@ export default function App() {
     }
     rerender(v => v + 1);
   }
-  function act(fn: (e: Engine) => void) {
+  function act<T>(fn: (e: Engine) => T): T {
     const e = engineRef.current;
     const priorStep = e.state.firstRun?.step;
-    fn(e);
+    const output = fn(e);
     if (priorStep !== e.state.firstRun?.step && !saveBlocked) {
       const result = saveLocal(e.state);
       if (!result.ok) setMessage(result.message);
     }
     collect();
+    return output;
   }
   const skipOpening = useCallback(() => {
     const e = engineRef.current;
@@ -250,7 +252,15 @@ export default function App() {
     <div className="lab-grid">
       <section className="panel reactor-panel"><div className="panel-heading"><div><span className="eyebrow">REACTION CHAMBER</span><h2>{c.name}<span className="tiny-label">{c.roman} 级</span></h2></div><button className={`status-pill ${r.active ? '' : 'paused'}`} data-opening-target={focus === 1 ? "start" : undefined} onClick={() => act(e => e.toggleReactor(focus))}>{r.active ? <><i/>运行中 <CirclePause size={13}/></> : <><CirclePlay size={13}/>{opening === "start" ? "开始实验" : "已暂停"}</>}</button></div>
         <div className="reactor-switch"><label htmlFor="reactor-selector">仪器</label><select id="reactor-selector" aria-label="切换反应容器" value={focus} onChange={e => setFocus(+e.target.value)}>{REACTORS.filter(t => s.reactors[t.id - 1].built).map(t => <option key={t.id} value={t.id}>{t.roman} 级 · {t.name}{!s.reactors[t.id - 1].active && ' · 已暂停'}</option>)}</select><button className="text-button" onClick={() => goToTab('research')}>研发仪器<ArrowRight size={13}/></button></div>
-        <div className={`device device-${focus} ${focus > 5 ? 'device-schematic' : ''}`}><div className="device-photo" style={focus <= 5 ? { backgroundPosition: `${focus <= 3 ? (focus - 1) * 50 : (focus - 4) * 100}% center` } : undefined}/><div className="device-readout readout-left"><span>CHAMBER {c.roman}</span><strong>{fmt(activeAtoms(r))}</strong><small>样本</small></div><div className="device-readout readout-right"><span>THROUGHPUT</span><strong>{fmt(eventRate(r))}<small>次/秒</small></strong><small>实验速度</small></div><div className="viewport"><Particles count={Math.min(60, activeAtoms(r).toNumber())} mix={visualPool} speed={r.upgrades.speed} reduced={s.settings.reducedMotion} active={r.active} flash={flash}/></div><span className="visual-note">粒子示意</span><span className="device-id">R118 — {String(focus).padStart(3, '0')}</span></div>
+        <div className={`device device-${focus} ${focus > 5 ? 'device-schematic' : ''}`}><div className="device-photo" style={focus <= 5 ? { backgroundPosition: `${focus <= 3 ? (focus - 1) * 50 : (focus - 4) * 100}% center` } : undefined}/><div className="device-readout readout-left"><span>CHAMBER {c.roman}</span><strong>{fmt(activeAtoms(r))}</strong><small>样本</small></div><div className="device-readout readout-right"><span>THROUGHPUT</span><strong>{fmt(eventRate(r))}<small>次/秒</small></strong><small>实验速度</small></div><div className="viewport">
+          <Particles count={Math.min(60, activeAtoms(r).toNumber())} mix={visualPool} speed={r.upgrades.speed} reduced={s.settings.reducedMotion} active={r.active} flash={flash}/>
+          <ManualPulse key={focus} enabled={engine.canManualPulse(focus)} reducedMotion={s.settings.reducedMotion}
+            tutorialTarget={focus === 1} label={r.active ? '点击触发碰撞' : '仪器已暂停'}
+            onPulse={() => {
+              const reward = act(e => e.manualPulse(focus));
+              return reward ? { energy: fmt(reward.energy), data: fmt(reward.data) } : null;
+            }}/>
+        </div><span className="visual-note">粒子示意</span><span className="device-id">R118 — {String(focus).padStart(3, '0')}</span></div>
         <div className="target-control"><div className="target-element" style={{ '--element': element(r.target).color } as CSSProperties}><small>{r.target}</small><strong>{element(r.target).symbol}</strong></div><div className="target-copy"><span className="eyebrow">{targetKnown ? '重复生产' : '正在探索'}</span><h3>{element(r.target).name}<span>{element(r.target).english}</span></h3><p>{r.active && r.target === 2 && s.firstRun?.step === "helium" ? `首次合成 · 约 ${Math.ceil(s.firstRun.remaining)} 秒` : r.active ? `平均等待${intervalLabel(1 / targetRate.toNumber()).replace(' / 次', '')} · 随机触发` : '已暂停'}</p></div><div className="target-actions"><label className="sr-only" htmlFor="target">选择实验目标</label><select id="target" value={r.target} onChange={e => act(engine => { engine.target(focus, +e.target.value); })}>{ELEMENTS.slice(0, Math.min(PLAYABLE_ELEMENTS, max + 1)).map(e => <option key={e.z} value={e.z}>{e.symbol} · {e.name}{e.z > max ? ' · 下一发现' : ''}</option>)}</select>{max < PLAYABLE_ELEMENTS && <button className="text-button accent" data-opening-target={focus === 1 && max === 1 ? "explore" : undefined} onClick={() => act(e => { e.target(focus, max + 1, true); })}>探索 {element(max + 1).symbol}<ArrowRight size={14}/></button>}</div></div>
         <div className="chamber-footer"><span>{targetKnown ? '单次成功率' : '单次发现率'} {(targetChance * 100).toPrecision(3)}%</span><span>{parallel > 1 ? `批量生产 ×${parallel}` : ''}</span></div>
         <div className="mix-control">

@@ -23,6 +23,7 @@ export function pilot(e: Engine, strategy: Strategy) {
   const s = e.state, max = discoveredMax(s);
   if (s.firstRun?.step === 'welcome') { e.beginOpening(); return; }
   if (s.firstRun?.step === 'start') { e.toggleReactor(1); return; }
+  if (s.firstRun?.step === 'charge') { e.manualPulse(1); return; }
   if (s.firstRun?.step === 'sample') { e.buy(1, 'atoms', 1); return; }
   if (s.firstRun?.step === 'explore') { e.target(1, 2, true); return; }
   if (s.firstRun?.step === 'helium') return;

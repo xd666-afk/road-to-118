@@ -16,6 +16,7 @@ describe('authoritative progression', () => {
     e.advance(20);
     expect(e.target(1, 2, true)).toBe(false);
     expect(e.state.elements[1].discovered).toBe(false);
+    expect(e.manualPulse(1)).not.toBeNull();
     expect(e.buy(1, 'atoms', 1)).toBe(1);
     expect(e.target(1, 2, true)).toBe(true);
     e.advance(2);
