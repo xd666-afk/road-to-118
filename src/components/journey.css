@@ -1,4 +1,13 @@
-.nexus-coach { margin-bottom: 18px; border-radius: 6px; }
+.lab-guidance { margin-bottom: 18px; }
+.lab-guidance .nexus-coach { border-radius: 6px; }
+.lab-guidance .mission-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(185px, auto);
+  align-items: center;
+  gap: 12px 24px;
+}
+.lab-guidance .mission-card p { margin: 8px 0 0; }
+.lab-guidance .mission-card .goal-action { margin: 0; }
 .journey-stages { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 0 0 22px; }
 .journey-stage { display: flex; align-items: center; gap: 12px; padding: 14px 16px; min-width: 0; text-align: left; background: #172023; border: 1px solid #36433f; border-radius: 5px; }
 .journey-stage:hover { border-color: var(--gold); background: #1c2828; }
@@ -24,6 +33,7 @@
 /* Mobile: keep the stage symbols, let cards grow with their text, and give
    lab controls a real 44px touch target. Scoped so the periodic table is untouched. */
 @media (max-width: 620px) {
+  .lab-guidance .mission-card { grid-template-columns: minmax(0, 1fr); padding: 12px 14px; }
   .app-shell .journey-stages { gap: 6px; margin-bottom: 15px; }
   .app-shell .journey-stage { flex-direction: column; align-items: stretch; gap: 2px; height: auto; min-height: 0; padding: 9px 8px; }
   .app-shell .journey-index { display: none; }

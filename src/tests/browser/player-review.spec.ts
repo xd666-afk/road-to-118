@@ -9,6 +9,7 @@ test('welcome waits for the player and mobile guide holds each step before advan
   await page.goto('/');
   const welcome = page.getByRole('dialog', { name: '欢迎来到《通往118》' });
   await expect(welcome).toContainText('我是你的实验助手');
+  await expect(page.locator('.lab-guidance')).toHaveCount(0);
   await expect(page.locator('#root')).toHaveAttribute('inert', '');
   await page.clock.runFor(1500);
   await expect(welcome).toBeVisible();
@@ -17,6 +18,7 @@ test('welcome waits for the player and mobile guide holds each step before advan
   const guide = page.getByRole('region', { name: '开局操作引导' });
   const start = page.getByRole('button', { name: '开始实验', exact: true });
   await expect(guide).toContainText('第 1 步');
+  await expect(page.locator('.lab-guidance')).toHaveCount(0);
   await expect(start).toBeInViewport();
   const nav = page.locator('.main-nav');
   await expect(nav).toHaveAttribute('inert', '');
@@ -62,6 +64,18 @@ test('welcome waits for the player and mobile guide holds each step before advan
   await expect(card.getByRole('button', { name: '提交 1 单位至档案' })).toBeEnabled();
   await card.getByRole('button', { name: '关闭弹窗' }).click();
   await expect(page.locator('#target')).toHaveValue('2');
+  await expect(page.getByRole('region', { name: '下一步', exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: '新手实验引导' })).toHaveCount(0);
+});
+
+test('skipping the spotlight switches to the single next-step panel', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('dialog', { name: '欢迎来到《通往118》' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  const next = page.getByRole('region', { name: '下一步', exact: true });
+  await expect(next.getByRole('button', { name: '补充第一份氢样本' })).toBeVisible();
+  await expect(page.getByRole('region', { name: '新手实验引导' })).toHaveCount(0);
 });
 
 test('player review: all six sections fit phone widths; pause survives reload', async ({page}) => {

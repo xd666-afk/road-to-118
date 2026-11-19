@@ -81,6 +81,7 @@ test('online first discovery opens exactly one knowledge card and can be reread'
 
 test('opening hints lead from Be to a new reactor, parallel production and a real 50-unit archive', async ({page})=>{
   const e=new Engine(createState(61));e.state.coins=D(100000);
+  e.state.settings.guideDismissed = true;
   e.buy(1,'atoms',20);
   for(let z=2;z<=4;z++){e.target(1,z);e.state.reactors[0].discoveryHazard=0;e.step(.1);}
   e.state.coins=D(2000);e.state.data=D(2000);e.state.notices=[];
@@ -101,7 +102,9 @@ test('mobile first upgrade is reachable without scrolling',async({page})=>{
   const state=createState(62);state.coins=D(10);state.reactors[0].discoveryHazard=100;
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(state)});
   await page.setViewportSize({width:360,height:800});await page.goto('/');
-  const action=page.locator('.opening-quick-action').getByRole('button',{name:'补充第一份氢样本'});
+  const coach = page.getByRole('region', { name: '新手实验引导' });
+  const action = coach.getByRole('button', { name: '引导操作：补充第一份氢样本' });
+  await expect(page.getByRole('region', { name: '下一步', exact: true })).toHaveCount(0);
   await expect(action).toBeInViewport();await action.click();
   await expect(page.getByText('等级 1',{exact:true})).toBeVisible();
 });
@@ -302,7 +305,7 @@ test('V opens after Ar and reaches Ca; its graphic and representative samples us
   e.state.reactors.forEach(r=>r.active=false);e.state.reactors[4].active=true;e.state.reactors[4].discoveryHazard=0;e.state.notices=[];
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(e.state)});
   await page.setViewportSize({width:1440,height:1000});await page.goto('/');
-  await page.locator('.mission-card').getByRole('button',{name:'建造 V 级仪器'}).click();
+  await page.locator('.lab-guidance').getByRole('button',{name:/建造 V 级仪器/}).click();
   await expect(page.getByRole('dialog')).toContainText('新元素发现 · 钙');await page.keyboard.press('Escape');
   await expect(page.getByRole('heading',{name:/回旋加速器/})).toBeVisible();
   await expect(page.locator('canvas')).toHaveAttribute('aria-label',/展示元素：K、Ca。/);
