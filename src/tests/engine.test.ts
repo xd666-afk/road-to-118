@@ -4,8 +4,9 @@ import { D, format } from '../game/numbers';
 import { activeAtoms, eventRate, income, maxAffordable, price, probability } from '../game/economy';
 import { deserialize, serialize } from '../game/save';
 import { ELEMENTS, KNOWLEDGE } from '../data/elements';
+import { discoverThrough } from './discovery-fixture';
 const rich = () => { const e = new Engine(createState(123, 100000)); e.state.coins = D('1e100'); e.state.data = D('1e100'); return e; };
-function discoverThrough(e: Engine, z: number) { for (let next = discoveredMax(e.state) + 1; next <= z; next++) { e.target(1, next); e.state.reactors[0].discoveryHazard = 0; e.step(.1); } }
+
 
 describe('authoritative progression', () => {
   it('first He synthesis waits for the player and resumes after save, offline time, and pause', () => {
@@ -35,7 +36,7 @@ describe('authoritative progression', () => {
     expect(resumed.state.reactors[0].target).toBe(2);
   });
   it('starts with exactly two H active samples, no coins; time yields money', () => { const e = new Engine(createState(1)); expect(activeAtoms(e.state.reactors[0]).eq(2)).toBe(true); expect(e.state.coins.eq(0)).toBe(true); expect(discoveredMax(e.state)).toBe(1); e.step(1); expect(e.state.coins.gt(0)).toBe(true); });
-  it('rejects skipped or future targets; discovers ordered elements through Xe exactly once', () => { const e = rich(); expect(e.target(1, 3)).toBe(false); discoverThrough(e, 54); expect(discoveredMax(e.state)).toBe(54); expect(e.target(1, 55)).toBe(false); expect(e.state.notices.filter(n => n.kind === 'discovery').map(n => n.z)).toEqual(Array.from({length:53},(_,i)=>i+2)); e.step(100); expect(e.state.notices.filter(n => n.kind === 'discovery')).toHaveLength(53); });
+  it('rejects skipped or future targets; discovers ordered elements through Xe exactly once', () => { const e = rich(); expect(e.target(1, 3)).toBe(false); expect(discoverThrough(e, 54)).toEqual(Array.from({length:53},(_,i)=>i+2)); expect(discoveredMax(e.state)).toBe(54); expect(e.target(1, 55)).toBe(false); const before = e.state.noticeSeq; e.step(100); expect(e.state.notices.filter(n => n.id > before && n.kind === 'discovery')).toEqual([]); });
   it('allows discovery independently of archiving, and gates construction at Be / N', () => { const e = rich(); expect(e.build(2)).toBe(false); discoverThrough(e, 4); expect(archivedCount(e.state)).toBe(0); expect(e.build(2)).toBe(true); expect(e.build(2)).toBe(false); expect(e.build(3)).toBe(false); discoverThrough(e, 7); expect(e.build(3)).toBe(true); expect(e.state.reactors.slice(0,3).every(r => r.built)).toBe(true); expect(e.state.reactors.slice(3).every(r=>!r.built)).toBe(true); });
   it('archives in integer installments, once, with no negative stock or active-sample drain', () => { const e = rich(), h = e.state.elements[0]; h.inventory = D(49); h.totalProduced = D(49); expect(e.deposit(1)).toBe(49); expect(h.archived).toBe(false); expect(e.deposit(1)).toBe(0); h.inventory = D(2); h.totalProduced = D(51); expect(e.deposit(1)).toBe(1); expect(h.archived).toBe(true); expect(h.inventory.eq(1)).toBe(true); expect(e.deposit(1)).toBe(0); expect(activeAtoms(e.state.reactors[0]).eq(2)).toBe(true); expect(e.state.notices.filter(n => n.kind === 'archive')).toHaveLength(1); });
   it('keeps Ca as a historical milestone, then completes Xe and full H–Xe separately', () => {

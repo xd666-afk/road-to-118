@@ -7,6 +7,7 @@ import { FINAL_ELEMENT, PLAYABLE_ELEMENTS, REACTORS } from '../src/game/config';
 import type { Upgrade } from '../src/game/types';
 import { activateElementAbility, availableAbilities } from '../src/game/abilityProgress';
 import { applyAdvice, recommend } from '../src/game/advisor';
+import { discoveryStage, stageReadiness } from '../src/game/discovery';
 
 const CADENCE = { balanced: 6, automation: 10, newcomer: 8, guided: 8 } as const;
 type Strategy = keyof typeof CADENCE;
@@ -65,6 +66,12 @@ export function pilot(e: Engine, strategy: Strategy) {
   const reserve = next ? D(next.buildCoins) : D(0);
   s.automation.reserve = reserve;
   s.automation.feed = s.modules.feed && strategy !== 'balanced';
+  const stage = discoveryStage(max + 1);
+  if (stage && !stageReadiness(s, stage).ready) {
+    applyAdvice(e, recommend(s));
+    s.notices = [];
+    return;
+  }
 
   // At Xe, switch once to the real archive pipeline. Its per-reactor range
   // targeting and the allocation module then deposit the remaining 54 rows.

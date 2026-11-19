@@ -1,6 +1,7 @@
 import { D, Big, finiteNumber } from './numbers';
 import type { Amount } from './numbers';
 import { abilityBonuses } from './abilityProgress';
+import { discoveryStage, observationProgress, observationRate, stageReadiness } from './discovery';
 import { ACHIEVEMENTS, CALCIUM_ELEMENT, FINAL_ELEMENT, MODULES, OFFLINE_LIMIT, PLAYABLE_ELEMENTS, REACTORS, SAVE_VERSION, XENON_ELEMENT, productionParallel } from './config';
 import { coinPerEvent, eventRate, firstDiscoveryRate, maxAffordable, price, probability, usefulAtomPurchase } from './economy';
 import { poisson, random, waitingHazard } from './rng';
@@ -250,6 +251,16 @@ export class Engine {
       const e = s.elements[r.target - 1];
       if (!e.discovered) {
         if (!online || r.target !== discoveredMax(s) + 1) continue;
+        const stage = discoveryStage(r.target);
+        if (stage) {
+          if (r.id !== stage.reactor || !stageReadiness(s, stage).ready) continue;
+          const progress = observationProgress(s, r.target) + observationRate(r, stage, r.target, rate) * seconds;
+          if (progress >= 1 - 1e-12) {
+            delete s.observation;
+            this.produce(r, D(1), true);
+          } else s.observation = { z: r.target, progress };
+          continue;
+        }
         if (r.id === 1 && r.target === 2 && s.firstRun) {
           if (s.firstRun.step === 'helium') {
             s.firstRun.remaining = Math.max(0, s.firstRun.remaining - seconds);
@@ -262,7 +273,7 @@ export class Engine {
           continue;
         }
         // Exponential survival clock: genuine online probability, independent of visual frames.
-        const hazard = firstDiscoveryRate(r, s.reactors, rate).mul(seconds);
+        const hazard = firstDiscoveryRate(r, rate).mul(seconds);
         if (hazard.gte(r.discoveryHazard)) { this.produce(r, D(1), true); r.discoveryHazard = waitingHazard(s); }
         else r.discoveryHazard -= hazard.toNumber();
       } else {

@@ -89,6 +89,10 @@ export function deserialize(text: string): GameState {
   }
   const activeAbilities = savedAbilities(s, raw.activeAbilities);
   if (activeAbilities.length) s.activeAbilities = activeAbilities;
+  if (max >= 10 && max < PLAYABLE_ELEMENTS && raw.observation?.z === max + 1) {
+    const progress = raw.observation.progress;
+    if (typeof progress === 'number' && progress >= 0 && progress < 1) s.observation = { z: max + 1, progress };
+  }
   s.saveVersion = SAVE_VERSION; s.notices = []; return s;
 }
 export function saveLocal(s: GameState): { ok: boolean; message: string } {

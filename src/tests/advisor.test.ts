@@ -59,6 +59,8 @@ describe('progress recommendations', () => {
   it('produces Ne on the highest suitable built reactor, then archives and explores again', () => {
     const e = advanced(); const ne = e.state.elements[9];
     e.state.elements[19].discovered = false;
+    archive(e, 18);
+    Object.assign(e.state.reactors[4].upgrades, { capacity: 1, yield: 2 });
     ne.archived = false; ne.deposited = 38; ne.inventory = D(0);
     const first = recommend(e.state);
     expect(first).toMatchObject({ id: 'neon', action: 'produce', reactor: 5, target: 10 });
@@ -73,7 +75,7 @@ describe('progress recommendations', () => {
     applyAdvice(e, recommend(e.state));
     expect(ne.archived).toBe(true); expect(ne.inventory.eq(8)).toBe(true);
     expect(e.state.stats.neonCompletedAt).not.toBeNull();
-    expect(recommend(e.state)).toMatchObject({ id: 'explore', action: 'explore', target: 20 });
+    expect(recommend(e.state)).toMatchObject({ id: 'observe-20', action: 'explore', target: 20 });
     applyAdvice(e, recommend(e.state));
     expect(e.state.reactors[4]).toMatchObject({ target: 20, exploring: true, active: true });
   });
@@ -122,6 +124,8 @@ describe('progress recommendations', () => {
     expect(recommend(e.state)).toMatchObject({ id: 'build-6', action: 'build', reactor: 6 });
     applyAdvice(e, recommend(e.state));
     expect(e.state.reactors[5].built).toBe(true);
+    expect(recommend(e.state)).toMatchObject({ action: 'upgrade', upgrade: 'capacity', reactor: 6 });
+    for (let i = 0; i < 4; i++) applyAdvice(e, recommend(e.state));
     expect(recommend(e.state)).toMatchObject({ action: 'explore', target: 21, reactor: 6 });
     for (let z = 21; z <= 36; z++) e.state.elements[z - 1].discovered = true;
     expect(recommend(e.state)).toMatchObject({ id: 'build-7', action: 'build', reactor: 7 });

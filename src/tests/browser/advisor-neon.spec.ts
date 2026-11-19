@@ -12,7 +12,9 @@ test('Ne advice archives with a real deposit, then returns the top instrument to
   s.elements[19].discovered = false;
   const ne = s.elements[9]; ne.discovered = true; ne.archived = false; ne.deposited = 38; ne.inventory = D(20); ne.totalProduced = D(58);
   const h = s.elements[0]; h.archived = true; h.deposited = 50; h.totalProduced = D(50);
+  const ar = s.elements[17]; ar.archived = true; ar.deposited = 50; ar.totalProduced = D(50);
   s.reactors.forEach((r, i) => { r.built = i < 5; r.active = true; r.target = 2; r.exploring = false; r.discoveryHazard = 100000; });
+  Object.assign(s.reactors[4].upgrades, { capacity: 1, yield: 2 });
   s.modules.feed = s.modules.reaction = s.modules.allocation = true;
   s.automation.feed = s.automation.reaction = s.automation.allocation = false;
   await page.addInitScript(({ key, text }) => localStorage.setItem(key, text), { key: KEY, text: serialize(s) });
@@ -28,7 +30,7 @@ test('Ne advice archives with a real deposit, then returns the top instrument to
   await expect(page.locator('.journey-stage').nth(0)).toHaveClass(/done/);
   await expect(page.locator('.journey-stage').nth(0)).toContainText('已完成');
 
-  await page.locator('.mission-card').getByRole('button', { name: '继续探索 · Ca' }).click();
+  await page.locator('.mission-card').getByRole('button', { name: '开始研究 · Ca' }).click();
   await expect(page.locator('#reactor-selector')).toHaveValue('5');
   await expect(page.locator('#target')).toHaveValue('20');
 });

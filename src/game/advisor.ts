@@ -4,6 +4,7 @@ import { archivedCount, discoveredMax, highestReactor, type Engine } from './eng
 import { eventRate, income, price } from './economy';
 import type { GameState, Module, Upgrade } from './types';
 import { abilityBonuses } from './abilityProgress';
+import { discoveryStage, observationProgress, stageReadiness } from './discovery';
 
 export interface Advice {
   id: string; label: string; detail: string; enabled: boolean;
@@ -90,6 +91,31 @@ export function recommend(s: GameState): Advice {
     return build();
   }
   if (max < PLAYABLE_ELEMENTS) {
+    const stage = discoveryStage(max + 1);
+    if (stage) {
+      const { reactor, capacity, tuning, archived, tuned } = stageReadiness(s, stage);
+      const device = REACTORS[stage.reactor - 1], target = max + 1;
+      if (!tuned) {
+        const upgrade = capacity < stage.capacity || price(reactor, 'capacity').lt(price(reactor, 'yield')) ? 'capacity' : 'yield';
+        const cost = price(reactor, upgrade);
+        const detail = `扩容 ${capacity}/${stage.capacity} · 调校 ${tuning}/${stage.tuning}（扩容＋单次收益）。`;
+        return { id: `tune-${device.id}-${upgrade}-${reactor.upgrades[upgrade]}`, label: `培养 ${device.roman} 级 · ${UPGRADES[upgrade].name}`, detail: detail + (s.coins.gte(cost) ? '' : `还差 ${Math.ceil(cost.minus(s.coins).toNumber()).toLocaleString('zh-CN')} 碰撞能。`), enabled: s.coins.gte(cost), action: 'upgrade', reactor: device.id, upgrade };
+      }
+      if (!archived) {
+        const z = stage.specimen, sample = s.elements[z - 1];
+        const producer = s.reactors.find(r => r.built && REACTORS[r.id - 1].softMax >= z) ?? reactor;
+        const enough = sample.inventory.gte(50 - sample.deposited);
+        const producing = producer.active && producer.target === z && !producer.exploring;
+        const symbol = element(z).symbol;
+        return { id: `calibration-${z}`, label: enough ? `收录 ${symbol} · 开放探索` : producing ? `正在生产 ${symbol}` : `生产校准样本 · ${symbol}`,
+          detail: `收录 ${symbol} 至 50 份，开放 ${element(stage.from).symbol}–${element(stage.to).symbol}。已提交 ${sample.deposited}/50，库存 ${Math.floor(sample.inventory.toNumber())}。`,
+          enabled: enough || !producing, action: enough ? 'deposit' : 'produce', target: z, reactor: producer.id };
+      }
+      const running = reactor.active && reactor.target === target && reactor.exploring;
+      return { id: `observe-${target}`, label: running ? `正在研究 · ${element(target).symbol}` : `开始研究 · ${element(target).symbol}`,
+        detail: running ? `观测进度 ${Math.floor(observationProgress(s, target) * 100)}%。升级扩容可缩短观测时间。` : `${device.roman} 级已校准，可开始累积观测进度。`,
+        enabled: !running, action: 'explore', target, reactor: device.id };
+    }
     const waiting = top.active && top.exploring && top.target === max + 1;
     return { id: 'explore', label: waiting ? `正在探索 ${element(max + 1).symbol}` : `继续探索 · ${element(max + 1).symbol}`, detail: waiting ? '每次实验都有机会发现新元素。等待期间可升级设备；平均等待并非倒计时。' : '让最高级仪器连续探索新元素，首次发现后自动前往下一种。钙、锌和氪都只是路线节点。', enabled: !waiting, action: 'explore', reactor: top.id, target: max + 1 };
   }

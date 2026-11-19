@@ -22,4 +22,5 @@ export interface GameState {
   notices: Notice[]; noticeSeq: number;
   firstRun?: FirstRun;
   activeAbilities?: number[];
+  observation?: { z: number; progress: number };
 }

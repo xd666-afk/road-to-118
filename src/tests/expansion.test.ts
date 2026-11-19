@@ -1,16 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { Engine, archivedCount, createState, discoveredMax } from '../game/engine';
 import { D } from '../game/numbers';
-import { capacity, eventRate, firstDiscoveryRate, income, probability } from '../game/economy';
+import { capacity, eventRate, income, probability } from '../game/economy';
+import { observationProgress } from '../game/discovery';
 import { deserialize, serialize } from '../game/save';
 import { reactorDisplayPool } from '../game/visuals';
 import { ATOMIC_PROFILES } from '../data/atomic';
 import { KNOWLEDGE, element } from '../data/elements';
 import { CALCIUM_ELEMENT, PLAYABLE_ELEMENTS, REACTORS, XENON_ELEMENT } from '../game/config';
+import { discoverThrough } from './discovery-fixture';
 
 function discover(e: Engine, z: number) {
   e.state.coins = D('1e40'); e.state.data = D('1e30');
-  for (let n = discoveredMax(e.state) + 1; n <= z; n++) { e.target(1, n); e.state.reactors[0].discoveryHazard = 0; e.step(.1); }
+  for (let n = discoveredMax(e.state) + 1; n <= z; n++) e.state.elements[n - 1].discovered = true;
 }
 function released10Save(version = 1) {
   const e = new Engine(createState(741, 100000)); discover(e, 10); e.build(2); e.build(3);
@@ -84,35 +86,61 @@ describe('H–Xe progression, instrumentation and migration', () => {
     expect(e.build(4)).toBe(true);
     expect(s.coins.eq(balance.minus(price.buildCoins))).toBe(true);
     expect(s.data.eq(0)).toBe(true);
-    e.target(4, 11); e.state.reactors[3].discoveryHazard = 0; e.step(.1);
+    e.buy(4, 'capacity', 1); e.buy(4, 'yield', 2);
+    e.target(4, 11); e.step(60);
     expect(discoveredMax(s)).toBe(11); expect(s.elements[0].deposited).toBe(38);
   });
 
-  it('slows the first Na discovery even when upgraded instruments share the target', () => {
+  it('requires tuning and a reference sample, then preserves active observation through save and offline time', () => {
     const e = new Engine(createState(743));
     discover(e, 10);
     e.build(3);
     e.build(4);
-    e.target(3, 11);
-    e.target(4, 11);
-    const reactors = e.state.reactors;
-    const third = reactors[2], fourth = reactors[3];
-    const normal = firstDiscoveryRate(fourth, reactors);
-    for (const reactor of [third, fourth]) {
-      reactor.upgrades.atoms = 1000;
-      reactor.upgrades.capacity = 40;
-      reactor.discoveryHazard = .8;
-    }
-    const boosted = firstDiscoveryRate(fourth, reactors);
-    expect(boosted.gt(normal)).toBe(true);
-    expect(boosted.plus(firstDiscoveryRate(third, reactors)).lt(D(1).div(24))).toBe(true);
-    e.step(5);
+    e.target(3, 11, true); e.target(4, 11, true);
+    e.step(120);
+    expect(observationProgress(e.state, 11)).toBe(0);
+    e.buy(4, 'capacity', 1); e.buy(4, 'yield', 2);
+    e.step(120);
+    expect(observationProgress(e.state, 11)).toBe(0);
+    const neon = e.state.elements[9];
+    neon.inventory = D(50); neon.totalProduced = D(50); e.deposit(10);
+    e.step(12);
+    const progress = observationProgress(e.state, 11);
+    expect(progress).toBeGreaterThan(0);
+    expect(progress).toBeLessThan(.5);
     expect(discoveredMax(e.state)).toBe(10);
-    e.step(60);
-    expect(discoveredMax(e.state)).toBe(11);
-    e.state.elements[10].inventory = D(0);
-    e.step(5, false);
-    expect(e.state.elements[10].inventory.gt(50)).toBe(true);
+    for (let i = 0; i < 120; i++) e.manualPulse(4);
+    expect(observationProgress(e.state, 11)).toBe(progress);
+    const resumed = new Engine(deserialize(serialize(e.state, 1000)));
+    resumed.offline(61_000);
+    expect(observationProgress(resumed.state, 11)).toBe(progress);
+    resumed.step(60);
+    expect(discoveredMax(resumed.state)).toBe(11);
+    expect(resumed.state.reactors[3].target).toBe(12);
+    expect(resumed.state.observation).toBeUndefined();
+  });
+  it('stops automatic exploration at the next calibration even when the current reactor is fast', () => {
+    const e = new Engine(createState(746));
+    discover(e, 13);
+    e.build(4);
+    e.buy(4, 'capacity', 1); e.buy(4, 'yield', 2);
+    const neon = e.state.elements[9];
+    neon.inventory = D(50); neon.totalProduced = D(50); e.deposit(10);
+    e.target(4, 14, true);
+    e.advance(120);
+    expect(discoveredMax(e.state)).toBe(14);
+    expect(e.state.reactors[3]).toMatchObject({ target: 15, exploring: true });
+    expect(observationProgress(e.state, 15)).toBe(0);
+    e.buy(4, 'capacity', 8); e.buy(4, 'yield', 4);
+    e.advance(120);
+    expect(discoveredMax(e.state)).toBe(14);
+    const silicon = e.state.elements[13];
+    silicon.inventory = D(50); silicon.totalProduced = silicon.totalProduced.plus(50); e.deposit(14);
+    e.advance(30);
+    expect(discoveredMax(e.state)).toBe(14);
+    expect(observationProgress(e.state, 15)).toBeGreaterThan(.5);
+    e.advance(20);
+    expect(discoveredMax(e.state)).toBe(15);
   });
   it('migrates a released v2 20/5 save without turning its Ca completion into Xe', () => {
     const raw = released20Save(), s = deserialize(JSON.stringify(raw));
@@ -129,10 +157,11 @@ describe('H–Xe progression, instrumentation and migration', () => {
     // The migrated save can genuinely continue: build VI, discover 21,
     // then build VII and reach/archive Xe and all 54 through the Engine.
     const e = new Engine(s); e.state.coins = D('1e40'); e.state.data = D('1e30');
-    expect(e.build(6)).toBe(true); e.target(6, 21, true); e.state.reactors[5].discoveryHazard = 0; e.step(.1);
-    expect(discoveredMax(e.state)).toBe(21);
-    for (let z = 22; z <= 54; z++) { e.target(6, z, true); e.state.reactors[5].discoveryHazard = 0; e.step(.1); }
-    expect(discoveredMax(e.state)).toBe(54); expect(e.build(7)).toBe(true);
+    expect(e.build(6)).toBe(true);
+    expect(discoverThrough(e, 21)).toEqual([21]);
+    expect(discoverThrough(e, 54)).toEqual(Array.from({ length: 33 }, (_, index) => index + 22));
+    expect(discoveredMax(e.state)).toBe(54);
+    expect(e.state.reactors[6].built).toBe(true);
     const xe = e.state.elements[XENON_ELEMENT - 1]; xe.inventory = D(50); xe.totalProduced = D(50); e.deposit(XENON_ELEMENT);
     expect(e.state.stats.xeCompletedAt).not.toBeNull();
     for (let z = 1; z <= PLAYABLE_ELEMENTS; z++) {

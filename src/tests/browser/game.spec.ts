@@ -53,7 +53,7 @@ test('mobile 360px: usable navigation, scrollable table, knowledge cards, no pag
 });
 test('49 Ca remains incomplete; one more submission preserves the 20th milestone, not the version end', async ({ page }) => {
   const e=new Engine(createState(222));e.state.coins=D('1e30');e.state.data=D('1e30');
-  for(let z=2;z<=20;z++){e.target(1,z);e.state.reactors[0].discoveryHazard=0;e.step(.1);}
+  e.state.elements.slice(0, 20).forEach(element => { element.discovered = true; });
   for(let id=2;id<=5;id++)e.build(id);
   e.state.modules.feed=true;e.state.modules.reaction=true;e.state.automation.reaction=true;
   e.state.reactors.forEach(r=>r.active=false);e.target(5,20);
@@ -321,7 +321,7 @@ test('320px and 360px knowledge cards keep atomic data readable and distinguish 
   await dialog.screenshot({path:'artifacts/knowledge-fluorine-details-mobile.png',animations:'disabled'});
 });
 
-test('released Ne save upgrades in place, builds IV and discovers Na without clearing old progress',async({page})=>{
+test('released Ne save upgrades in place and shows a real Na survey after IV tuning',async({page})=>{
   test.setTimeout(45000);
   const start = Date.parse('2026-11-19T00:00:00Z');
   const e=new Engine(createState(801));e.state.coins=D('1e12');e.state.data=D('1e12');
@@ -340,37 +340,46 @@ test('released Ne save upgrades in place, builds IV and discovers Na without cle
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.locator('.mission-card').getByRole('button',{name:'建造 IV 级仪器'}).click();
   await expect(page.getByRole('heading',{name:/离子束反应器/})).toBeVisible();
-  await expect(page.locator('.target-copy')).toContainText('平均等待约 25 秒');
+  await expect(page.locator('.target-copy')).toContainText('需要 IV 级完成校准');
   await page.clock.runFor(6000);
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await page.clock.runFor(22_000);
-  await expect(page.getByRole('dialog')).toContainText('新元素发现 · 钠');
-  await expect(page.getByRole('dialog').locator('.atomic-facts')).toContainText('电子数（中性）11');
-  await page.keyboard.press('Escape');
-  await expect(page.locator('canvas')).toHaveAttribute('aria-label',/展示元素：Na。/);
+  const tuning = page.locator('.mission-card').getByRole('button', { name: /培养 IV 级/ });
+  for (let level = 0; level < 3; level++) await tuning.click();
+  await page.locator('.mission-card').getByRole('button', { name: '开始研究 · Na' }).click();
+  const progress = page.getByRole('progressbar', { name: '首次观测进度' });
+  await expect(progress).toHaveAttribute('value', '0');
+  await page.clock.runFor(6000);
+  expect(Number(await progress.getAttribute('value'))).toBeGreaterThan(.1);
+  await expect(page.locator('.target-copy')).toContainText('观测');
+  await expect(page.locator('[data-z="10"]')).toHaveClass(/archived/);
   await expect(page.locator('.device-photo')).toHaveCSS('background-image',/reactor-expansion-atlas/);
   await page.screenshot({path:'artifacts/v02-reactor-iv-desktop.png',fullPage:true,animations:'disabled'});
 });
 
 test('V opens after Ar and reaches Ca; its graphic and representative samples use the new stage',async({page})=>{
   const e=new Engine(createState(802));e.state.coins=D('1e12');e.state.data=D('1e12');
-  for(let z=2;z<=19;z++){e.target(1,z);e.state.reactors[0].discoveryHazard=0;e.step(.1);}
+  e.state.elements.slice(0, 19).forEach(element => { element.discovered = true; });
+  for (const z of [10, 18]) {
+    const row = e.state.elements[z - 1]; row.inventory = D(50); row.totalProduced = D(50); e.deposit(z);
+  }
   for(let id=2;id<=4;id++)e.build(id);
   e.state.modules.feed=true;e.state.modules.reaction=true;e.state.automation.reaction=false;
   e.state.reactors.forEach(r=>r.active=false);e.state.reactors[4].active=true;e.state.reactors[4].discoveryHazard=0;e.state.notices=[];
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(e.state)});
   await page.setViewportSize({width:1440,height:1000});await page.goto('/');
   await page.locator('.lab-guidance').getByRole('button',{name:/建造 V 级仪器/}).click();
-  await expect(page.getByRole('dialog')).toContainText('新元素发现 · 钙');await page.keyboard.press('Escape');
+  const tune = page.locator('.mission-card').getByRole('button', { name: /培养 V 级/ });
+  for (let level = 0; level < 3; level++) await tune.click();
+  await page.locator('.mission-card').getByRole('button', { name: '开始研究 · Ca' }).click();
   await expect(page.getByRole('heading',{name:/回旋加速器/})).toBeVisible();
-  await expect(page.locator('canvas')).toHaveAttribute('aria-label',/展示元素：K、Ca。/);
+  await expect(page.locator('canvas')).toHaveAttribute('aria-label',/展示元素：K。/);
   await expect(page.getByLabel('切换反应容器').locator('option')).toHaveCount(5);
   await page.screenshot({path:'artifacts/v02-reactor-v-desktop.png',fullPage:true,animations:'disabled'});
 });
 
 test('new period fits 320px and 360px screens and reads Ca and P knowledge without overflow',async({page})=>{
   const e=new Engine(createState(803));e.state.coins=D('1e12');e.state.data=D('1e12');
-  for(let z=2;z<=20;z++){e.target(1,z);e.state.reactors[0].discoveryHazard=0;e.step(.1);}
+  e.state.elements.slice(0, 20).forEach(element => { element.discovered = true; });
   for(let id=2;id<=5;id++)e.build(id);e.state.reactors.forEach(r=>r.active=false);e.state.notices=[];
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(e.state)});
   await page.setViewportSize({width:360,height:800});await page.goto('/');
