@@ -67,7 +67,7 @@ test('the last onboarding step is the sole guidance on desktop and phone, then h
   await archive.click();
   await expect(coach).toHaveCount(0);
   await expect(guidance.getByRole('region', { name: '下一步', exact: true })).toBeVisible();
-  await expect(page.locator('.route-cell').first()).toContainText('已收录');
+  await expect(page.locator('[data-z="1"]')).toContainText('已收录');
 });
 
 test('calcium recommendation preserves the 20th milestone without ending the H–Xe version', async ({page})=>{

@@ -12,8 +12,14 @@ test('desktop: renders live economy, buys upgrades, opens all 118 elements, and 
   await expect(page.getByTestId('coins')).toBeVisible();
   await page.getByRole('button',{name:'购买补充氢样本',exact:true}).click();
   await expect(page.getByText('等级 1',{exact:true})).toBeVisible();
+  const archive = page.getByRole('region', { name: '元素周期表', exact: true });
+  const archiveHeading = archive.getByRole('heading', { name: '元素周期表' });
+  await expect(archive.locator('.periodic-cell')).toHaveCount(118);
+  await expect(archive.locator('[data-z="2"]')).toContainText('下一发现');
   await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'周期表'}).click();
-  await expect(page.locator('.periodic-cell')).toHaveCount(118);
+  await expect(archiveHeading).toBeInViewport();
+  await expect(page).toHaveURL(/#periodic-table$/);
+  await expect(page.getByTestId('current-rate')).toHaveCount(1);
   await page.locator('[data-z="118"]').click();
   await expect(page.getByRole('dialog')).toContainText('鿫');
   await expect(page.getByRole('dialog')).toContainText('50 次成功合成');
@@ -39,6 +45,11 @@ test('mobile 360px: usable navigation, scrollable table, knowledge cards, no pag
   await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'科研'}).click();
   await expect(page.getByText('让实验室，自己运转。')).toBeVisible();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'周期表'}).click();
+  await expect(page.getByRole('heading',{name:'元素周期表',exact:true})).toBeInViewport();
+  await page.reload();
+  await expect(page.getByRole('heading',{name:'元素周期表',exact:true})).toBeInViewport();
+  await expect(page.getByTestId('current-rate')).toHaveCount(1);
 });
 test('49 Ca remains incomplete; one more submission preserves the 20th milestone, not the version end', async ({ page }) => {
   const e=new Engine(createState(222));e.state.coins=D('1e30');e.state.data=D('1e30');
@@ -54,13 +65,13 @@ test('49 Ca remains incomplete; one more submission preserves the 20th milestone
   await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'实验室',exact:true}).click();
   await page.getByLabel('切换反应容器').selectOption('5');await page.getByRole('button',{name:'已暂停'}).click();
-  await page.locator('.route-cell').nth(19).click();
+  await page.locator('[data-z="20"]').click();
   await page.getByRole('button',{name:'提交 1 单位至档案'}).click({timeout:15000});
   await expect(page.getByRole('dialog')).toContainText('周期表已永久点亮');
   await page.keyboard.press('Escape');
   await expect(page.locator('.toast-stack')).toContainText('第二十号里程碑');
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await expect(page.locator('.route-cell').nth(19)).toHaveClass(/archived/);
+  await expect(page.locator('[data-z="20"]')).toHaveClass(/archived/);
 });
 
 test('corrupt import is rejected without losing the active run', async ({ page }) => {
@@ -76,7 +87,7 @@ test('online first discovery opens exactly one knowledge card and can be reread'
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(s)});
   await page.goto('/'); await expect(page.getByRole('dialog')).toContainText('新元素发现 · 氦');
   await page.keyboard.press('Escape'); await page.waitForTimeout(500); await expect(page.getByRole('dialog')).not.toBeVisible();
-  await page.locator('.route-cell').nth(1).click(); await expect(page.getByRole('dialog')).toContainText('氦');
+  await page.locator('[data-z="2"]').click(); await expect(page.getByRole('dialog')).toContainText('氦');
 });
 
 test('opening hints lead from Be to a new reactor, parallel production and a real 50-unit archive', async ({page})=>{
@@ -95,7 +106,7 @@ test('opening hints lead from Be to a new reactor, parallel production and a rea
   await page.locator('.mission-card').getByRole('button',{name:'研发自动反应'}).click();
   await page.locator('.mission-card').getByRole('button',{name:'让 I 型生产氢样本'}).click();
   await page.locator('.mission-card').getByRole('button',{name:'提交并点亮 H'}).click({timeout:10000});
-  await expect(page.locator('.route-cell').first()).toContainText('已收录');
+  await expect(page.locator('[data-z="1"]')).toContainText('已收录');
 });
 
 test('mobile first upgrade is reachable without scrolling',async({page})=>{
@@ -285,7 +296,7 @@ test('released Ne save upgrades in place, builds IV and discovers Na without cle
   delete old.stats.neonCompletedAt;delete old.stats.milestones.neonArchive;
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:JSON.stringify(old)});
   await page.setViewportSize({width:1440,height:1000});await page.goto('/');
-  await expect(page.locator('.route-cell').nth(9)).toHaveClass(/archived/);
+  await expect(page.locator('[data-z="10"]')).toHaveClass(/archived/);
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.locator('.mission-card').getByRole('button',{name:'建造 IV 级仪器'}).click();
   await expect(page.getByRole('heading',{name:/离子束反应器/})).toBeVisible();
@@ -322,11 +333,11 @@ test('new period fits 320px and 360px screens and reads Ca and P knowledge witho
   await page.getByLabel('切换反应容器').selectOption('5');
   for(const width of [320,360]){await page.setViewportSize({width,height:800});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}
   await page.screenshot({path:'artifacts/v02-mobile-laboratory.png',fullPage:true,animations:'disabled'});
-  await page.locator('.route-cell').nth(19).click();
+  await page.locator('[data-z="20"]').click();
   await expect(page.getByRole('dialog').locator('.electron-shells')).toHaveAttribute('aria-label','电子层由内到外：2、8、8、2');
   expect(await page.getByRole('dialog').evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
   await page.getByRole('dialog').screenshot({path:'artifacts/v02-calcium-mobile.png',animations:'disabled'});
-  await page.keyboard.press('Escape');await page.locator('.route-cell').nth(14).click();
+  await page.keyboard.press('Escape');await page.locator('[data-z="15"]').click();
   await page.getByRole('dialog').locator('summary').click();
   await expect(page.getByRole('dialog').locator('.physical-facts')).toContainText('白磷');
   await page.keyboard.press('Escape');

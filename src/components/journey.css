@@ -19,6 +19,30 @@
 .journey-stage.done .journey-index, .journey-stage.done small { color: #b0d4b8; }
 .goal-detail { font-size: 11px; color: #adb8af; margin: 12px 0; line-height: 1.8; overflow-wrap: anywhere; }
 .guide-replay { display: flex; justify-content: flex-end; margin-bottom: 12px; }
+.lab-archive { margin-top: 28px; scroll-margin-top: 16px; }
+.archive-heading, .archive-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+.archive-heading { margin-bottom: 14px; }
+.archive-heading h2 { font-size: 20px; }
+.archive-heading p { color: var(--muted); font-size: 12px; }
+.archive-heading strong { color: var(--gold); font-family: var(--mono); }
+.archive-toolbar { margin-bottom: 10px; }
+.lab-archive .table-key { max-width: none; padding: 0; justify-content: flex-start; gap: 8px 14px; font-size: 11px; }
+.table-caption { margin-bottom: 9px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.table-caption span { display: none; }
+.table-scroll:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+.periodic-cell.next { border: 1px dashed #b5a378; background: #243029; }
+.periodic-cell.next > i { color: #c9b483; }
+
+@media (max-width: 1200px) {
+  .table-caption span { display: block; }
+}
+
 @media (max-width: 600px) {
   .nexus-coach__actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .nexus-coach__actions .nexus-coach__btn--primary { grid-column: 1 / -1; }

@@ -75,19 +75,6 @@
 .app-shell .table-key .key-discovered { background: #8a9b83; }
 .app-shell .table-key .key-archived { background: #d9b17b; }
 
-/* —— 元素路线与档案卡：让“已收录”比“已发现”更亮 —— */
-.app-shell .route-cell.archived {
-  box-shadow: inset 0 0 0 1px #c9aa7433, inset 0 1px 0 #f6dda51f;
-}
-
-.app-shell .route-cell.discovered:not(.archived) {
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--element) 24%, transparent);
-}
-
-.app-shell .route-cell.next { background: #182420; }
-
-.app-shell .mini-archive:hover { border-color: #d3b37c; }
-
 /* —— 阶段条：已完成的节点更扎实 —— */
 .app-shell .journey-stage.done {
   border-color: #7c9274;
@@ -102,17 +89,13 @@
   .app-shell .coin-value { font-size: 35px; }
   .app-shell .resource-item strong { font-variant-numeric: tabular-nums; }
   .app-shell .mission-card { border-left-width: 2px; }
-  .app-shell .route-cell { min-height: 104px; }
   .app-shell .periodic-cell.archived { box-shadow: inset 0 0 0 1px #d3b37c4d; }
 }
 
 @media (max-width: 360px) {
   .app-shell .coin-value { font-size: 32px; }
-  .app-shell .route-cell { min-height: 100px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .app-shell .periodic-cell:hover,
-  .app-shell .mini-archive:hover,
-  .app-shell .route-cell:hover { transform: none; }
+  .app-shell .periodic-cell:hover { transform: none; }
 }
