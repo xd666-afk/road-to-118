@@ -30,3 +30,25 @@
 .device-4 .device-photo,.device-5 .device-photo,.research-device-art.expansion-art{background-image:url('/assets/reactor-expansion-atlas.png');background-size:200% 100%}.device-4 .viewport{left:35.3%;top:21.3%;width:29%}.device-5 .viewport{left:34.2%;top:17.8%;width:31.5%}.specimen.specimen-expansion{background-image:url('/assets/specimen-expansion-atlas.png')}
 .reactor-switch{align-items:center;gap:12px;padding-bottom:9px}.reactor-switch>label{color:#899d90;font-size:11px}.reactor-switch select{min-height:33px;padding:4px 8px;font-size:11px;min-width:0;max-width:280px;flex:1}.reactor-switch>button{margin-left:auto;white-space:nowrap;border:0;color:#c6b28c;font-size:10px}.reactor-switch>button svg{display:block}.element-route{row-gap:10px}
 @media(max-width:620px){.reactor-switch{padding:0 16px 9px;gap:8px}.reactor-switch>label{font-size:10px}.reactor-switch select{font-size:10px;max-width:none;width:0}.reactor-switch>button{font-size:9px;gap:3px;padding:5px 0}.reactor-switch>button svg{width:12px}}
+
+/* H–Xe extension: original CSS schematics replace missing 21–54 specimen art. */
+.atomic-specimen{position:relative;flex:1;width:100%;max-width:230px;min-height:230px;aspect-ratio:1;border:1px solid color-mix(in srgb,var(--element),transparent 55%);border-radius:4px;background:radial-gradient(circle at 50% 46%,color-mix(in srgb,var(--element),#0c1518 88%) 0 7%,#0c1518 58%,#0a1214 100%);overflow:hidden;isolation:isolate}
+.atomic-specimen-head{position:absolute;top:10px;left:12px;right:12px;display:flex;justify-content:space-between;z-index:2;font:9px var(--mono);color:color-mix(in srgb,var(--element),#fff 12%);letter-spacing:1px}
+.atomic-specimen-head small{font-size:7px;color:#69817a}
+.atomic-nucleus{position:absolute;z-index:2;left:50%;top:46%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;justify-content:center;width:62px;height:62px;border-radius:50%;border:1px solid color-mix(in srgb,var(--element),transparent 38%);background:radial-gradient(circle,color-mix(in srgb,var(--element),#182224 58%),#101a1c 72%);box-shadow:0 0 28px color-mix(in srgb,var(--element),transparent 82%)}
+.atomic-nucleus strong{font:500 27px/1 var(--mono);color:color-mix(in srgb,var(--element),#fff 18%)}
+.atomic-nucleus small{font:8px var(--mono);color:#93a69a;margin-top:3px}
+.atomic-orbit{position:absolute;left:50%;top:46%;width:calc(29% * var(--orbit-scale));aspect-ratio:1;transform:translate(-50%,-50%);border:1px solid color-mix(in srgb,var(--element),transparent 74%);border-radius:50%;z-index:1;box-shadow:0 0 16px color-mix(in srgb,var(--element),transparent 92%) inset}
+.atomic-orbit i{position:absolute;right:-1px;top:50%;transform:translate(50%,-50%);min-width:18px;height:18px;padding:0 3px;border-radius:9px;background:#172326;border:1px solid #43534b;color:#b8c6b7;font:8px/16px var(--mono);font-style:normal;text-align:center}
+.atomic-specimen-foot{position:absolute;left:12px;right:12px;bottom:10px;z-index:2;display:flex;flex-direction:column;gap:2px;font:8px/1.5 var(--mono);color:#91a79a}
+.atomic-specimen-foot small{font:8px/1.5 'Noto Sans SC',sans-serif;color:#607a6d}
+.device-schematic .device-photo{background:none!important;background-image:radial-gradient(circle at 50% 44%,#0b1416 0 15%,transparent 15.5%),repeating-radial-gradient(circle at 50% 44%,#253436 0 2px,#111b1e 2px 26px),linear-gradient(135deg,#1c292b,#0c1517 58%,#182426)!important;background-size:cover!important}
+.device-schematic .device-photo::before,.device-schematic .device-photo::after{content:'';position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);border-radius:50%;border:1px solid #5e756d;opacity:.7}
+.device-schematic .device-photo::before{width:48%;aspect-ratio:1;box-shadow:0 0 60px #7da08f22 inset}
+.device-schematic .device-photo::after{width:34%;aspect-ratio:1;border-color:#9f855f;box-shadow:0 0 0 14px #121d1f,0 0 0 15px #45544e}
+.research-device-art.schematic-art{background:none!important;background-image:radial-gradient(circle at 50% 45%,#0b1416 0 16%,transparent 16.5%),repeating-radial-gradient(circle at 50% 45%,#2b3b3d 0 2px,#101a1d 2px 31px),linear-gradient(135deg,#1c292b,#0b1416 60%,#1b282a)!important;background-size:cover!important;position:relative}
+.research-device-art.schematic-art::before,.research-device-art.schematic-art::after{content:'';position:absolute;left:50%;top:45%;transform:translate(-50%,-50%);border-radius:50%;border:1px solid #5f756d}
+.research-device-art.schematic-art::before{width:52%;aspect-ratio:1;box-shadow:0 0 60px #7da08f22 inset}
+.research-device-art.schematic-art::after{width:36%;aspect-ratio:1;border-color:#a18760;box-shadow:0 0 0 12px #111c1e,0 0 0 13px #46564f}
+.specimen.specimen-expansion{background-size:500% 200%}
+@media(max-width:620px){.atomic-specimen{min-height:0;max-width:none;aspect-ratio:1.15}.atomic-nucleus{width:54px;height:54px}.atomic-nucleus strong{font-size:23px}.atomic-orbit{top:44%}.atomic-specimen-foot{font-size:7px}}

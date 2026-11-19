@@ -1,0 +1,118 @@
+/*
+ * 实验室界面增强层：只使用现有真实 class，追加层级、对比与窄屏细节。
+ * 不改变布局结构、不新增文案；宿主在合并时 import 本文件即可。
+ */
+
+/* —— 资源区：像资源面板一样分块，增长数字更醒目 —— */
+.app-shell .resource-bar {
+  background: linear-gradient(180deg, #14201f 0%, #101719 88%);
+  border-bottom-color: #3a4b45;
+}
+
+.app-shell .resource-label { color: #b6c3b8; }
+.app-shell .resource-label svg { color: #e0bd88; }
+
+.app-shell .coin-value {
+  color: #f0e1c6;
+  font-variant-numeric: tabular-nums;
+}
+
+.app-shell .resource-income strong {
+  color: #c4dfc3;
+  font-variant-numeric: tabular-nums;
+}
+
+.app-shell .resource-item > span { color: #93a39c; }
+.app-shell .resource-item strong { color: #e8e2cf; font-variant-numeric: tabular-nums; }
+.app-shell .resource-item strong small { color: #8fa096; }
+.app-shell .progress-resource strong em { color: #e0bd88; }
+
+.app-shell .segmented-progress i { background: #2b383a; }
+.app-shell .segmented-progress i.discovered { background: #978b68; }
+.app-shell .segmented-progress i.archived { background: #e0bd88; }
+
+/* —— 当前目标：左侧金色导轨 + 更明确的行动按钮 —— */
+.app-shell .mission-card {
+  border-left: 3px solid #a88a5a;
+  background: linear-gradient(125deg, #2a2d25, #1a2724 72%);
+  box-shadow: inset 0 1px 0 #ffffff0a;
+}
+
+.app-shell .mission-card .eyebrow { color: #d3b384; }
+.app-shell .mission-card .goal-detail { color: #bcc7ba; }
+.app-shell .mission-card .goal-action { min-height: 44px; }
+
+.app-shell .opening-milestones > span { color: #8a9d91; }
+.app-shell .opening-milestones > span.done { color: #e0c290; }
+
+/* —— 实验舞台：加深仪器边界与观察窗的聚焦感 —— */
+.app-shell .device {
+  box-shadow: inset 0 0 0 1px #46564c, inset 0 -46px 90px #091012b8;
+}
+
+.app-shell .device-readout strong { color: #d2ddd1; }
+.app-shell .chamber-footer { color: #9cad9f; }
+
+/* —— 周期表：已发现与已点亮一眼可分 —— */
+.app-shell .periodic-cell.discovered {
+  background: color-mix(in srgb, var(--element) 9%, #131e20);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--element) 30%, transparent);
+}
+
+.app-shell .periodic-cell.archived {
+  background: linear-gradient(150deg, #4b4733, #38392b);
+  border-color: #d3b37c;
+  box-shadow: inset 0 0 0 1px #d3b37c38, inset 0 1px 0 #f6dda826;
+}
+
+.app-shell .periodic-cell.archived:hover { border-color: #ecd09a; }
+
+.app-shell .periodic-cell:not(.version-locked):focus-visible {
+  outline: 2px solid #d9b17b;
+  outline-offset: 1px;
+}
+
+.app-shell .table-key .key-discovered { background: #8a9b83; }
+.app-shell .table-key .key-archived { background: #d9b17b; }
+
+/* —— 元素路线与档案卡：让“已收录”比“已发现”更亮 —— */
+.app-shell .route-cell.archived {
+  box-shadow: inset 0 0 0 1px #c9aa7433, inset 0 1px 0 #f6dda51f;
+}
+
+.app-shell .route-cell.discovered:not(.archived) {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--element) 24%, transparent);
+}
+
+.app-shell .route-cell.next { background: #182420; }
+
+.app-shell .mini-archive:hover { border-color: #d3b37c; }
+
+/* —— 阶段条：已完成的节点更扎实 —— */
+.app-shell .journey-stage.done {
+  border-color: #7c9274;
+  box-shadow: inset 0 0 0 1px #b7d0a51a;
+}
+
+.app-shell .journey-stage.done .journey-symbol { color: #cfe0bd; }
+
+/* —— 窄屏：保留分块感，避免数字挤成一团 —— */
+@media (max-width: 620px) {
+  .app-shell .resource-bar { background: linear-gradient(180deg, #13201e, #101719 92%); }
+  .app-shell .coin-value { font-size: 35px; }
+  .app-shell .resource-item strong { font-variant-numeric: tabular-nums; }
+  .app-shell .mission-card { border-left-width: 2px; }
+  .app-shell .route-cell { min-height: 104px; }
+  .app-shell .periodic-cell.archived { box-shadow: inset 0 0 0 1px #d3b37c4d; }
+}
+
+@media (max-width: 360px) {
+  .app-shell .coin-value { font-size: 32px; }
+  .app-shell .route-cell { min-height: 100px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell .periodic-cell:hover,
+  .app-shell .mini-archive:hover,
+  .app-shell .route-cell:hover { transform: none; }
+}

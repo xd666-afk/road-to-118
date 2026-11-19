@@ -1,5 +1,6 @@
 import { D, Big, finiteNumber } from './numbers';
-import { ACHIEVEMENTS, FINAL_ELEMENT, MODULES, OFFLINE_LIMIT, PLAYABLE_ELEMENTS, REACTORS, productionParallel } from './config';
+import { abilityBonuses } from './abilityProgress';
+import { ACHIEVEMENTS, CALCIUM_ELEMENT, FINAL_ELEMENT, MODULES, OFFLINE_LIMIT, PLAYABLE_ELEMENTS, REACTORS, SAVE_VERSION, XENON_ELEMENT, productionParallel } from './config';
 import { coinPerEvent, eventRate, maxAffordable, price, probability, usefulAtomPurchase } from './economy';
 import { poisson, random, waitingHazard } from './rng';
 import type { GameState, Module, Notice, ReactorState, Upgrade, WorkMode } from './types';
@@ -7,12 +8,12 @@ import { element } from '../data/elements';
 
 export function createState(seed = Date.now() >>> 0, now = Date.now()): GameState {
   const s: GameState = {
-    saveVersion: 2, savedAt: now, elapsed: 0, seed, rng: seed >>> 0, coins: D(0), data: D(0),
+    saveVersion: SAVE_VERSION, savedAt: now, elapsed: 0, seed, rng: seed >>> 0, coins: D(0), data: D(0),
     reactors: REACTORS.map(({ id }) => ({ id, built: id === 1, active: true, target: 2, exploring: false, upgrades: { atoms: 0, speed: 0, yield: 0, capacity: 0 }, events: D(0), discoveryHazard: 1, productionRemainder: D(0), eventRemainder: D(0) })),
     elements: Array.from({ length: PLAYABLE_ELEMENTS }, (_, i) => ({ discovered: i === 0, inventory: D(0), deposited: 0, archived: false, firstDiscoveredAt: i === 0 ? 0 : null, firstDiscoveredReactor: i === 0 ? 1 : null, totalProduced: D(0) })),
     modules: { feed: false, reaction: false, allocation: false },
     automation: { feed: false, reaction: false, allocation: false, reserve: D(100), mode: 'explore', target: 1 },
-    stats: { events: D(0), produced: D(0), earned: D(0), peak: D(0), builds: 1, purchases: 0, lastEvent: '实验室已准备就绪', neonCompletedAt: null, completedAt: null, milestones: {} },
+    stats: { events: D(0), produced: D(0), earned: D(0), peak: D(0), builds: 1, purchases: 0, lastEvent: '实验室已准备就绪', neonCompletedAt: null, calciumCompletedAt: null, xeCompletedAt: null, completedAt: null, milestones: {} },
     achievements: [], settings: { scientific: false, reducedMotion: false, guideDismissed: false, mix: [1] },
     notices: [], noticeSeq: 0,
   };
@@ -24,8 +25,8 @@ export const archivedCount = (s: GameState) => s.elements.filter(e => e.archived
 export const highestReactor = (s: GameState) => s.reactors.filter(r => r.built).at(-1)!;
 export const FIRST_HELIUM_SECONDS = 5;
 
-export function createFirstRun(): GameState {
-  const s = createState();
+export function createFirstRun(seed?: number, now?: number): GameState {
+  const s = createState(seed, now);
   s.firstRun = { step: 'welcome' };
   s.reactors[0].active = false;
   s.reactors[0].target = 1;
@@ -117,13 +118,29 @@ export class Engine {
       this.target(r.id, target, false);
     }
   }
-  archiveTarget(offset = 1): number {
-    const available = this.state.elements.map((e, i) => ({ e, z: i + 1 })).filter(({ e }) => e.discovered && !e.archived);
-    if (!available.length) return this.state.automation.target;
-    // The newest stage objective is filled by the most advanced available device.
-    const final = this.state.elements[FINAL_ELEMENT - 1];
-    if (final.discovered && !final.archived && offset === highestReactor(this.state).id) return FINAL_ELEMENT;
-    return available[(offset - 1) % available.length].z;
+  archiveTarget(reactorId = 1): number {
+    const s = this.state;
+    const available = s.elements.map((e, i) => ({ e, z: i + 1 })).filter(({ e }) => e.discovered && !e.archived);
+    if (!available.length) return s.automation.target;
+    // The current objective is finished by the most advanced device; older
+    // devices then sweep the elements inside their own ranges.
+    const final = s.elements[FINAL_ELEMENT - 1];
+    const top = highestReactor(s);
+    if (final.discovered && !final.archived && reactorId === top.id) return FINAL_ELEMENT;
+    const config = REACTORS[reactorId - 1];
+    if (config) {
+      const inRange = available.filter(({ z }) => z >= Math.max(1, config.anchor - 1) && z <= config.softMax);
+      if (inRange.length) {
+        // Work downward within the assigned range so the stage edge is not starved.
+        inRange.sort((a, b) => b.z - a.z);
+        return inRange[0].z;
+      }
+      // If this device has already cleared its range, help with the element it
+      // can produce most reliably instead of idling on an impossible target.
+      const best = available.map(({ z }) => ({ z, p: probability(z, reactorId) })).sort((a, b) => b.p - a.p)[0];
+      if (best) return best.z;
+    }
+    return available[0].z;
   }
   deposit(z: number, silent = false): number {
     const s = this.state, e = s.elements[z - 1];
@@ -135,9 +152,23 @@ export class Engine {
       e.archived = true; this.award('archive'); this.notify('archive', `${element(z).name}已正式收录 · 周期表已点亮`, z);
       if (s.stats.milestones.firstArchive === undefined) s.stats.milestones.firstArchive = s.elapsed;
       if (z === 10 && s.stats.neonCompletedAt === null) { s.stats.neonCompletedAt = s.elapsed; s.stats.milestones.neonArchive = s.elapsed; this.award('complete'); this.notify('milestone', '50 份氖已收录，继续向第二十号元素前进。', 10); }
-      if (z === FINAL_ELEMENT && s.stats.completedAt === null) { s.stats.completedAt = s.elapsed; s.stats.milestones.complete = s.elapsed; this.award('calcium_complete'); this.notify('complete', '50 份钙的记录，属于你的第二十号里程碑。', FINAL_ELEMENT); }
+      if (z === CALCIUM_ELEMENT && s.stats.calciumCompletedAt === null) {
+        s.stats.calciumCompletedAt = s.elapsed; s.stats.milestones.complete = s.elapsed;
+        this.award('calcium_complete');
+        this.notify('milestone', '50 份钙已收录，第二十号里程碑保留；下一站是锌、氪与氙，而不是终点。', CALCIUM_ELEMENT);
+      }
+      if (z === XENON_ELEMENT && s.stats.xeCompletedAt === null) {
+        s.stats.xeCompletedAt = s.elapsed; s.stats.milestones.xeArchive = s.elapsed;
+        this.award('xenon_complete');
+        this.notify('milestone', '50 份氙已收录，第五十四号里程碑达成；继续补齐 H–Xe 全部五十四格。', XENON_ELEMENT);
+      }
       if (s.elements.slice(0, 10).every(e => e.archived)) this.award('collection');
-      if (archivedCount(s) === PLAYABLE_ELEMENTS) this.award('twenty_collection');
+      if (s.elements.slice(0, CALCIUM_ELEMENT).every(e => e.archived)) this.award('twenty_collection');
+      if (archivedCount(s) === PLAYABLE_ELEMENTS && s.stats.completedAt === null) {
+        s.stats.completedAt = s.elapsed; s.stats.milestones.stage54 = s.elapsed;
+        this.award('fifty_four_collection');
+        this.notify('complete', `H–Xe 全部 ${PLAYABLE_ELEMENTS} 格档案已点亮；这是当前版本的完整收集，不代表 55–118 已开放。`, XENON_ELEMENT);
+      }
     } else if (!silent) this.notify('info', `已提交 ${n} 单位${element(z).name} · ${e.deposited}/50`);
     return n;
   }
@@ -153,7 +184,10 @@ export class Engine {
       if (z === 2) this.award('helium');
       if (z === 10) { this.award('neon'); this.notify('milestone', '已发现氖 · IV 级离子束反应器已开放。', 10); }
       if (z === 18) { this.award('argon'); this.notify('milestone', '已发现氩 · V 级回旋加速器已开放。', 18); }
-      if (z === FINAL_ELEMENT) { this.award('calcium'); this.notify('milestone', '已发现钙 · 提交 50 Ca 完成当前阶段。', FINAL_ELEMENT); }
+      if (z === CALCIUM_ELEMENT) { this.award('calcium'); this.notify('milestone', '已发现钙 · 提交 50 Ca 保留第二十号里程碑；VI 级同步辐射研究环已开放。', CALCIUM_ELEMENT); }
+      if (z === 30) { this.award('zinc'); this.notify('milestone', '已发现锌 · 第 30 号只是中段，继续向氪与氙推进。', 30); }
+      if (z === 36) { this.award('krypton'); this.notify('milestone', '已发现氪 · 第四周期结束；VII 级重离子储存环已开放，目标仍是氙。', 36); }
+      if (z === XENON_ELEMENT) { this.award('xenon'); this.notify('milestone', '已发现氙 · 提交 50 Xe 点亮第五十四号档案，并补齐全部 H–Xe。', XENON_ELEMENT); }
     }
     e.inventory = e.inventory.plus(amount); e.totalProduced = e.totalProduced.plus(amount); s.stats.produced = s.stats.produced.plus(amount);
     if (online) {
@@ -168,11 +202,18 @@ export class Engine {
   step(seconds: number, online = true) {
     if (!Number.isFinite(seconds) || seconds <= 0) return;
     const s = this.state; s.elapsed += seconds;
+    const bonuses = s.activeAbilities?.length ? abilityBonuses(s) : null;
+    const energyMultiplier = bonuses?.energy ? D(100 + bonuses.energy).div(100) : null;
+    const dataMultiplier = bonuses?.data ? D(100 + bonuses.data).div(100) : null;
+    const productionBonus = bonuses?.production ? D(bonuses.production).div(100) : null;
     for (const r of s.reactors) {
       if (!r.built || !r.active) continue;
-      const events = eventRate(r).mul(seconds), gain = events.mul(coinPerEvent(r));
+      const events = eventRate(r).mul(seconds);
+      const baseGain = events.mul(coinPerEvent(r));
+      const gain = energyMultiplier ? baseGain.mul(energyMultiplier) : baseGain;
       r.events = r.events.plus(events); s.stats.events = s.stats.events.plus(events);
-      s.coins = s.coins.plus(gain); s.stats.earned = s.stats.earned.plus(gain); s.data = s.data.plus(events);
+      s.coins = s.coins.plus(gain); s.stats.earned = s.stats.earned.plus(gain);
+      s.data = s.data.plus(dataMultiplier ? events.mul(dataMultiplier) : events);
       if (s.stats.events.gte(1)) this.award('collision');
       const e = s.elements[r.target - 1], p = probability(r.target, r.id);
       if (!e.discovered) {
@@ -196,12 +237,10 @@ export class Engine {
         const parallel = s.modules.reaction && s.automation.reaction ? productionParallel(r.id) : 1;
         const expected = events.mul(p).mul(parallel);
         let count;
-        if (!online) {
-          // Offline stable production keeps fractions between settlements, without rare-event achievements.
-          const total = expected.plus(r.productionRemainder); count = total.floor(); r.productionRemainder = total.minus(count);
-        } else if (expected.gte(1e8)) {
-          // Massive batches: deterministic expectation avoids overflowing a Poisson parameter.
-          const total = expected.plus(r.productionRemainder); count = total.floor(); r.productionRemainder = total.minus(count);
+        const fixedProduction = !online || expected.gte(1e8);
+        if (fixedProduction) {
+          // Offline and massive batches settle by expectation, preserving fractions.
+          count = expected;
         } else if (events.lt(1000) && parallel === 1) {
           const total = events.plus(r.eventRemainder), attempts = total.floor().toNumber(); r.eventRemainder = total.minus(attempts);
           let hits = 0; for (let i = 0; i < attempts; i++) { // bounded to < 1000 trials
@@ -210,6 +249,12 @@ export class Engine {
           }
           count = D(hits);
         } else count = D(poisson(s, expected.toNumber()));
+        if (fixedProduction || productionBonus) {
+          // Online bonuses add to actual production. They never alter first discovery odds.
+          const total = (productionBonus ? count.plus(count.mul(productionBonus)) : count).plus(r.productionRemainder);
+          count = total.floor();
+          r.productionRemainder = total.minus(count);
+        }
         this.produce(r, count, online);
       }
     }

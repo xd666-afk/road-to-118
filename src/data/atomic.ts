@@ -1,4 +1,5 @@
 import { EXPANDED_ATOMS } from './expansion';
+import { EXPANDED54_ATOMS } from './expansion54';
 /** Neutral, ground-state atoms. RSC element pages are linked from KNOWLEDGE.
  * The selected isotope is explicit: relative atomic mass is never rounded to
  * manufacture a neutron count. Thermal values are approximate, in Celsius.
@@ -8,7 +9,7 @@ export interface AtomicProfile {
   configuration: string;
   shells: readonly number[];
   group: number;
-  state: '气态' | '固态';
+  state: '气态' | '液态' | '固态';
   melting: string;
   boiling: string;
   chemistry: string;
@@ -80,4 +81,5 @@ export const ATOMIC_PROFILES: Record<number, AtomicProfile> = {
     occurrence: '氖在地球大气中含量很低，约为百万分之 18。工业上通常通过液化空气的分离过程获得，并用于发光及低温等领域。',
   },
   ...EXPANDED_ATOMS,
+  ...EXPANDED54_ATOMS,
 };

@@ -1,4 +1,5 @@
 import { EXPANDED_COLORS, EXPANDED_KNOWLEDGE, EXPANDED_MASSES, EXPANDED_SPECIMENS } from './expansion';
+import { EXPANDED54_COLORS, EXPANDED54_KNOWLEDGE, EXPANDED54_MASSES, EXPANDED54_SPECIMENS } from './expansion54';
 /** Static element data. Layout follows an 18-column table with detached La–Lu / Ac–Lr rows. */
 export type ElementCategory =
   | 'nonmetal' | 'noble' | 'alkali' | 'alkaline' | 'metalloid'
@@ -16,7 +17,7 @@ export interface ElementInfo {
   period: number;
   category: ElementCategory;
   color: string;
-  /** Conventional rounded relative atomic mass, supplied for the playable first twenty. */
+  /** Conventional rounded relative atomic mass, supplied for the playable H–Xe range. */
   mass?: string;
   specimenDescription?: string;
 }
@@ -146,8 +147,11 @@ export const ELEMENTS: ElementInfo[] = NAMES.map(([symbol, name, english], i) =>
     z, symbol, name, english, col, row,
     period: row === 9 ? 6 : row === 10 ? 7 : row,
     category: kind,
-    color: PLAYABLE_COLORS[i] ?? EXPANDED_COLORS[i - 10] ?? CATEGORY_COLORS[kind],
-    ...(i < 20 ? { mass: i < 10 ? PLAYABLE_MASSES[i] : EXPANDED_MASSES[i - 10], specimenDescription: i < 10 ? SPECIMENS[i] : EXPANDED_SPECIMENS[i - 10] } : {}),
+    color: PLAYABLE_COLORS[i] ?? EXPANDED_COLORS[i - 10] ?? EXPANDED54_COLORS[i - 20] ?? CATEGORY_COLORS[kind],
+    ...(i < 54 ? {
+      mass: i < 10 ? PLAYABLE_MASSES[i] : i < 20 ? EXPANDED_MASSES[i - 10] : EXPANDED54_MASSES[i - 20],
+      specimenDescription: i < 10 ? SPECIMENS[i] : i < 20 ? EXPANDED_SPECIMENS[i - 10] : EXPANDED54_SPECIMENS[i - 20],
+    } : {}),
   };
 });
 
@@ -242,6 +246,7 @@ export const KNOWLEDGE: Record<number, KnowledgeCard> = {
     source: 'https://periodic-table.rsc.org/element/10/neon',
   },
   ...EXPANDED_KNOWLEDGE,
+  ...EXPANDED54_KNOWLEDGE,
 };
 
 export const SCIENCE_NOTE = '碰撞能资源、合成概率和按原子序数推进的生成顺序均为游戏机制，不代表真实核反应条件或路线。粒子大小、颜色与轨迹为示意，大小不表示真实原子半径；现实中的原子无法肉眼直接看见。';

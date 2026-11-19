@@ -8,11 +8,18 @@ export interface Notice { id: number; kind: 'discovery' | 'archive' | 'achieveme
 export type OpeningStep = 'start' | 'sample' | 'explore';
 export type FirstRun = { step: 'welcome' | OpeningStep | 'free' } | { step: 'helium'; remaining: number };
 export interface GameState {
-  saveVersion: 2; savedAt: number; elapsed: number; seed: number; rng: number; coins: Amount; data: Amount;
+  saveVersion: 3; savedAt: number; elapsed: number; seed: number; rng: number; coins: Amount; data: Amount;
   reactors: ReactorState[]; elements: ElementState[];
   modules: Record<Module, boolean>; automation: { feed: boolean; reaction: boolean; allocation: boolean; reserve: Amount; mode: WorkMode; target: number };
-  stats: { events: Amount; produced: Amount; earned: Amount; peak: Amount; builds: number; purchases: number; lastEvent: string; neonCompletedAt: number | null; completedAt: number | null; milestones: Record<string, number>; };
+  stats: {
+    events: Amount; produced: Amount; earned: Amount; peak: Amount; builds: number; purchases: number; lastEvent: string;
+    /** Historical checkpoints. Each is null unless its own element was archived. */
+    neonCompletedAt: number | null; calciumCompletedAt: number | null; xeCompletedAt: number | null;
+    /** Full H–Xe collection, not the calcium milestone and not a claim about 118. */
+    completedAt: number | null; milestones: Record<string, number>;
+  };
   achievements: string[]; settings: { scientific: boolean; reducedMotion: boolean; guideDismissed: boolean; mix: number[] };
   notices: Notice[]; noticeSeq: number;
   firstRun?: FirstRun;
+  activeAbilities?: number[];
 }

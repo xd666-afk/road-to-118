@@ -1,6 +1,7 @@
 import { D } from './numbers';
+import { savedAbilities } from './abilityProgress';
 import { createFirstRun, createState, FIRST_HELIUM_SECONDS } from './engine';
-import { ACHIEVEMENTS, PLAYABLE_ELEMENTS, REACTORS } from './config';
+import { ACHIEVEMENTS, CALCIUM_ELEMENT, PLAYABLE_ELEMENTS, REACTORS, SAVE_VERSION, XENON_ELEMENT } from './config';
 import type { GameState } from './types';
 const KEY = 'road-to-118.save.v1';
 export function serialize(s: GameState, now = Date.now()): string {
@@ -10,13 +11,18 @@ export function deserialize(text: string): GameState {
   if (text.length > 2_000_000) throw new Error('存档文件过大。');
   let raw: any; try { raw = JSON.parse(text); } catch { throw new Error('无法读取存档：JSON 格式损坏。'); }
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('这不是有效的游戏存档。');
-  // Accept the released 10-element saves and migrate them without clearing progress.
-  if (![0, 1, 2].includes(raw.saveVersion)) throw new Error('存档版本不兼容。请保留原文件。');
-  const legacy = raw.saveVersion < 2;
-  if (!Array.isArray(raw.elements) || raw.elements.length !== (legacy ? 10 : PLAYABLE_ELEMENTS) || !Array.isArray(raw.reactors) || raw.reactors.length !== (legacy ? 3 : REACTORS.length)) throw new Error('存档缺少元素或设备数据。');
+  // v0/v1: released ten elements and three instruments.
+  // v2: released twenty elements and five instruments.
+  // v3: current H–Xe (54) and eight instruments.
+  if (![0, 1, 2, 3].includes(raw.saveVersion)) throw new Error('存档版本不兼容。请保留原文件。');
+  const released10 = raw.saveVersion < 2, released20 = raw.saveVersion === 2;
+  const expectedElements = released10 ? 10 : released20 ? 20 : PLAYABLE_ELEMENTS;
+  const expectedReactors = released10 ? 3 : released20 ? 5 : REACTORS.length;
+  if (!Array.isArray(raw.elements) || raw.elements.length !== expectedElements || !Array.isArray(raw.reactors) || raw.reactors.length !== expectedReactors) throw new Error('存档缺少元素或设备数据。');
   const s = createState(1, 0), defaults = createState(1, 0), num = (v: unknown, max = Number.MAX_SAFE_INTEGER): number => { if (typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > max) throw new Error('存档包含无效数值。'); return v; };
   const amount = (v: unknown) => { if (typeof v !== 'string' || v.length > 10000) throw new Error('存档中的大数格式错误。'); let d; try { d = D(v); } catch { throw new Error('存档中的大数格式错误。'); } if (!d.isFinite() || d.lt(0) || d.e > 1e9) throw new Error('存档数值超出支持范围。'); return d; };
   const bool = (v: unknown) => { if (typeof v !== 'boolean') throw new Error('存档状态字段损坏。'); return v; };
+  const time = (v: unknown): number | null => v === null || v === undefined ? null : num(v);
   s.seed = num(raw.seed, 0xffffffff); s.rng = num(raw.rng, 0xffffffff); s.elapsed = num(raw.elapsed); s.savedAt = num(raw.savedAt);
   s.coins = amount(raw.coins); s.data = amount(raw.data);
   let locked = false;
@@ -26,9 +32,12 @@ export function deserialize(text: string): GameState {
     const inventory = amount(e.inventory), totalProduced = amount(e.totalProduced);
     if (!inventory.isInteger() || !totalProduced.isInteger() || bool(e.archived) !== (deposited === 50) || (!discovered && (deposited > 0 || !inventory.isZero()))) throw new Error('元素库存或收录状态损坏。');
     if (totalProduced.lt(inventory.plus(deposited))) throw new Error('库存与历史产量不一致。');
-    return { discovered, inventory, deposited, archived: deposited === 50, totalProduced, firstDiscoveredAt: e.firstDiscoveredAt === null ? null : num(e.firstDiscoveredAt), firstDiscoveredReactor: e.firstDiscoveredReactor === null ? null : num(e.firstDiscoveredReactor, legacy ? 3 : REACTORS.length) };
+    return { discovered, inventory, deposited, archived: deposited === 50, totalProduced, firstDiscoveredAt: time(e.firstDiscoveredAt), firstDiscoveredReactor: time(e.firstDiscoveredReactor) === null ? null : num(e.firstDiscoveredReactor, REACTORS.length) };
   });
-  if (legacy) s.elements.push(...defaults.elements.slice(10));
+  // Preserve every released discovery and partial archive, then add the new
+  // undiscovered future rows. This is an expansion, never a reset.
+  if (released10) s.elements.push(...defaults.elements.slice(10));
+  else if (released20) s.elements.push(...defaults.elements.slice(20));
   if (!s.elements[0].discovered) throw new Error('存档缺少初始氢元素。');
   const max = s.elements.filter(e => e.discovered).length;
   s.reactors = raw.reactors.map((r: any, i: number) => {
@@ -38,7 +47,8 @@ export function deserialize(text: string): GameState {
     const target = num(r.target, Math.min(PLAYABLE_ELEMENTS, max + 1)); if (target < 1 || !Number.isInteger(target)) throw new Error('设备目标无效。');
     return { id: i + 1, built: bool(r.built), active: bool(r.active), target, exploring: bool(r.exploring), upgrades, events: amount(r.events), discoveryHazard: num(r.discoveryHazard), productionRemainder: amount(r.productionRemainder), eventRemainder: r.eventRemainder === undefined ? D(0) : amount(r.eventRemainder) };
   });
-  if (legacy) s.reactors.push(...defaults.reactors.slice(3).map(r => ({ ...r, discoveryHazard: 1 })));
+  if (released10) s.reactors.push(...defaults.reactors.slice(3).map(r => ({ ...r, discoveryHazard: 1 })));
+  else if (released20) s.reactors.push(...defaults.reactors.slice(5).map(r => ({ ...r, discoveryHazard: 1 })));
   if (!s.reactors[0].built || s.reactors.some(r => r.built && !s.elements[REACTORS[r.id - 1].unlock - 1].discovered)) throw new Error('设备开放状态不正确。');
   if (!raw.modules || !raw.automation || !raw.stats) throw new Error('存档缺少工业或统计数据。');
   for (const key of ['feed', 'reaction', 'allocation'] as const) { s.modules[key] = bool(raw.modules[key]); s.automation[key] = bool(raw.automation[key]); if (s.automation[key] && !s.modules[key]) throw new Error('工业模块尚未研发。'); }
@@ -47,14 +57,21 @@ export function deserialize(text: string): GameState {
   s.automation.mode = raw.automation.mode; s.automation.reserve = amount(raw.automation.reserve); s.automation.target = num(raw.automation.target, max);
   if (!Number.isInteger(s.automation.target) || s.automation.target < 1) throw new Error('生产目标无效。');
   for (const k of ['events', 'produced', 'earned', 'peak'] as const) s.stats[k] = amount(raw.stats[k]);
-  s.stats.builds = num(raw.stats.builds, legacy ? 3 : REACTORS.length); s.stats.purchases = num(raw.stats.purchases); s.stats.lastEvent = typeof raw.stats.lastEvent === 'string' ? raw.stats.lastEvent.slice(0, 200) : '存档已恢复';
-  const priorComplete = raw.stats.completedAt === null ? null : num(raw.stats.completedAt);
-  s.stats.neonCompletedAt = legacy ? priorComplete : raw.stats.neonCompletedAt === null ? null : num(raw.stats.neonCompletedAt);
-  s.stats.completedAt = legacy ? null : priorComplete;
-  if ((s.stats.neonCompletedAt !== null) !== s.elements[9].archived || (s.stats.completedAt !== null) !== s.elements[PLAYABLE_ELEMENTS - 1].archived) throw new Error('阶段完成状态与收录进度不一致。');
-  const validMilestones = new Set(['complete', 'neonArchive', 'firstUpgrade', 'firstArchive', 'module_feed', 'module_reaction', 'module_allocation', ...Array.from({length: PLAYABLE_ELEMENTS - 1}, (_, i) => `element${i + 2}`), ...REACTORS.slice(1).map(r => `reactor${r.id}`)]);
-  s.stats.milestones = {}; for (const [k, v] of Object.entries(raw.stats.milestones || {})) { const key = legacy && k === 'complete' ? 'neonArchive' : k; if (validMilestones.has(key)) s.stats.milestones[key] = num(v); }
-  if (legacy && priorComplete !== null && s.stats.milestones.neonArchive === undefined) s.stats.milestones.neonArchive = priorComplete;
+  s.stats.builds = num(raw.stats.builds, REACTORS.length); s.stats.purchases = num(raw.stats.purchases); s.stats.lastEvent = typeof raw.stats.lastEvent === 'string' ? raw.stats.lastEvent.slice(0, 200) : '存档已恢复';
+  const oldStage = time(raw.stats.completedAt);
+  // Released v2's completedAt meant "50 Ca archived". It is preserved as the
+  // calcium checkpoint and must never be reinterpreted as the Xenon endpoint.
+  s.stats.neonCompletedAt = released10 ? oldStage : time(raw.stats.neonCompletedAt);
+  s.stats.calciumCompletedAt = released10 ? null : released20 ? oldStage : time(raw.stats.calciumCompletedAt);
+  s.stats.xeCompletedAt = released10 || released20 ? null : time(raw.stats.xeCompletedAt);
+  s.stats.completedAt = released10 || released20 ? null : oldStage;
+  if ((s.stats.neonCompletedAt !== null) !== s.elements[9].archived) throw new Error('氖的完成状态与收录进度不一致。');
+  if ((s.stats.calciumCompletedAt !== null) !== s.elements[CALCIUM_ELEMENT - 1].archived) throw new Error('钙的完成状态与收录进度不一致。');
+  if ((s.stats.xeCompletedAt !== null) !== s.elements[XENON_ELEMENT - 1].archived) throw new Error('氙的完成状态与收录进度不一致。');
+  if ((s.stats.completedAt !== null) !== (max === PLAYABLE_ELEMENTS && s.elements.every(e => e.archived))) throw new Error('完整收集状态与档案不一致。');
+  const validMilestones = new Set(['complete', 'neonArchive', 'xeArchive', 'stage54', 'firstUpgrade', 'firstArchive', 'module_feed', 'module_reaction', 'module_allocation', ...Array.from({ length: PLAYABLE_ELEMENTS - 1 }, (_, i) => `element${i + 2}`), ...REACTORS.slice(1).map(r => `reactor${r.id}`)]);
+  s.stats.milestones = {}; for (const [k, v] of Object.entries(raw.stats.milestones || {})) { const key = released10 && k === 'complete' ? 'neonArchive' : k; if (validMilestones.has(key)) s.stats.milestones[key] = num(v); }
+  if (released10 && oldStage !== null && s.stats.milestones.neonArchive === undefined) s.stats.milestones.neonArchive = oldStage;
   const valid = new Set<string>(ACHIEVEMENTS.map(a => a.id)); if (!Array.isArray(raw.achievements)) throw new Error('成就数据损坏。');
   s.achievements = [...new Set<string>(raw.achievements.filter((id: unknown) => typeof id === 'string' && valid.has(id)))];
   if (raw.settings && typeof raw.settings === 'object') {
@@ -70,7 +87,9 @@ export function deserialize(text: string): GameState {
       s.firstRun = { step, remaining };
     }
   }
-  s.saveVersion = 2; s.notices = []; return s;
+  const activeAbilities = savedAbilities(s, raw.activeAbilities);
+  if (activeAbilities.length) s.activeAbilities = activeAbilities;
+  s.saveVersion = SAVE_VERSION; s.notices = []; return s;
 }
 export function saveLocal(s: GameState): { ok: boolean; message: string } {
   try { localStorage.setItem(KEY, serialize(s)); return { ok: true, message: '存档已保存在此浏览器' }; }

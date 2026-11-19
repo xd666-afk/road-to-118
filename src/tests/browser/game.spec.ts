@@ -40,7 +40,7 @@ test('mobile 360px: usable navigation, scrollable table, knowledge cards, no pag
   await expect(page.getByText('让实验室，自己运转。')).toBeVisible();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
-test('49 Ca remains incomplete; one more production and submission completes once', async ({ page }) => {
+test('49 Ca remains incomplete; one more submission preserves the 20th milestone, not the version end', async ({ page }) => {
   const e=new Engine(createState(222));e.state.coins=D('1e30');e.state.data=D('1e30');
   for(let z=2;z<=20;z++){e.target(1,z);e.state.reactors[0].discoveryHazard=0;e.step(.1);}
   for(let id=2;id<=5;id++)e.build(id);
@@ -57,9 +57,9 @@ test('49 Ca remains incomplete; one more production and submission completes onc
   await page.locator('.route-cell').nth(19).click();
   await page.getByRole('button',{name:'提交 1 单位至档案'}).click({timeout:15000});
   await expect(page.getByRole('dialog')).toContainText('周期表已永久点亮');
-  await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).toContainText('你的第二十号里程碑');
-  await expect(page.getByRole('dialog')).toContainText('CALCIUM / 钙');
-  await page.getByRole('button',{name:'继续我的实验室'}).click();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.toast-stack')).toContainText('第二十号里程碑');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.locator('.route-cell').nth(19)).toHaveClass(/archived/);
 });
 
@@ -202,7 +202,7 @@ test('tutorial keeps experiments running and defers discovery popups until retur
   await expect(page.getByRole('dialog')).toContainText('新元素发现 · 氦');
 });
 
-test('all twenty knowledge cards show neutral electrons, isotope-specific neutrons and electronic structure',async({page})=>{
+test('H–Xe cards show neutral electrons, isotope-specific neutrons and the new atomic schematics',async({page})=>{
   const state=createState(68);state.elements.forEach(e=>e.discovered=true);state.reactors[0].active=false;
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(state)});
   await page.setViewportSize({width:1280,height:1000});await page.goto('/');
@@ -229,6 +229,18 @@ test('all twenty knowledge cards show neutral electrons, isotope-specific neutro
     if(z===2){await dialog.locator('summary').click();await expect(dialog.locator('.physical-facts')).toContainText('常压下不凝固');}
     await page.keyboard.press('Escape');
   }
+  await page.locator('[data-z="30"]').click();
+  await expect(value('质子数')).toHaveText('30');
+  await expect(dialog.locator('.electron-configuration')).toContainText('3d¹⁰');
+  await page.keyboard.press('Escape');
+  await page.locator('[data-z="54"]').click();
+  await expect(value('质子数')).toHaveText('54');
+  await expect(dialog.locator('.electron-configuration')).toContainText('5p⁶');
+  await expect(dialog.locator('.atomic-specimen')).toBeVisible();
+  await expect(dialog.locator('.specimen')).toHaveCount(0);
+  await expect(dialog).toContainText('第五十四号');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('[data-z="55"]')).toHaveClass(/version-locked/);
   await page.locator('[data-z="118"]').click();
   await expect(value('质子数')).toHaveText('118');
   await expect(value('电子数（中性）')).toHaveText('118');
@@ -316,6 +328,6 @@ test('new period fits 320px and 360px screens and reads Ca and P knowledge witho
   await expect(page.getByRole('dialog').locator('.physical-facts')).toContainText('白磷');
   await page.keyboard.press('Escape');
   await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'科研',exact:true}).click();
-  await expect(page.locator('.research-device')).toHaveCount(5);
+  await expect(page.locator('.research-device')).toHaveCount(8);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });

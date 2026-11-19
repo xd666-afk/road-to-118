@@ -82,14 +82,16 @@ test('x100 buys exactly 100 even when MAX can buy 102', async ({ page }) => {
   await expect(page.getByTestId('coins')).toHaveText('1');
 });
 
-test('stage copy reports discovered species and accessible opening checks keep completed He', async ({ page }) => {
+test('stage copy reports H–Xe archive checkpoints and accessible opening checks keep completed He', async ({ page }) => {
   const s = pausedLab(713);
   s.elements[1].discovered = true;
   await page.addInitScript(({ key, text }) => localStorage.setItem(key, text), { key: KEY, text: serialize(s) });
   await page.goto('/');
 
-  await expect(page.locator('.journey-stage').first()).toContainText('已发现 2/10 种');
-  await expect(page.locator('.journey-stage').nth(1)).toContainText('已提交 0/50 份');
+  await expect(page.locator('.journey-stage').first()).toContainText('氖档案');
+  await expect(page.locator('.journey-stage').first()).toContainText('已提交 0/50 份');
+  await expect(page.locator('.journey-stage').nth(1)).toContainText('钙档案 · 第20号');
+  await expect(page.locator('.progress-resource strong')).toContainText('2/54 发现');
   const checklist = page.getByRole('list', { name: '开局检查清单' });
   await expect(checklist).toBeVisible();
   await expect(checklist.getByRole('listitem', { name: '发现 He：已完成' })).toBeVisible();
@@ -98,7 +100,7 @@ test('stage copy reports discovered species and accessible opening checks keep c
 
 test('Be discovery card stays open while background discovery queues B, then opens the next card', async ({ page }) => {
   const clock = new Date('2026-11-19T00:00:00.000Z').getTime();
-  const s = createState(720);
+  const s = createState(23);
   s.settings.guideDismissed = true;
   s.elements[1].discovered = true;
   s.elements[2].discovered = true;
@@ -112,20 +114,19 @@ test('Be discovery card stays open while background discovery queues B, then ope
   await page.goto('/');
 
   const beDialog = page.getByRole('dialog', { name: '新元素发现 · 铍' });
-  let ticks = 0;
-  while (ticks < 240 && (await beDialog.count()) === 0) { await page.clock.runFor(250); ticks++; }
+  await page.clock.runFor(500);
   await expect(beDialog).toBeVisible();
 
   const next = page.getByRole('button', { name: '查看下一个发现' });
-  ticks = 0;
-  while (ticks < 400 && (await next.count()) === 0) { await page.clock.runFor(250); ticks++; }
+  // Seed 23 crosses the second discovery threshold after about three virtual seconds.
+  await page.clock.runFor(3500);
   await expect(next).toBeVisible();
   await expect(beDialog).toBeVisible();
   await expect(beDialog).toContainText('还有 1 项新发现待查看');
-  await expect(page.locator('.progress-resource strong')).toContainText('5/20 发现');
+  await expect(page.locator('.progress-resource strong')).toContainText('5/54 发现');
 
   await next.click();
   await expect(page.getByRole('dialog', { name: '新元素发现 · 硼' })).toBeVisible();
-  await expect(page.locator('.progress-resource strong')).toContainText('5/20 发现');
+  await expect(page.locator('.progress-resource strong')).toContainText('5/54 发现');
   await expect(page.getByRole('button', { name: '查看下一个发现' })).toHaveCount(0);
 });

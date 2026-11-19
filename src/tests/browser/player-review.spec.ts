@@ -23,7 +23,7 @@ test('welcome waits for the player and mobile guide holds each step before advan
   await page.evaluate(() => document.querySelector<HTMLButtonElement>('.main-nav button:nth-child(2)')?.click());
   await expect(start).toBeVisible();
   await page.clock.runFor(10_000);
-  await expect(page.locator('.progress-resource strong')).toContainText('1/20 发现');
+  await expect(page.locator('.progress-resource strong')).toContainText('1/54 发现');
 
   await start.click();
   await page.clock.runFor(400);
@@ -39,7 +39,7 @@ test('welcome waits for the player and mobile guide holds each step before advan
   await expect(buy).toBeDisabled();
   await page.clock.runFor(10_000);
   await expect(buy).toBeEnabled();
-  await expect(page.locator('.progress-resource strong')).toContainText('1/20 发现');
+  await expect(page.locator('.progress-resource strong')).toContainText('1/54 发现');
   await buy.click();
 
   await page.clock.runFor(400);
@@ -49,13 +49,13 @@ test('welcome waits for the player and mobile guide holds each step before advan
   await page.reload();
   await expect(guide).toContainText('第 3 步');
   await page.clock.runFor(10_000);
-  await expect(page.locator('.progress-resource strong')).toContainText('1/20 发现');
+  await expect(page.locator('.progress-resource strong')).toContainText('1/54 发现');
   await page.getByRole('button', { name: '探索 He' }).click();
   await page.clock.runFor(1000);
   await expect(guide).toHaveCount(0);
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.clock.runFor(3750);
-  await expect(page.locator('.progress-resource strong')).toContainText('1/20 发现');
+  await expect(page.locator('.progress-resource strong')).toContainText('1/54 发现');
   await page.clock.runFor(250);
   const card = page.getByRole('dialog', { name: '新元素发现 · 氦' });
   await expect(card).toBeVisible();

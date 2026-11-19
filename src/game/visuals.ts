@@ -15,4 +15,4 @@ export function reactorDisplayPool(state: GameState, reactor: ReactorState): num
 }
 
 // A modest visual cue for progression, not a model of actual atomic radii.
-export const particleScale = (z: number) => .88 + .03 * (Math.max(1, Math.min(20, z)) - 1);
+export const particleScale = (z: number) => .88 + .015 * (Math.max(1, Math.min(54, z)) - 1);
