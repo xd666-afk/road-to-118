@@ -32,7 +32,7 @@ test('He archive submit is above the fold at 360x800 and 1440x1000 and deposits 
   await submit.click();
 
   await expect(region).toContainText('档案累计提交');
-  await expect(region).toContainText('4 / 50');
+  await expect(region).toContainText('4 / 100');
   await expect(region).toContainText('可提交库存');
   await expect(region).toContainText('0 单位');
   await expect(region.getByRole('button', { name: '提交 0 单位至档案' })).toBeDisabled();
@@ -89,7 +89,7 @@ test('stage copy reports H–Xe archive checkpoints and accessible opening check
   await page.goto('/');
 
   await expect(page.locator('.journey-stage').first()).toContainText('氖档案');
-  await expect(page.locator('.journey-stage').first()).toContainText('已提交 0/50 份');
+  await expect(page.locator('.journey-stage').first()).toContainText('已提交 0/100 份');
   await expect(page.locator('.journey-stage').nth(1)).toContainText('钙档案 · 第20号');
   await expect(page.locator('.progress-resource strong')).toContainText('2/54 发现');
   const checklist = page.getByRole('list', { name: '开局检查清单' });

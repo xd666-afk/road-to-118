@@ -46,8 +46,8 @@ test('the last onboarding step is the sole guidance on desktop and phone, then h
   const s = createState(704);
   s.stats.purchases = 1;
   s.elements.slice(0, 4).forEach(element => { element.discovered = true; });
-  s.elements[0].inventory = D(50);
-  s.elements[0].totalProduced = D(50);
+  s.elements[0].inventory = D(100);
+  s.elements[0].totalProduced = D(100);
   s.reactors[1].built = true;
   s.modules.feed = s.modules.reaction = true;
   await page.addInitScript(({ key, text }) => localStorage.setItem(key, text), { key: KEY, text: serialize(s) });
@@ -74,8 +74,8 @@ test('calcium recommendation preserves the 20th milestone without ending the H�
   const s=createState(703);s.elements.forEach((x,i)=>{x.discovered=i<20;});
   s.reactors.forEach((r,i)=>{r.built=i<5;r.target=2;r.discoveryHazard=100000;});
   s.modules.feed=s.modules.reaction=true;s.automation.feed=false;s.automation.reaction=true;
-  s.elements[0].archived=true;s.elements[0].deposited=50;s.elements[0].totalProduced=D(50);
-  s.elements[19].deposited=49;s.elements[19].inventory=D(0);s.elements[19].totalProduced=D(49);
+  s.elements[0].archived=true;s.elements[0].deposited=100;s.elements[0].totalProduced=D(100);
+  s.elements[19].deposited=99;s.elements[19].inventory=D(0);s.elements[19].totalProduced=D(99);
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(s)});
   await page.goto('/');
   await expect(page.getByRole('region',{name:'新手实验引导'})).toHaveCount(0);

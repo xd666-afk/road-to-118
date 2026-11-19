@@ -12,7 +12,7 @@ function advanced() {
   e.state.modules.feed = e.state.modules.reaction = e.state.modules.allocation = true;
   return e;
 }
-function archive(e: Engine, z: number, units = 50) {
+function archive(e: Engine, z: number, units = 100) {
   const row = e.state.elements[z - 1]; row.inventory = D(units); row.totalProduced = row.totalProduced.plus(units); e.deposit(z, true);
 }
 
@@ -44,7 +44,7 @@ describe('progress recommendations', () => {
     expect(recommend(e.state).id).toBe('research-feed');
   });
   it('directs discovered calcium into production, then preserves the 20th milestone without ending the version', () => {
-    const e = advanced(); const ca = e.state.elements[CALCIUM_ELEMENT - 1]; ca.deposited = 38; ca.inventory = D(0);
+    const e = advanced(); const ca = e.state.elements[CALCIUM_ELEMENT - 1]; ca.deposited = 88; ca.inventory = D(0);
     expect(recommend(e.state).action).toBe('produce');
     applyAdvice(e, recommend(e.state));
     expect(e.state.reactors[4].target).toBe(CALCIUM_ELEMENT);
@@ -61,7 +61,7 @@ describe('progress recommendations', () => {
     e.state.elements[19].discovered = false;
     archive(e, 18);
     Object.assign(e.state.reactors[4].upgrades, { capacity: 1, yield: 2 });
-    ne.archived = false; ne.deposited = 38; ne.inventory = D(0);
+    ne.archived = false; ne.deposited = 88; ne.inventory = D(0);
     const first = recommend(e.state);
     expect(first).toMatchObject({ id: 'neon', action: 'produce', reactor: 5, target: 10 });
     applyAdvice(e, first);
@@ -82,7 +82,7 @@ describe('progress recommendations', () => {
   it('rejects an obsolete Ne command and deposits only the remaining units', () => {
     const e = advanced(); const ne = e.state.elements[9];
     e.state.elements[19].discovered = false;
-    ne.archived = false; ne.deposited = 45; ne.inventory = D(0);
+    ne.archived = false; ne.deposited = 95; ne.inventory = D(0);
     const stale = recommend(e.state);
     expect(stale.action).toBe('produce');
     ne.inventory = D(10);
@@ -114,11 +114,11 @@ describe('progress recommendations', () => {
   });
   it('keeps Ca first for a legacy all-20 save even when Ne was never archived', () => {
     const e = advanced(); const ca = e.state.elements[19];
-    e.state.elements[9].archived = false; ca.deposited = 38; ca.inventory = D(0);
+    e.state.elements[9].archived = false; ca.deposited = 88; ca.inventory = D(0);
     expect(recommend(e.state)).toMatchObject({ id: 'calcium', action: 'produce', reactor: 5, target: 20 });
   });
   it('after Ca opens VI, after Kr opens VII, and at Xe recommends the real archive sweep', () => {
-    const e = advanced(); archive(e, CALCIUM_ELEMENT, 50);
+    const e = advanced(); archive(e, CALCIUM_ELEMENT);
     const ca = e.state.elements[CALCIUM_ELEMENT - 1]; ca.inventory = D(0);
     e.state.coins = D('1e30'); e.state.data = D('1e30');
     expect(recommend(e.state)).toMatchObject({ id: 'build-6', action: 'build', reactor: 6 });
@@ -132,7 +132,7 @@ describe('progress recommendations', () => {
     applyAdvice(e, recommend(e.state));
     expect(e.state.reactors[6].built).toBe(true);
     for (let z = 37; z <= XENON_ELEMENT; z++) e.state.elements[z - 1].discovered = true;
-    const xe = e.state.elements[XENON_ELEMENT - 1]; xe.archived = false; xe.deposited = 49; xe.inventory = D(1); xe.totalProduced = D(50);
+    const xe = e.state.elements[XENON_ELEMENT - 1]; xe.archived = false; xe.deposited = 99; xe.inventory = D(1); xe.totalProduced = D(100);
     expect(recommend(e.state)).toMatchObject({ id: 'xenon', action: 'deposit', target: XENON_ELEMENT });
     applyAdvice(e, recommend(e.state));
     expect(xe.archived).toBe(true); expect(e.state.stats.xeCompletedAt).not.toBeNull();
@@ -157,7 +157,7 @@ describe('progress recommendations', () => {
   it('reports full H–Xe collection without claiming 55–118', () => {
     const e = advanced();
     e.state.reactors.forEach(reactor => { reactor.built = true; });
-    e.state.elements.forEach(row => { row.discovered = true; row.deposited = 50; row.archived = true; row.inventory = D(0); });
+    e.state.elements.forEach(row => { row.discovered = true; row.deposited = 100; row.archived = true; row.inventory = D(0); });
     e.state.stats.xeCompletedAt = 1; e.state.stats.completedAt = 2;
     const advice = recommend(e.state);
     expect(advice.action).toBe('table');

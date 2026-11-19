@@ -22,7 +22,7 @@ test('desktop: renders live economy, buys upgrades, opens all 118 elements, and 
   await expect(page.getByTestId('current-rate')).toHaveCount(1);
   await page.locator('[data-z="118"]').click();
   await expect(page.getByRole('dialog')).toContainText('鿫');
-  await expect(page.getByRole('dialog')).toContainText('50 次成功合成');
+  await expect(page.getByRole('dialog')).toContainText('100 次成功合成');
   await page.keyboard.press('Escape'); await expect(page.getByRole('dialog')).not.toBeVisible();
   await page.getByRole('button',{name:'存档与设置'}).click();
   const downloadPromise=page.waitForEvent('download'); await page.getByRole('button',{name:'导出存档',exact:true}).click();
@@ -43,7 +43,7 @@ test('mobile 360px: usable navigation, scrollable table, knowledge cards, no pag
   await page.keyboard.press('Escape');
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'科研'}).click();
-  await expect(page.getByText('让实验室，自己运转。')).toBeVisible();
+  await expect(page.getByRole('heading', { name: '工业自动化' })).toBeVisible();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   await page.evaluate(() => { location.hash = '#periodic-table'; });
   await expect(page.getByRole('heading',{name:'元素周期表',exact:true})).toBeInViewport();
@@ -51,17 +51,17 @@ test('mobile 360px: usable navigation, scrollable table, knowledge cards, no pag
   await expect(page.getByRole('heading',{name:'元素周期表',exact:true})).toBeInViewport();
   await expect(page.getByTestId('current-rate')).toHaveCount(1);
 });
-test('49 Ca remains incomplete; one more submission preserves the 20th milestone, not the version end', async ({ page }) => {
+test('99 Ca remains incomplete; one more submission preserves the 20th milestone, not the version end', async ({ page }) => {
   const e=new Engine(createState(222));e.state.coins=D('1e30');e.state.data=D('1e30');
   e.state.elements.slice(0, 20).forEach(element => { element.discovered = true; });
   for(let id=2;id<=5;id++)e.build(id);
   e.state.modules.feed=true;e.state.modules.reaction=true;e.state.automation.reaction=true;
   e.state.reactors.forEach(r=>r.active=false);e.target(5,20);
-  const ca=e.state.elements[19];ca.inventory=D(49);ca.totalProduced=D(49);e.state.notices=[];
+  const ca=e.state.elements[19];ca.inventory=D(99);ca.totalProduced=D(99);e.state.notices=[];
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(e.state)});
   await page.goto('/');await page.locator('#periodic-table').scrollIntoViewIfNeeded();
-  await page.locator('[data-z="20"]').click();await page.getByRole('button',{name:'提交 49 单位至档案'}).click();
-  await expect(page.getByRole('dialog').locator('.inventory-block')).toContainText('49 / 50');
+  await page.locator('[data-z="20"]').click();await page.getByRole('button',{name:'提交 99 单位至档案'}).click();
+  await expect(page.getByRole('dialog').locator('.inventory-block')).toContainText('99 / 100');
   await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'实验室',exact:true}).click();
   await page.getByLabel('切换反应容器').selectOption('5');await page.getByRole('button',{name:'已暂停'}).click();
@@ -326,10 +326,11 @@ test('released Ne save upgrades in place and shows a real Na survey after IV tun
   const start = Date.parse('2026-11-19T00:00:00Z');
   const e=new Engine(createState(801));e.state.coins=D('1e12');e.state.data=D('1e12');
   for(let z=2;z<=10;z++){e.target(1,z);e.state.reactors[0].discoveryHazard=0;e.step(.1);}
-  e.build(2);e.build(3);e.state.elements[9].inventory=D(50);e.state.elements[9].totalProduced=D(50);e.deposit(10);
+  e.build(2);e.build(3);e.state.elements[9].inventory=D(100);e.state.elements[9].totalProduced=D(100);e.deposit(10);
   e.state.modules.feed=true;e.state.modules.reaction=true;e.state.automation.reaction=false;
   e.state.reactors.forEach(r=>r.active=false);
   const old=JSON.parse(serialize(e.state, start + 1000));old.saveVersion=1;old.elements=old.elements.slice(0,10);old.reactors=old.reactors.slice(0,3);
+  old.elements[9].deposited=50;old.elements[9].totalProduced='50';
   old.stats.completedAt=old.stats.neonCompletedAt;old.stats.milestones.complete=old.stats.milestones.neonArchive;
   delete old.stats.neonCompletedAt;delete old.stats.milestones.neonArchive;
   await page.clock.install({ time: start });
@@ -360,7 +361,7 @@ test('V opens after Ar and reaches Ca; its graphic and representative samples us
   const e=new Engine(createState(802));e.state.coins=D('1e12');e.state.data=D('1e12');
   e.state.elements.slice(0, 19).forEach(element => { element.discovered = true; });
   for (const z of [10, 18]) {
-    const row = e.state.elements[z - 1]; row.inventory = D(50); row.totalProduced = D(50); e.deposit(z);
+    const row = e.state.elements[z - 1]; row.inventory = D(100); row.totalProduced = D(100); e.deposit(z);
   }
   for(let id=2;id<=4;id++)e.build(id);
   e.state.modules.feed=true;e.state.modules.reaction=true;e.state.automation.reaction=false;

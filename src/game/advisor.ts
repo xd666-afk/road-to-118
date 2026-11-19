@@ -1,4 +1,4 @@
-import { CALCIUM_ELEMENT, MODULES, PLAYABLE_ELEMENTS, REACTORS, UPGRADES, XENON_ELEMENT } from './config';
+import { ARCHIVE_UNITS, CALCIUM_ELEMENT, MODULES, PLAYABLE_ELEMENTS, REACTORS, UPGRADES, XENON_ELEMENT } from './config';
 import { element } from '../data/elements';
 import { archivedCount, discoveredMax, highestReactor, type Engine } from './engine';
 import { eventRate, income, price } from './economy';
@@ -62,8 +62,8 @@ export function recommend(s: GameState): Advice {
   if (next?.id === 2) return build();
   if (s.reactors[1].built && !s.modules.reaction) return research('reaction');
   if (archivedCount(s) === 0 && s.modules.reaction && max < 10) {
-    const h = s.elements[0], enough = h.inventory.gte(50 - h.deposited), running = s.reactors[0].target === 1 && s.reactors[0].active;
-    return { id: 'first-archive', label: enough ? '提交并点亮 H' : running ? '氢样本正在生产…' : '让 I 型生产氢样本', detail: `档案 ${h.deposited}/50；库存 ${Math.floor(h.inventory.toNumber())}。累计提交 50 单位即可永久点亮。`, enabled: enough || !running, action: enough ? 'deposit' : 'produce', reactor: 1, target: 1 };
+    const h = s.elements[0], enough = h.inventory.gte(ARCHIVE_UNITS - h.deposited), running = s.reactors[0].target === 1 && s.reactors[0].active;
+    return { id: 'first-archive', label: enough ? '提交并点亮 H' : running ? '氢样本正在生产…' : '让 I 型生产氢样本', detail: `档案 ${h.deposited}/${ARCHIVE_UNITS}；库存 ${Math.floor(h.inventory.toNumber())}。累计提交 ${ARCHIVE_UNITS} 单位即可永久点亮。`, enabled: enough || !running, action: enough ? 'deposit' : 'produce', reactor: 1, target: 1 };
   }
   const ne = s.elements[9], ca = s.elements[CALCIUM_ELEMENT - 1], xe = s.elements[XENON_ELEMENT - 1];
   // Ne is a historical checkpoint: with Ca still undiscovered, finish this
@@ -74,15 +74,15 @@ export function recommend(s: GameState): Advice {
   if (next && neStage && (canBuild || !neProducer)) return build();
   if (neStage) {
     const suitable = neProducer ?? top;
-    const enough = ne.inventory.gte(50 - ne.deposited), running = suitable.target === 10 && suitable.active;
-    return { id: 'neon', label: enough ? '提交氖的记录' : running ? '氖正在生产…' : '生产氖 · 收录档案', detail: `氖档案 ${ne.deposited}/50；库存 ${Math.floor(ne.inventory.toNumber())}。使用 ${REACTORS[suitable.id - 1].roman} 级仪器真实生产氖，累计提交 50 份完成这一历史节点。`, enabled: enough || !running, action: enough ? 'deposit' : 'produce', reactor: suitable.id, target: 10 };
+    const enough = ne.inventory.gte(ARCHIVE_UNITS - ne.deposited), running = suitable.target === 10 && suitable.active;
+    return { id: 'neon', label: enough ? '提交氖的记录' : running ? '氖正在生产…' : '生产氖 · 收录档案', detail: `氖档案 ${ne.deposited}/${ARCHIVE_UNITS}；库存 ${Math.floor(ne.inventory.toNumber())}。使用 ${REACTORS[suitable.id - 1].roman} 级仪器真实生产氖，累计提交 ${ARCHIVE_UNITS} 份完成这一历史节点。`, enabled: enough || !running, action: enough ? 'deposit' : 'produce', reactor: suitable.id, target: 10 };
   }
   // Calcium remains the twentieth milestone. It is intentionally not labelled
   // as the end of the version; VI opens on discovery and zinc/krypton continue.
   if (ca.discovered && !ca.archived && max <= CALCIUM_ELEMENT) {
     const producer = s.reactors.filter(r => r.built && REACTORS[r.id - 1].softMax >= CALCIUM_ELEMENT).at(-1) ?? top;
-    const enough = ca.inventory.gte(50 - ca.deposited), running = producer.target === CALCIUM_ELEMENT && producer.active;
-    return { id: 'calcium', label: enough ? '提交钙的记录' : running ? '钙正在生产…' : '生产钙 · 保留第二十号里程碑', detail: `钙档案 ${ca.deposited}/50；库存 ${Math.floor(ca.inventory.toNumber())}。提交 50 Ca 只保留历史里程碑，之后仍需建造 VI 级仪器并继续到氙。`, enabled: enough || !running, action: enough ? 'deposit' : 'produce', reactor: producer.id, target: CALCIUM_ELEMENT };
+    const enough = ca.inventory.gte(ARCHIVE_UNITS - ca.deposited), running = producer.target === CALCIUM_ELEMENT && producer.active;
+    return { id: 'calcium', label: enough ? '提交钙的记录' : running ? '钙正在生产…' : '生产钙 · 保留第二十号里程碑', detail: `钙档案 ${ca.deposited}/${ARCHIVE_UNITS}；库存 ${Math.floor(ca.inventory.toNumber())}。提交 ${ARCHIVE_UNITS} Ca 只保留历史里程碑，之后仍需建造 VI 级仪器并继续到氙。`, enabled: enough || !running, action: enough ? 'deposit' : 'produce', reactor: producer.id, target: CALCIUM_ELEMENT };
   }
   // VI and VII are required range transitions. VIII is an optional post-Xe
   // capacity instrument and should not block the final archive sweep.
@@ -104,11 +104,11 @@ export function recommend(s: GameState): Advice {
       if (!archived) {
         const z = stage.specimen, sample = s.elements[z - 1];
         const producer = s.reactors.find(r => r.built && REACTORS[r.id - 1].softMax >= z) ?? reactor;
-        const enough = sample.inventory.gte(50 - sample.deposited);
+        const enough = sample.inventory.gte(ARCHIVE_UNITS - sample.deposited);
         const producing = producer.active && producer.target === z && !producer.exploring;
         const symbol = element(z).symbol;
         return { id: `calibration-${z}`, label: enough ? `收录 ${symbol} · 开放探索` : producing ? `正在生产 ${symbol}` : `生产校准样本 · ${symbol}`,
-          detail: `收录 ${symbol} 至 50 份，开放 ${element(stage.from).symbol}–${element(stage.to).symbol}。已提交 ${sample.deposited}/50，库存 ${Math.floor(sample.inventory.toNumber())}。`,
+          detail: `收录 ${symbol} 至 ${ARCHIVE_UNITS} 份，开放 ${element(stage.from).symbol}–${element(stage.to).symbol}。已提交 ${sample.deposited}/${ARCHIVE_UNITS}，库存 ${Math.floor(sample.inventory.toNumber())}。`,
           enabled: enough || !producing, action: enough ? 'deposit' : 'produce', target: z, reactor: producer.id };
       }
       const running = reactor.active && reactor.target === target && reactor.exploring;
@@ -121,14 +121,14 @@ export function recommend(s: GameState): Advice {
   }
   if (!xe.archived) {
     const producer = s.reactors.filter(r => r.built && REACTORS[r.id - 1].softMax >= XENON_ELEMENT).at(-1) ?? top;
-    const enough = xe.inventory.gte(50 - xe.deposited), running = producer.target === XENON_ELEMENT && producer.active;
-    return { id: 'xenon', label: enough ? '提交氙的记录' : running ? '氙正在生产…' : '生产氙 · 点亮第五十四号', detail: `氙档案 ${xe.deposited}/50；库存 ${Math.floor(xe.inventory.toNumber())}。氙是本版终点，但提交 50 Xe 之后还要补齐 H–Xe 的全部五十四格。`, enabled: enough || !running, action: enough ? 'deposit' : 'produce', reactor: producer.id, target: XENON_ELEMENT };
+    const enough = xe.inventory.gte(ARCHIVE_UNITS - xe.deposited), running = producer.target === XENON_ELEMENT && producer.active;
+    return { id: 'xenon', label: enough ? '提交氙的记录' : running ? '氙正在生产…' : '生产氙 · 点亮第五十四号', detail: `氙档案 ${xe.deposited}/${ARCHIVE_UNITS}；库存 ${Math.floor(xe.inventory.toNumber())}。氙是本版终点，但提交 ${ARCHIVE_UNITS} Xe 之后还要补齐 H–Xe 的全部五十四格。`, enabled: enough || !running, action: enough ? 'deposit' : 'produce', reactor: producer.id, target: XENON_ELEMENT };
   }
   const archived = archivedCount(s);
   if (archived < PLAYABLE_ELEMENTS) {
     if (!s.modules.allocation) return research('allocation');
-    if (s.automation.mode === 'archive' && s.automation.allocation) {
-      return { id: 'archive-running', label: '查看收录进度', detail: `仪器正在补齐 H–Xe 档案 · ${archived}/${PLAYABLE_ELEMENTS}。已点亮的元素能力可在周期表激活。`, enabled: true, action: 'table' };
+    if (s.automation.mode === 'archive' && s.automation.reaction && s.automation.allocation && s.automation.allocationScope === 'all') {
+      return { id: 'archive-running', label: '查看收录进度', detail: `仪器正在补齐 H–Xe 档案 · ${archived}/${PLAYABLE_ELEMENTS}。每点亮一格，对应能力立即生效。`, enabled: true, action: 'table' };
     }
     return { id: 'archive-sweep', label: `补齐 H–Xe 档案 · ${archived}/${PLAYABLE_ELEMENTS}`, detail: '切换到收录优先，各代仪器会分工生产，元素分配模块自动提交库存。', enabled: true, action: 'archive' };
   }
@@ -145,7 +145,12 @@ export function applyAdvice(e: Engine, advice: Advice): void {
   if (current.action === 'research') e.research(current.module!);
   if (current.action === 'build') e.build(current.reactor!);
   if (current.action === 'deposit') e.deposit(current.target!);
-  if (current.action === 'archive') e.setMode('archive');
+  if (current.action === 'archive') {
+    e.state.automation.reaction = true;
+    e.state.automation.allocation = true;
+    e.state.automation.allocationScope = 'all';
+    e.setMode('archive');
+  }
   if (current.action === 'explore' || current.action === 'produce') {
     e.target(current.reactor!, current.target!, current.action === 'explore');
     e.state.reactors[current.reactor! - 1].active = true;

@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { Engine, createFirstRun, createState } from '../game/engine';
 import { Big, D } from '../game/numbers';
 import { coinPerEvent, eventRate } from '../game/economy';
-import { activateElementAbility } from '../game/abilityProgress';
 import { deserialize, serialize } from '../game/save';
 
 const pulseEvents = (e: Engine, id: number) =>
@@ -64,11 +63,10 @@ describe('manual pulse settlement', () => {
     for (const z of [1, 2, 4, 5, 7, 8]) {
       const row = e.state.elements[z - 1];
       row.discovered = true;
-      row.inventory = D(50);
-      row.totalProduced = D(50);
+      row.inventory = D(100);
+      row.totalProduced = D(100);
       e.deposit(z);
     }
-    for (const z of [1, 2, 4, 5, 7, 8]) expect(activateElementAbility(e.state, z)).toBe(true);
     const r = e.state.reactors[0];
     const events = pulseEvents(e, 1);
 

@@ -1,16 +1,6 @@
-import { Check, Cpu, Layers3, LockKeyhole, Sparkles, Zap } from 'lucide-react';
+import { Check, Cpu, Layers3, LockKeyhole, Zap } from 'lucide-react';
 import { getElementAbility, type AbilityChannel } from '../game/elementAbilities';
 import './element-ability.css';
-
-export interface ElementAbilityProps {
-  z: number;
-  /** 该元素是否已收录（档案永久点亮）。 */
-  archived: boolean;
-  /** 该能力是否已被宿主激活。 */
-  active: boolean;
-  /** 宿主负责写入存档、校验上限并应用到引擎。 */
-  onActivate: () => void;
-}
 
 const CHANNEL_LABEL: Record<AbilityChannel, string> = {
   energy: '碰撞能',
@@ -24,12 +14,12 @@ const CHANNEL_ICON = {
   production: Layers3,
 } as const;
 
-export default function ElementAbility({ z, archived, active, onActivate }: ElementAbilityProps) {
+export default function ElementAbility({ z, archived }: { z: number; archived: boolean }) {
   const ability = getElementAbility(z);
   if (!ability) return null;
 
   const ChannelIcon = CHANNEL_ICON[ability.channel];
-  const stage = active ? 'active' : archived ? 'ready' : 'locked';
+  const stage = archived ? 'active' : 'locked';
 
   return (
     <section className={`element-ability ea-${stage}`} data-stage={stage} aria-label={`${ability.name} · 元素能力`}>
@@ -46,25 +36,11 @@ export default function ElementAbility({ z, archived, active, onActivate }: Elem
       </header>
       <p className="ea-description">{ability.description}</p>
       <footer className="ea-foot">
-        {active ? (
-          <p className="ea-value" aria-live="polite">
-            <strong>+{ability.percent}%</strong>
-            <span>{CHANNEL_LABEL[ability.channel]}增益</span>
-          </p>
+        <p className="ea-value"><strong>+{ability.percent}%</strong><span>{CHANNEL_LABEL[ability.channel]}增益</span></p>
+        {archived ? (
+          <span className="ea-state ea-state-active"><Check size={14} aria-hidden="true"/>已生效</span>
         ) : (
-          <p className="ea-hint">
-            {archived ? <>能力已就绪，激活后计入实验室。</> : <><LockKeyhole size={11} aria-hidden="true"/>收录后可激活</>}
-          </p>
-        )}
-        {active ? (
-          <span className="ea-state ea-state-active"><Check size={14} aria-hidden="true"/>已激活</span>
-        ) : archived ? (
-          <button type="button" className="ea-activate" onClick={onActivate}>
-            激活能力
-            <Sparkles size={14} aria-hidden="true"/>
-          </button>
-        ) : (
-          <span className="ea-state ea-state-locked"><LockKeyhole size={14} aria-hidden="true"/>未点亮</span>
+          <span className="ea-state ea-state-locked"><LockKeyhole size={14} aria-hidden="true"/>收录后生效</span>
         )}
       </footer>
     </section>

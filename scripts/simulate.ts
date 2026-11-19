@@ -3,9 +3,8 @@ import { dirname } from 'node:path';
 import { Engine, createFirstRun, discoveredMax, highestReactor, archivedCount } from '../src/game/engine';
 import { D } from '../src/game/numbers';
 import { income, price } from '../src/game/economy';
-import { FINAL_ELEMENT, PLAYABLE_ELEMENTS, REACTORS } from '../src/game/config';
+import { ARCHIVE_UNITS, FINAL_ELEMENT, PLAYABLE_ELEMENTS, REACTORS } from '../src/game/config';
 import type { Upgrade } from '../src/game/types';
-import { activateElementAbility, availableAbilities } from '../src/game/abilityProgress';
 import { applyAdvice, recommend } from '../src/game/advisor';
 import { discoveryStage, stageReadiness } from '../src/game/discovery';
 
@@ -29,8 +28,6 @@ export function pilot(e: Engine, strategy: Strategy) {
   if (s.firstRun?.step === 'explore') { e.target(1, 2, true); return; }
   if (s.firstRun?.step === 'helium') return;
 
-  // One click in the periodic table activates the earned bonuses together.
-  for (const z of availableAbilities(s)) activateElementAbility(s, z);
   if (strategy === 'guided') {
     applyAdvice(e, recommend(s));
     s.notices = [];
@@ -45,7 +42,7 @@ export function pilot(e: Engine, strategy: Strategy) {
     else if (max >= 4 && !s.reactors[1].built) e.build(2);
     else if (s.reactors[1].built && !s.modules.reaction) e.research('reaction');
     else if (s.modules.reaction) {
-      if (s.elements[0].inventory.gte(50 - s.elements[0].deposited)) e.deposit(1, true);
+      if (s.elements[0].inventory.gte(ARCHIVE_UNITS - s.elements[0].deposited)) e.deposit(1, true);
       else e.target(1, 1, false);
     }
     s.notices = []; return;
@@ -76,6 +73,7 @@ export function pilot(e: Engine, strategy: Strategy) {
   // At Xe, switch once to the real archive pipeline. Its per-reactor range
   // targeting and the allocation module then deposit the remaining 54 rows.
   if (max >= FINAL_ELEMENT && archivedCount(s) < PLAYABLE_ELEMENTS && s.modules.reaction && s.automation.mode !== 'archive') {
+    s.automation.allocation = true;
     e.setMode('archive');
   }
 
@@ -87,12 +85,6 @@ export function pilot(e: Engine, strategy: Strategy) {
         const target = e.archiveTarget(reactor.id);
         if (s.elements[target - 1]?.discovered && !s.elements[target - 1].archived && reactor.target !== target) e.target(reactor.id, target, false);
       }
-    }
-  } else if (s.automation.mode === 'archive' && max >= FINAL_ELEMENT && archivedCount(s) < PLAYABLE_ELEMENTS) {
-    // Re-seed in-range targets if a newly built reactor joined after the first
-    // switch. Normally step() already advances archived targets itself.
-    for (const reactor of s.reactors.filter(reactor => reactor.built && !reactor.exploring && s.elements[reactor.target - 1]?.archived)) {
-      e.target(reactor.id, e.archiveTarget(reactor.id), false);
     }
   }
 
@@ -118,7 +110,7 @@ export function pilot(e: Engine, strategy: Strategy) {
 
   // Manual submissions are allowed too; the allocation module is the normal
   // path, but a player can submit one visible archive per action window.
-  const nextArchive = s.elements.findIndex((element, index) => element.discovered && !element.archived && element.inventory.gte(50 - element.deposited));
+  const nextArchive = s.elements.findIndex((element, index) => element.discovered && !element.archived && element.inventory.gte(ARCHIVE_UNITS - element.deposited));
   if (nextArchive >= 0) e.deposit(nextArchive + 1, true);
   s.notices = [];
 }
@@ -131,7 +123,7 @@ const limit = 7200, dt = 2;
 const summary: any = {
   runsPerStrategy: count, dtSeconds: dt, limitMinutes: limit / 60,
   generatedAt: new Date().toISOString(),
-  engine: 'Production Decimal.js and Engine.step, fresh game and real tutorial actions. First He uses the same timed synthesis as the game. Earned abilities are activated through the bulk action.',
+  engine: 'Production Decimal.js and Engine.step, fresh game and real tutorial actions. First He uses the same timed synthesis as the game. Archived element abilities take effect automatically.',
   actionCadenceSeconds: CADENCE,
   seedPolicy: 'seed = (run+1)*2654435761 + strategyOffset mod 2^32', seedOffsets: SEED_OFFSET,
   balance: REACTORS.map(r => ({ id: r.id, roman: r.roman, range: r.range, softMax: r.softMax, anchor: r.anchor, anchorP: r.p, q: r.q, buildCoins: r.buildCoins, buildData: r.buildData, unlock: r.unlock })),

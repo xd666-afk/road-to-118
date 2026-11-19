@@ -2,19 +2,19 @@ import { D, Big, finiteNumber } from './numbers';
 import type { Amount } from './numbers';
 import { abilityBonuses } from './abilityProgress';
 import { discoveryStage, observationProgress, observationRate, stageReadiness } from './discovery';
-import { ACHIEVEMENTS, CALCIUM_ELEMENT, FINAL_ELEMENT, MODULES, OFFLINE_LIMIT, PLAYABLE_ELEMENTS, REACTORS, SAVE_VERSION, XENON_ELEMENT, productionParallel } from './config';
+import { ACHIEVEMENTS, ARCHIVE_UNITS, CALCIUM_ELEMENT, FINAL_ELEMENT, MODULES, OFFLINE_LIMIT, PLAYABLE_ELEMENTS, REACTORS, SAVE_VERSION, XENON_ELEMENT, productionParallel } from './config';
 import { coinPerEvent, eventRate, firstDiscoveryRate, maxAffordable, price, probability, usefulAtomPurchase } from './economy';
 import { poisson, random, waitingHazard } from './rng';
-import type { GameState, Module, Notice, ReactorState, Upgrade, WorkMode } from './types';
+import type { GameState, Module, Notice, ReactorJob, ReactorState, Upgrade, WorkMode } from './types';
 import { element } from '../data/elements';
 
 export function createState(seed = Date.now() >>> 0, now = Date.now()): GameState {
   const s: GameState = {
     saveVersion: SAVE_VERSION, savedAt: now, elapsed: 0, seed, rng: seed >>> 0, coins: D(0), data: D(0),
-    reactors: REACTORS.map(({ id }) => ({ id, built: id === 1, active: true, target: 2, exploring: false, upgrades: { atoms: 0, speed: 0, yield: 0, capacity: 0 }, events: D(0), discoveryHazard: 1, productionRemainder: D(0), eventRemainder: D(0) })),
+    reactors: REACTORS.map(({ id }) => ({ id, built: id === 1, active: true, target: 2, exploring: false, job: 'manual', upgrades: { atoms: 0, speed: 0, yield: 0, capacity: 0 }, events: D(0), discoveryHazard: 1, productionRemainder: D(0), eventRemainder: D(0) })),
     elements: Array.from({ length: PLAYABLE_ELEMENTS }, (_, i) => ({ discovered: i === 0, inventory: D(0), deposited: 0, archived: false, firstDiscoveredAt: i === 0 ? 0 : null, firstDiscoveredReactor: i === 0 ? 1 : null, totalProduced: D(0) })),
     modules: { feed: false, reaction: false, allocation: false },
-    automation: { feed: false, reaction: false, allocation: false, reserve: D(100), mode: 'explore', target: 1 },
+    automation: { feed: false, reaction: false, allocation: false, reserve: D(100), mode: 'custom', target: 1, feedScope: 'latest', allocationScope: 'all' },
     stats: { events: D(0), produced: D(0), earned: D(0), peak: D(0), builds: 1, purchases: 0, lastEvent: '实验室已准备就绪', neonCompletedAt: null, calciumCompletedAt: null, xeCompletedAt: null, completedAt: null, milestones: {} },
     achievements: [], settings: { scientific: false, reducedMotion: false, guideDismissed: false, mix: [1] },
     notices: [], noticeSeq: 0,
@@ -69,6 +69,16 @@ export class Engine {
   }
 
   target(id: number, z: number, exploring = false): boolean {
+    if (!this.setTarget(id, z, exploring)) return false;
+    const reactor = this.state.reactors[id - 1];
+    if (reactor.job !== 'manual') {
+      reactor.job = 'manual';
+      this.state.automation.mode = 'custom';
+    }
+    return true;
+  }
+
+  private setTarget(id: number, z: number, exploring = false): boolean {
     const s = this.state, r = s.reactors[id - 1];
     if (!r?.built || !Number.isInteger(z) || z < 1 || z > Math.min(PLAYABLE_ELEMENTS, discoveredMax(s) + 1)) return false;
     if (id === 1 && z === 2 && s.firstRun) {
@@ -100,7 +110,9 @@ export class Engine {
     const s = this.state, r = s.reactors[id - 1], c = REACTORS[id - 1];
     if (!r || r.built || !s.elements[c.unlock - 1].discovered || s.coins.lt(c.buildCoins) || s.data.lt(c.buildData)) return false;
     s.coins = s.coins.minus(c.buildCoins); s.data = s.data.minus(c.buildData); r.built = true;
-    r.target = Math.min(PLAYABLE_ELEMENTS, discoveredMax(s) + 1); r.exploring = s.modules.reaction && s.automation.reaction && s.automation.mode === 'explore';
+    r.target = Math.min(PLAYABLE_ELEMENTS, discoveredMax(s) + 1);
+    r.exploring = s.modules.reaction && s.automation.reaction;
+    if (s.modules.reaction && s.automation.mode !== 'custom') this.setMode(s.automation.mode);
     s.stats.builds++; s.stats.milestones[`reactor${id}`] = s.elapsed;
     this.award(`reactor${id}`); this.notify('info', `${c.name}已投入运行`); return true;
   }
@@ -113,27 +125,70 @@ export class Engine {
     this.award('automation'); this.notify('info', `${c.name}模块已上线`); return true;
   }
   setMode(mode: WorkMode, z = this.state.automation.target) {
-    const s = this.state; s.automation.mode = mode; s.automation.target = Math.max(1, Math.min(discoveredMax(s), z));
-    if (s.modules.allocation) s.automation.allocation = mode === 'archive';
-    if (mode === 'explore') this.target(highestReactor(s).id, Math.min(PLAYABLE_ELEMENTS, discoveredMax(s) + 1), true);
-    else for (const r of s.reactors.filter(r => r.built)) {
-      const target = mode === 'archive' ? this.archiveTarget(r.id) : s.automation.target;
-      this.target(r.id, target, false);
+    const s = this.state;
+    if (!s.modules.reaction || !['explore', 'produce', 'archive'].includes(mode) || !Number.isInteger(z)) return;
+    s.automation.mode = mode;
+    s.automation.target = Math.max(1, Math.min(discoveredMax(s), z));
+    const researcher = highestReactor(s).id;
+    for (const r of s.reactors) {
+      if (!r.built) continue;
+      r.job = mode === 'explore' ? r.id === researcher ? 'explore' : 'archive' : mode;
+      if (mode === 'produce') this.setTarget(r.id, s.automation.target);
+      else r.exploring = false;
+    }
+    this.routeJobs();
+  }
+
+  setReactorJob(id: number, job: ReactorJob, z?: number): boolean {
+    const s = this.state, r = s.reactors[id - 1];
+    if (!r?.built || !s.modules.reaction || !['manual', 'explore', 'produce', 'archive'].includes(job)) return false;
+    if (job === 'produce') {
+      const target = z ?? (s.elements[r.target - 1].discovered ? r.target : 1);
+      if (!Number.isInteger(target) || !s.elements[target - 1]?.discovered || !this.setTarget(id, target)) return false;
+    }
+    r.job = job;
+    r.exploring = false;
+    s.automation.mode = 'custom';
+    this.routeJobs();
+    return true;
+  }
+
+  private routeJobs() {
+    const s = this.state;
+    if (!s.modules.reaction || !s.automation.reaction) return;
+    const working = s.reactors.filter(r => r.built && r.active && r.job !== 'manual');
+    if (!working.length) return;
+    const next = discoveredMax(s) + 1;
+    const stage = discoveryStage(next);
+    const assigned = new Set(working.filter(r => r.job === 'produce').map(r => r.target));
+    for (const r of working.reverse()) {
+      if (r.job === 'produce') continue;
+      if (r.job === 'explore' && (next <= 10 || (stage?.reactor === r.id && stageReadiness(s, stage).ready))) {
+        this.setTarget(r.id, next, true);
+        continue;
+      }
+      const z = this.archiveTarget(r.id, assigned, stage?.specimen);
+      this.setTarget(r.id, z);
+      assigned.add(z);
     }
   }
-  archiveTarget(reactorId = 1): number {
+
+  archiveTarget(reactorId = 1, assigned: ReadonlySet<number> = new Set(), specimen?: number): number {
     const s = this.state;
-    const available = s.elements.map((e, i) => ({ e, z: i + 1 })).filter(({ e }) => e.discovered && !e.archived);
-    if (!available.length) return s.automation.target;
+    const incomplete = s.elements.map((e, i) => ({ e, z: i + 1 }))
+      .filter(({ e }) => e.discovered && !e.archived && e.inventory.lt(ARCHIVE_UNITS - e.deposited));
+    if (!incomplete.length) return s.automation.target;
+    const unassigned = incomplete.filter(({ z }) => !assigned.has(z));
+    const available = unassigned.length ? unassigned : incomplete;
     // The current objective is finished by the most advanced device; older
     // devices then sweep the elements inside their own ranges.
-    const final = s.elements[FINAL_ELEMENT - 1];
     const top = highestReactor(s);
-    if (final.discovered && !final.archived && reactorId === top.id) return FINAL_ELEMENT;
+    if (reactorId === top.id && incomplete.some(({ z }) => z === FINAL_ELEMENT)) return FINAL_ELEMENT;
     const config = REACTORS[reactorId - 1];
     if (config) {
       const inRange = available.filter(({ z }) => z >= Math.max(1, config.anchor - 1) && z <= config.softMax);
       if (inRange.length) {
+        if (specimen !== undefined && inRange.some(({ z }) => z === specimen)) return specimen;
         // Work downward within the assigned range so the stage edge is not starved.
         inRange.sort((a, b) => b.z - a.z);
         return inRange[0].z;
@@ -148,22 +203,22 @@ export class Engine {
   deposit(z: number, silent = false): number {
     const s = this.state, e = s.elements[z - 1];
     if (!e?.discovered || e.archived) return 0;
-    const n = Math.min(50 - e.deposited, finiteNumber(e.inventory.floor(), 50));
+    const n = Math.min(ARCHIVE_UNITS - e.deposited, finiteNumber(e.inventory.floor(), ARCHIVE_UNITS));
     if (n <= 0) return 0;
     e.inventory = Big.max(0, e.inventory.minus(n)); e.deposited += n;
-    if (e.deposited === 50) {
-      e.archived = true; this.award('archive'); this.notify('archive', `${element(z).name}已正式收录 · 周期表已点亮`, z);
+    if (e.deposited === ARCHIVE_UNITS) {
+      e.archived = true; this.award('archive'); this.notify('archive', `${element(z).name}已正式收录 · 元素能力生效`, z);
       if (s.stats.milestones.firstArchive === undefined) s.stats.milestones.firstArchive = s.elapsed;
-      if (z === 10 && s.stats.neonCompletedAt === null) { s.stats.neonCompletedAt = s.elapsed; s.stats.milestones.neonArchive = s.elapsed; this.award('complete'); this.notify('milestone', '50 份氖已收录，继续向第二十号元素前进。', 10); }
+      if (z === 10 && s.stats.neonCompletedAt === null) { s.stats.neonCompletedAt = s.elapsed; s.stats.milestones.neonArchive = s.elapsed; this.award('complete'); this.notify('milestone', '氖档案已收录，继续向第二十号元素前进。', 10); }
       if (z === CALCIUM_ELEMENT && s.stats.calciumCompletedAt === null) {
         s.stats.calciumCompletedAt = s.elapsed; s.stats.milestones.complete = s.elapsed;
         this.award('calcium_complete');
-        this.notify('milestone', '50 份钙已收录，第二十号里程碑保留；下一站是锌、氪与氙，而不是终点。', CALCIUM_ELEMENT);
+        this.notify('milestone', '钙档案已收录，第二十号里程碑保留；下一站是锌、氪与氙，而不是终点。', CALCIUM_ELEMENT);
       }
       if (z === XENON_ELEMENT && s.stats.xeCompletedAt === null) {
         s.stats.xeCompletedAt = s.elapsed; s.stats.milestones.xeArchive = s.elapsed;
         this.award('xenon_complete');
-        this.notify('milestone', '50 份氙已收录，第五十四号里程碑达成；继续补齐 H–Xe 全部五十四格。', XENON_ELEMENT);
+        this.notify('milestone', '氙档案已收录，第五十四号里程碑达成；继续补齐 H–Xe 全部五十四格。', XENON_ELEMENT);
       }
       if (s.elements.slice(0, 10).every(e => e.archived)) this.award('collection');
       if (s.elements.slice(0, CALCIUM_ELEMENT).every(e => e.archived)) this.award('twenty_collection');
@@ -172,7 +227,7 @@ export class Engine {
         this.award('fifty_four_collection');
         this.notify('complete', `H–Xe 全部 ${PLAYABLE_ELEMENTS} 格档案已点亮；这是当前版本的完整收集，不代表 55–118 已开放。`, XENON_ELEMENT);
       }
-    } else if (!silent) this.notify('info', `已提交 ${n} 单位${element(z).name} · ${e.deposited}/50`);
+    } else if (!silent) this.notify('info', `已提交 ${n} 单位${element(z).name} · ${e.deposited}/${ARCHIVE_UNITS}`);
     return n;
   }
   private produce(r: ReactorState, amount: ReturnType<typeof D>, online: boolean) {
@@ -187,10 +242,10 @@ export class Engine {
       if (z === 2) this.award('helium');
       if (z === 10) { this.award('neon'); this.notify('milestone', '已发现氖 · IV 级离子束反应器已开放。', 10); }
       if (z === 18) { this.award('argon'); this.notify('milestone', '已发现氩 · V 级回旋加速器已开放。', 18); }
-      if (z === CALCIUM_ELEMENT) { this.award('calcium'); this.notify('milestone', '已发现钙 · 提交 50 Ca 保留第二十号里程碑；VI 级同步辐射研究环已开放。', CALCIUM_ELEMENT); }
+      if (z === CALCIUM_ELEMENT) { this.award('calcium'); this.notify('milestone', '已发现钙 · 收录后达成第二十号里程碑，VI 级同步辐射研究环已开放。', CALCIUM_ELEMENT); }
       if (z === 30) { this.award('zinc'); this.notify('milestone', '已发现锌 · 第 30 号只是中段，继续向氪与氙推进。', 30); }
       if (z === 36) { this.award('krypton'); this.notify('milestone', '已发现氪 · 第四周期结束；VII 级重离子储存环已开放，目标仍是氙。', 36); }
-      if (z === XENON_ELEMENT) { this.award('xenon'); this.notify('milestone', '已发现氙 · 提交 50 Xe 点亮第五十四号档案，并补齐全部 H–Xe。', XENON_ELEMENT); }
+      if (z === XENON_ELEMENT) { this.award('xenon'); this.notify('milestone', '已发现氙 · 收录氙以点亮第五十四号档案。', XENON_ELEMENT); }
     }
     e.inventory = e.inventory.plus(amount); e.totalProduced = e.totalProduced.plus(amount); s.stats.produced = s.stats.produced.plus(amount);
     if (online) {
@@ -199,7 +254,7 @@ export class Engine {
       if (r.id === 2 && z >= 8) this.award('old');
       if (z >= REACTORS[r.id - 1].softMax + 2) this.award('upstream');
     }
-    if (online && r.exploring && z < PLAYABLE_ELEMENTS) this.target(r.id, Math.min(PLAYABLE_ELEMENTS, discoveredMax(s) + 1), true);
+    if (online && r.exploring && (r.job === 'manual' || s.automation.reaction) && z < PLAYABLE_ELEMENTS) this.setTarget(r.id, Math.min(PLAYABLE_ELEMENTS, discoveredMax(s) + 1), true);
   }
   canManualPulse(reactorId: number): boolean {
     const r = this.state.reactors[reactorId - 1];
@@ -213,7 +268,7 @@ export class Engine {
     if (!this.canManualPulse(reactorId)) return null;
     const s = this.state;
     const r = s.reactors[reactorId - 1];
-    const bonuses = s.activeAbilities?.length ? abilityBonuses(s) : null;
+    const bonuses = abilityBonuses(s);
     const energyMultiplier = bonuses?.energy ? D(100 + bonuses.energy).div(100) : null;
     const dataMultiplier = bonuses?.data ? D(100 + bonuses.data).div(100) : null;
     const events = Big.max(D(2), eventRate(r).mul(D('0.055')).floor());
@@ -234,7 +289,8 @@ export class Engine {
   step(seconds: number, online = true) {
     if (!Number.isFinite(seconds) || seconds <= 0) return;
     const s = this.state; s.elapsed += seconds;
-    const bonuses = s.activeAbilities?.length ? abilityBonuses(s) : null;
+    this.routeJobs();
+    const bonuses = abilityBonuses(s);
     const energyMultiplier = bonuses?.energy ? D(100 + bonuses.energy).div(100) : null;
     const dataMultiplier = bonuses?.data ? D(100 + bonuses.data).div(100) : null;
     const productionBonus = bonuses?.production ? D(bonuses.production).div(100) : null;
@@ -304,14 +360,20 @@ export class Engine {
     }
     s.stats.peak = Big.max(s.stats.peak, s.coins);
     if (s.modules.feed && s.automation.feed) {
-      const r = highestReactor(s), budget = Big.max(0, s.coins.minus(s.automation.reserve));
-      // Budgeted, logarithmic batch purchase, never one-operation-per-atom.
-      const n = usefulAtomPurchase(r, budget);
-      if (n > 0) this.buy(r.id, 'atoms', n);
+      const reactors = s.automation.feedScope === 'all' ? s.reactors.filter(r => r.built && r.active).reverse() : [highestReactor(s)];
+      for (const r of reactors) {
+        // Recompute the budget for each line so the combined purchases respect the reserve.
+        const n = usefulAtomPurchase(r, Big.max(0, s.coins.minus(s.automation.reserve)));
+        if (n > 0) this.buy(r.id, 'atoms', n);
+      }
     }
-    if (s.modules.allocation && s.automation.allocation) for (let z = 1; z <= PLAYABLE_ELEMENTS; z++) this.deposit(z, true);
-    if (s.automation.mode === 'archive' && s.modules.reaction && s.automation.reaction) for (const r of s.reactors) {
-      if (r.built && !r.exploring && s.elements[r.target - 1].archived) this.target(r.id, this.archiveTarget(r.id), false);
+    if (s.modules.allocation && s.automation.allocation) {
+      if (s.automation.allocationScope === 'all') {
+        for (let z = 1; z <= PLAYABLE_ELEMENTS; z++) this.deposit(z, true);
+      } else {
+        const stage = discoveryStage(discoveredMax(s) + 1);
+        if (stage) this.deposit(stage.specimen, true);
+      }
     }
   }
   advance(seconds: number, online = true) {

@@ -97,7 +97,7 @@ export const EXPANDED_KNOWLEDGE: Record<number, KnowledgeCard> = {
     title: '轻质金属与叶片中的中心',
     fact: '镁是银白色的轻金属，原子序数为 12。它既存在于许多矿物中，也以离子和化合物形式参与生命过程；植物叶绿素分子的中心就有一个镁原子。',
     application: '镁合金可用于需要减轻重量的汽车、航空和电子产品部件。镁燃烧会发出强烈白光，因此也用于照明信号材料；样本卡展示的是未燃烧的金属。',
-    unlock: '游戏中：发现镁即可继续探索铝，发现进度不要求先提交 50 单位完成收录。',
+    unlock: '游戏中：完成本轮观测并发现镁后，即可继续探索铝。',
     source: 'https://periodic-table.rsc.org/element/12/magnesium',
   },
   13: {
@@ -153,7 +153,7 @@ export const EXPANDED_KNOWLEDGE: Record<number, KnowledgeCard> = {
     title: '从灰白金属到生命骨架',
     fact: '钙是原子序数为 20 的银白色金属，属于碱土金属。金属钙能与水反应；骨骼、牙齿、石灰石和石膏中的钙则结合在不同的化合物中。',
     application: '钙的化合物广泛用于水泥、建筑材料和水处理，金属钙还可用于冶金。骨骼的重要无机组分是含钙磷酸盐材料，并不是金属钙的堆积。',
-    unlock: '游戏中：累计提交 50 单位钙达成本阶段目标，之后仍可继续运行实验室并收录前 20 号元素。',
+    unlock: '游戏中：累计提交 100 单位钙完成里程碑，并激活钙的元素能力。',
     source: 'https://periodic-table.rsc.org/element/20/calcium',
   },
 };

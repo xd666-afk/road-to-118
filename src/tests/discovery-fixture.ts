@@ -1,3 +1,4 @@
+import { ARCHIVE_UNITS } from '../game/config';
 import { discoveredMax, type Engine } from '../game/engine';
 import { discoveryStage, stageReadiness } from '../game/discovery';
 
@@ -18,7 +19,7 @@ export function discoverThrough(e: Engine, z: number) {
       if (missingTuning > 0) e.buy(stage.reactor, 'yield', missingTuning);
       if (!status.archived) {
         const specimen = e.state.elements[stage.specimen - 1];
-        const needed = 50 - specimen.deposited;
+        const needed = ARCHIVE_UNITS - specimen.deposited;
         specimen.inventory = specimen.inventory.plus(needed);
         specimen.totalProduced = specimen.totalProduced.plus(needed);
         e.deposit(stage.specimen, true);
