@@ -36,7 +36,7 @@ export default function App() {
   const tableScroll = useRef<HTMLDivElement>(null), importInput = useRef<HTMLInputElement>(null);
   const engine = engineRef.current, s = engine.state, r = s.reactors[focus - 1], c = REACTORS[focus - 1];
   const opening = s.firstRun?.step;
-  const spotlight = tab === 'lab' && (opening === 'start' || opening === 'sample' || opening === 'explore');
+  const spotlight = opening === 'welcome' || opening === 'start' || opening === 'sample' || opening === 'explore';
   const visualPool = reactorDisplayPool(s, r);
   const max = discoveredMax(s), archived = archivedCount(s), scientific = s.settings.scientific;
   const fmt = (v: Parameters<typeof format>[0]) => format(v, scientific);
@@ -178,7 +178,7 @@ export default function App() {
     </div>;
   }
   const lab = () => <>
-    {spotlight && <OpeningSpotlight step={opening} onSkip={skipOpening}/>}
+    <OpeningSpotlight step={spotlight ? opening : undefined} onBegin={() => act(e => e.beginOpening())} onSkip={skipOpening}/>
     <div className="section-heading"><div><div className="eyebrow">LABORATORY / 实验日志 {clock(s.elapsed)}</div><h1>每一次碰撞，<span>离未知更近一步。</span></h1></div></div>
     {!s.firstRun && ((!s.settings.guideDismissed && lesson < 6) || replayGuide) && <Onboarding step={Math.min(lesson, 5)} total={6} title={lesson >= 6 ? '你已掌握实验室的基本操作' : lessonTitles[lesson]} detail={lesson >= 6 ? '继续探索 H—Ca，收录 50 单位钙，完成当前阶段。完整教程随时可查。' : advice.detail} actionLabel={lesson >= 6 ? '完成引导' : goal.label} canAct={lesson >= 6 || goal.enabled} onAction={lesson >= 6 ? dismissGuide : () => act(goal.run)} onDismiss={dismissGuide} onGuide={() => goToTab('guide')}/>}
     <div className="journey-stages" aria-label="阶段目标">{[{ name: '发现氖', symbol: 'Ne', done: max >= 10, progress: `已发现 ${Math.min(max, 10)}/10 种` }, { name: '氖档案', symbol: 'Ne', done: s.elements[9].archived, progress: `已提交 ${s.elements[9].deposited}/50 份` }, { name: '钙档案 · 本版终点', symbol: 'Ca', done: s.elements[19].archived, progress: `已提交 ${s.elements[19].deposited}/50 份` }].map((stage, i) => <button key={stage.name} className={`journey-stage ${stage.done ? 'done' : ''}`} onClick={() => openElement(i < 2 ? 10 : 20)}><span className="journey-index">{stage.done ? <Check size={16}/> : `0${i + 1}`}</span><span><strong>{stage.name}</strong><small>{stage.done ? '已完成' : stage.progress}</small></span><span className="journey-symbol">{stage.symbol}</span></button>)}</div>

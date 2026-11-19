@@ -1,12 +1,19 @@
 import { expect, test } from '@playwright/test';
 import { writeFileSync } from 'node:fs';
 
-test('fresh mobile game restricts clicks to the highlighted control and synthesizes He afterward', async ({ page }) => {
+test('welcome waits for the player and mobile guide holds each step before advancing', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 800 });
   const now = Date.now();
   await page.clock.install({ time: now });
   await page.clock.pauseAt(now + 1000);
   await page.goto('/');
+  const welcome = page.getByRole('dialog', { name: '欢迎来到《通往118》' });
+  await expect(welcome).toContainText('我是你的实验助手');
+  await expect(page.locator('#root')).toHaveAttribute('inert', '');
+  await page.clock.runFor(1500);
+  await expect(welcome).toBeVisible();
+  await welcome.getByRole('button', { name: '开始引导' }).click();
+  await page.clock.runFor(1000);
   const guide = page.getByRole('region', { name: '开局操作引导' });
   const start = page.getByRole('button', { name: '开始实验', exact: true });
   await expect(guide).toContainText('第 1 步');
@@ -19,6 +26,13 @@ test('fresh mobile game restricts clicks to the highlighted control and synthesi
   await expect(page.locator('.progress-resource strong')).toContainText('1/20 发现');
 
   await start.click();
+  await page.clock.runFor(400);
+  await expect(guide).toContainText('第 1 步');
+  await expect(guide).toContainText('仪器开始运行了');
+  await expect(page.locator('.control-column')).toHaveAttribute('inert', '');
+  await page.evaluate(() => document.querySelector<HTMLButtonElement>('[data-opening-target="start"]')?.click());
+  await expect(page.locator('[data-opening-target="start"]')).toContainText('运行中');
+  await page.clock.runFor(600);
   await expect(guide).toContainText('第 2 步');
   const buy = page.getByRole('button', { name: '购买补充氢样本' });
   await expect(buy).toBeInViewport();
@@ -28,15 +42,19 @@ test('fresh mobile game restricts clicks to the highlighted control and synthesi
   await expect(page.locator('.progress-resource strong')).toContainText('1/20 发现');
   await buy.click();
 
+  await page.clock.runFor(400);
+  await expect(guide).toContainText('已补充一份氢样本');
+  await page.clock.runFor(600);
   await expect(guide).toContainText('第 3 步');
   await page.reload();
   await expect(guide).toContainText('第 3 步');
   await page.clock.runFor(10_000);
   await expect(page.locator('.progress-resource strong')).toContainText('1/20 发现');
   await page.getByRole('button', { name: '探索 He' }).click();
+  await page.clock.runFor(1000);
   await expect(guide).toHaveCount(0);
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await page.clock.runFor(4750);
+  await page.clock.runFor(3750);
   await expect(page.locator('.progress-resource strong')).toContainText('1/20 发现');
   await page.clock.runFor(250);
   const card = page.getByRole('dialog', { name: '新元素发现 · 氦' });
@@ -51,7 +69,7 @@ test('player review: all six sections fit phone widths; pause survives reload', 
     await dialog.getByRole('button',{name:'关闭弹窗'}).click();
   });
   await page.goto('/');
-  await expect(page.getByRole('region',{name:'开局操作引导'})).toBeVisible();
+  await expect(page.getByRole('dialog',{name:'欢迎来到《通往118》'})).toBeVisible();
   await page.keyboard.press('Escape');
   // Pause the fresh run through the normal control.
   await page.getByRole('button',{name:'运行中',exact:true}).click();

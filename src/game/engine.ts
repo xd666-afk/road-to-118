@@ -26,7 +26,7 @@ export const FIRST_HELIUM_SECONDS = 5;
 
 export function createFirstRun(): GameState {
   const s = createState();
-  s.firstRun = { step: 'start' };
+  s.firstRun = { step: 'welcome' };
   s.reactors[0].active = false;
   s.reactors[0].target = 1;
   return s;
@@ -53,10 +53,14 @@ export class Engine {
     if (id === 1 && r.active && this.state.firstRun?.step === 'start') this.state.firstRun = { step: 'sample' };
   }
 
+  beginOpening() {
+    if (this.state.firstRun?.step === 'welcome') this.state.firstRun = { step: 'start' };
+  }
+
   skipOpening() {
     const s = this.state;
     if (!s.firstRun || s.firstRun.step === 'helium') return;
-    if (s.firstRun.step === 'start') s.reactors[0].active = true;
+    if (s.firstRun.step === 'welcome' || s.firstRun.step === 'start') s.reactors[0].active = true;
     s.firstRun = { step: 'free' };
     s.settings.guideDismissed = true;
   }
@@ -65,7 +69,7 @@ export class Engine {
     const s = this.state, r = s.reactors[id - 1];
     if (!r?.built || !Number.isInteger(z) || z < 1 || z > Math.min(PLAYABLE_ELEMENTS, discoveredMax(s) + 1)) return false;
     if (id === 1 && z === 2 && s.firstRun) {
-      if (s.firstRun.step === 'start' || s.firstRun.step === 'sample') return false;
+      if (s.firstRun.step === 'welcome' || s.firstRun.step === 'start' || s.firstRun.step === 'sample') return false;
       if (s.firstRun.step !== 'helium') {
         s.firstRun = { step: 'helium', remaining: FIRST_HELIUM_SECONDS };
         s.settings.guideDismissed = true;

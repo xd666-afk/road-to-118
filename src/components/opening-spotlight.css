@@ -40,3 +40,58 @@ html:has(.opening-spotlight) { overflow: hidden; }
   bottom: auto;
   top: calc(var(--opening-y) + var(--opening-height) + 17px);
 }
+
+.opening-spotlight__welcome-shade {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(5 11 12 / 86%);
+}
+
+.opening-spotlight__welcome {
+  width: min(100%, 380px);
+  padding: clamp(20px, 6vw, 30px);
+  border: 1px solid #9c7e55;
+  border-radius: 8px;
+  background: #1a2526;
+  box-shadow: 0 14px 44px #0007;
+  color: #f2e8d9;
+}
+
+.opening-spotlight__welcome-icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  color: #e2bd8b;
+  border: 1px solid #9c7e55;
+  border-radius: 50%;
+}
+
+.opening-spotlight__welcome h2 { margin: 14px 0 7px; font-size: clamp(20px, 6vw, 25px); }
+.opening-spotlight__welcome p { font-size: 14px; line-height: 1.65; }
+.opening-spotlight__welcome button { pointer-events: auto; min-height: 44px; margin-top: 20px; }
+
+.opening-spotlight__cover {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background: rgb(5 11 12 / 86%);
+}
+
+.opening-spotlight__ring,
+.opening-spotlight__note,
+.opening-spotlight__welcome-shade,
+.opening-spotlight__cover { transition: opacity 250ms ease; }
+
+.opening-spotlight--switching .opening-spotlight__cover { opacity: 1; }
+:is(.opening-spotlight--switching, .opening-spotlight--closing)
+  :is(.opening-spotlight__ring, .opening-spotlight__note, .opening-spotlight__welcome-shade) { opacity: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .opening-spotlight :is(.opening-spotlight__ring, .opening-spotlight__note, .opening-spotlight__welcome-shade, .opening-spotlight__cover) {
+    transition: none;
+  }
+}

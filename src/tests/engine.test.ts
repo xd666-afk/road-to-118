@@ -12,6 +12,7 @@ describe('authoritative progression', () => {
   it('first He synthesis waits for the player and resumes after save, offline time, and pause', () => {
     const e = new Engine(createFirstRun());
     expect(e.target(1, 2, true)).toBe(false);
+    e.beginOpening();
     e.toggleReactor(1);
     e.advance(20);
     expect(e.target(1, 2, true)).toBe(false);

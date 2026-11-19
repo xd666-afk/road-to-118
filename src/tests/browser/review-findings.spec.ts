@@ -8,7 +8,7 @@ const KEY = 'road-to-118.save.v1';
 
 test('same-document tutorial links switch sections without losing laboratory progress', async ({page}) => {
   await page.goto('/');
-  await expect(page.getByRole('region',{name:'开局操作引导'})).toBeVisible();
+  await expect(page.getByRole('dialog',{name:'欢迎来到《通往118》'})).toBeVisible();
   await page.keyboard.press('Escape');
   await page.getByRole('button',{name:'运行中',exact:true}).click();
   await page.evaluate(()=>{ location.hash='guide'; });

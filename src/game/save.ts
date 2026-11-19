@@ -65,7 +65,7 @@ export function deserialize(text: string): GameState {
   s.noticeSeq = raw.noticeSeq === undefined ? 0 : num(raw.noticeSeq);
   if (max === 1 && raw.firstRun) {
     const { step, remaining } = raw.firstRun;
-    if (step === 'start' || step === 'sample' || step === 'explore' || step === 'free') s.firstRun = { step };
+    if (step === 'welcome' || step === 'start' || step === 'sample' || step === 'explore' || step === 'free') s.firstRun = { step };
     if (step === 'helium' && typeof remaining === 'number' && remaining > 0 && remaining <= FIRST_HELIUM_SECONDS) {
       s.firstRun = { step, remaining };
     }

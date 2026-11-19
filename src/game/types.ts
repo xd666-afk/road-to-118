@@ -6,7 +6,7 @@ export interface ElementState { discovered: boolean; inventory: Amount; deposite
 export interface ReactorState { id: number; built: boolean; active: boolean; target: number; exploring: boolean; upgrades: Record<Upgrade, number>; events: Amount; discoveryHazard: number; productionRemainder: Amount; eventRemainder: Amount; }
 export interface Notice { id: number; kind: 'discovery' | 'archive' | 'achievement' | 'milestone' | 'complete' | 'info'; text: string; z?: number; }
 export type OpeningStep = 'start' | 'sample' | 'explore';
-export type FirstRun = { step: OpeningStep | 'free' } | { step: 'helium'; remaining: number };
+export type FirstRun = { step: 'welcome' | OpeningStep | 'free' } | { step: 'helium'; remaining: number };
 export interface GameState {
   saveVersion: 2; savedAt: number; elapsed: number; seed: number; rng: number; coins: Amount; data: Amount;
   reactors: ReactorState[]; elements: ElementState[];
