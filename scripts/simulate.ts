@@ -149,16 +149,17 @@ for (const strategy of STRATEGIES) {
     outcomes.push({ milestones: e.state.stats.milestones, upgrades: e.state.reactors.map(r => ({ ...r.upgrades })), discovered: discoveredMax(e.state), archived: archivedCount(e.state), failed: e.state.stats.completedAt === null, opening });
     if ((run + 1) % 100 === 0) process.stderr.write(`${strategy}: ${run + 1}/${count}\n`);
   }
-  const values = (key: string) => outcomes.map(o => o.milestones[key]).filter((v): v is number => typeof v === 'number').sort((a, b) => a - b);
-  const quantiles = (key: string) => {
-    const vals = values(key);
+  const durationQuantiles = (durations: number[]) => {
+    const vals = durations.filter(Number.isFinite).sort((a, b) => a - b);
     const q = (fraction: number) => vals.length ? +(vals[Math.min(vals.length - 1, Math.floor((vals.length - 1) * fraction))] / 60).toFixed(2) : null;
     return { reached: vals.length, reachedPercent: +(vals.length / count * 100).toFixed(1), p10: q(.1), p50: q(.5), p90: q(.9) };
   };
-  const stageKeys = ['firstUpgrade', 'element2', 'element3', 'element4', 'module_feed', 'reactor2', 'module_reaction', 'firstArchive', 'reactor3', 'element10', 'neonArchive', 'reactor4', 'element20', 'complete', 'reactor5', 'element30', 'reactor6', 'element36', 'reactor7', 'element54', 'xeArchive', 'stage54'];
+  const quantiles = (key: string) => durationQuantiles(outcomes.map(o => o.milestones[key]));
+  const stageKeys = ['firstUpgrade', 'element2', 'element3', 'element4', 'module_feed', 'reactor2', 'module_reaction', 'firstArchive', 'reactor3', 'element10', 'neonArchive', 'reactor4', 'element11', 'element18', 'element20', 'complete', 'reactor5', 'element30', 'reactor6', 'element36', 'reactor7', 'element54', 'xeArchive', 'stage54'];
   const openingShare = (check: (o: typeof outcomes[number]['opening']) => boolean) => +(outcomes.filter(o => check(o.opening)).length / count * 100).toFixed(1);
   summary.strategies[strategy] = {
     stages: Object.fromEntries(stageKeys.map(key => [key, quantiles(key)])),
+    sodiumToArgon: durationQuantiles(outcomes.map(({ milestones }) => milestones.element18 - milestones.element11)),
     keyTargets: { xeDiscovered: quantiles('element54'), xeArchived: quantiles('xeArchive'), all54Collected: quantiles('stage54') },
     opening3Minutes: { reactor2Percent: openingShare(o => o.reactor2), automationPercent: openingShare(o => o.feed), parallelProductionPercent: openingShare(o => o.reaction), firstArchivePercent: openingShare(o => o.archived > 0), averageDiscovered: +(outcomes.reduce((sum, o) => sum + o.opening.discovered, 0) / count).toFixed(2) },
     failedToCollect54: outcomes.filter(o => o.failed).length,

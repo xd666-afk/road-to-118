@@ -16,9 +16,9 @@ test('desktop: renders live economy, buys upgrades, opens all 118 elements, and 
   const archiveHeading = archive.getByRole('heading', { name: '元素周期表' });
   await expect(archive.locator('.periodic-cell')).toHaveCount(118);
   await expect(archive.locator('[data-z="2"]')).toContainText('下一发现');
-  await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'周期表'}).click();
+  await archiveHeading.scrollIntoViewIfNeeded();
   await expect(archiveHeading).toBeInViewport();
-  await expect(page).toHaveURL(/#periodic-table$/);
+  await expect(page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '周期表' })).toHaveCount(0);
   await expect(page.getByTestId('current-rate')).toHaveCount(1);
   await page.locator('[data-z="118"]').click();
   await expect(page.getByRole('dialog')).toContainText('鿫');
@@ -36,7 +36,7 @@ test('mobile 360px: usable navigation, scrollable table, knowledge cards, no pag
   await expect(page.getByRole('button',{name:'购买补充氢样本',exact:true})).toBeVisible();
   await page.screenshot({path:'artifacts/mobile-laboratory.png',fullPage:true});
   expect(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'周期表'}).click();
+  await page.locator('#periodic-table').scrollIntoViewIfNeeded();
   expect(await page.locator('.table-scroll').evaluate(el=>el.scrollWidth>el.clientWidth)).toBe(true);
   await page.locator('[data-z="1"]').click(); await expect(page.getByRole('dialog')).toContainText('氢');
   await expect(page.getByRole('button',{name:'关闭弹窗'})).toBeVisible();
@@ -45,7 +45,7 @@ test('mobile 360px: usable navigation, scrollable table, knowledge cards, no pag
   await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'科研'}).click();
   await expect(page.getByText('让实验室，自己运转。')).toBeVisible();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-  await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'周期表'}).click();
+  await page.evaluate(() => { location.hash = '#periodic-table'; });
   await expect(page.getByRole('heading',{name:'元素周期表',exact:true})).toBeInViewport();
   await page.reload();
   await expect(page.getByRole('heading',{name:'元素周期表',exact:true})).toBeInViewport();
@@ -59,7 +59,7 @@ test('49 Ca remains incomplete; one more submission preserves the 20th milestone
   e.state.reactors.forEach(r=>r.active=false);e.target(5,20);
   const ca=e.state.elements[19];ca.inventory=D(49);ca.totalProduced=D(49);e.state.notices=[];
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(e.state)});
-  await page.goto('/');await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'周期表'}).click();
+  await page.goto('/');await page.locator('#periodic-table').scrollIntoViewIfNeeded();
   await page.locator('[data-z="20"]').click();await page.getByRole('button',{name:'提交 49 单位至档案'}).click();
   await expect(page.getByRole('dialog').locator('.inventory-block')).toContainText('49 / 50');
   await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -180,11 +180,11 @@ test('total speed sums devices; switching the device only changes its own speed 
   await expect(page.locator('#production-target')).toBeVisible();
 });
 
-test('mobile has six usable tabs and one readable tutorial document, including direct links',async({page})=>{
+test('mobile has five usable tabs and one readable tutorial document, including direct links',async({page})=>{
   const state=createState(66);state.reactors[0].discoveryHazard=1000000;
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(state)});
   await page.setViewportSize({width:360,height:800});await page.goto('/');
-  await expect(page.getByRole('navigation',{name:'主导航'}).getByRole('button')).toHaveCount(6);
+  await expect(page.getByRole('navigation',{name:'主导航'}).getByRole('button')).toHaveCount(5);
   await page.screenshot({path:'artifacts/simple-laboratory-mobile.png',fullPage:true,animations:'disabled'});
   await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'教程'}).click();
   await expect(page.getByRole('article').getByRole('heading',{level:2})).toHaveText(['开始实验','资源与速度','选择升级','发现与收录','自动化','存档与其他']);
@@ -220,7 +220,7 @@ test('H–Xe cards show neutral electrons, isotope-specific neutrons and the new
   const state=createState(68);state.elements.forEach(e=>e.discovered=true);state.reactors[0].active=false;
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(state)});
   await page.setViewportSize({width:1280,height:1000});await page.goto('/');
-  await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'周期表'}).click();
+  await page.locator('#periodic-table').scrollIntoViewIfNeeded();
   const dialog=page.getByRole('dialog');
   const value=(label:string)=>dialog.locator('.atomic-facts>div').filter({has:page.getByText(label,{exact:true})}).locator('dd');
   for(let z=1;z<=20;z++){
@@ -266,7 +266,7 @@ test('320px and 360px knowledge cards keep atomic data readable and distinguish 
   const state=createState(69);state.elements.forEach(e=>e.discovered=true);state.reactors[0].active=false;
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(state)});
   await page.setViewportSize({width:360,height:800});await page.goto('/');
-  await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'周期表'}).click();
+  await page.locator('#periodic-table').scrollIntoViewIfNeeded();
   await page.locator('[data-z="9"]').click();
   const dialog=page.getByRole('dialog');
   await expect(dialog.locator('.atomic-facts>div').filter({has:page.getByText('电子数（中性）',{exact:true})}).locator('dd')).toHaveText('9');
@@ -286,20 +286,28 @@ test('320px and 360px knowledge cards keep atomic data readable and distinguish 
 });
 
 test('released Ne save upgrades in place, builds IV and discovers Na without clearing old progress',async({page})=>{
+  test.setTimeout(45000);
+  const start = Date.parse('2026-11-19T00:00:00Z');
   const e=new Engine(createState(801));e.state.coins=D('1e12');e.state.data=D('1e12');
   for(let z=2;z<=10;z++){e.target(1,z);e.state.reactors[0].discoveryHazard=0;e.step(.1);}
   e.build(2);e.build(3);e.state.elements[9].inventory=D(50);e.state.elements[9].totalProduced=D(50);e.deposit(10);
   e.state.modules.feed=true;e.state.modules.reaction=true;e.state.automation.reaction=false;
   e.state.reactors.forEach(r=>r.active=false);
-  const old=JSON.parse(serialize(e.state));old.saveVersion=1;old.elements=old.elements.slice(0,10);old.reactors=old.reactors.slice(0,3);
+  const old=JSON.parse(serialize(e.state, start + 1000));old.saveVersion=1;old.elements=old.elements.slice(0,10);old.reactors=old.reactors.slice(0,3);
   old.stats.completedAt=old.stats.neonCompletedAt;old.stats.milestones.complete=old.stats.milestones.neonArchive;
   delete old.stats.neonCompletedAt;delete old.stats.milestones.neonArchive;
+  await page.clock.install({ time: start });
+  await page.clock.pauseAt(start + 1000);
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:JSON.stringify(old)});
   await page.setViewportSize({width:1440,height:1000});await page.goto('/');
   await expect(page.locator('[data-z="10"]')).toHaveClass(/archived/);
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.locator('.mission-card').getByRole('button',{name:'建造 IV 级仪器'}).click();
   await expect(page.getByRole('heading',{name:/离子束反应器/})).toBeVisible();
+  await expect(page.locator('.target-copy')).toContainText('平均等待约 25 秒');
+  await page.clock.runFor(6000);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.clock.runFor(22_000);
   await expect(page.getByRole('dialog')).toContainText('新元素发现 · 钠');
   await expect(page.getByRole('dialog').locator('.atomic-facts')).toContainText('电子数（中性）11');
   await page.keyboard.press('Escape');

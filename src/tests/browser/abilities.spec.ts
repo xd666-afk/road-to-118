@@ -21,7 +21,7 @@ test('element abilities unlock on archive, apply individually and in bulk, and s
   await page.setViewportSize({ width: 360, height: 800 });
   await page.goto('/');
 
-  const openTable = () => page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '周期表' }).click();
+  const openTable = () => page.locator('#periodic-table').scrollIntoViewIfNeeded();
   await openTable();
   await page.locator('.periodic-cell[data-z="1"]').click();
   const card = page.getByRole('dialog');
@@ -64,6 +64,6 @@ test('archiving the last unit of Xe completes H–Xe and leaves 55 locked', asyn
   const completion = page.getByRole('dialog', { name: 'H–Xe 全收集完成。' });
   await expect(completion).toContainText('54 / 54 已收录');
   await completion.getByRole('button', { name: '继续我的实验室' }).click();
-  await page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '周期表' }).click();
+  await page.locator('#periodic-table').scrollIntoViewIfNeeded();
   await expect(page.locator('.periodic-cell[data-z="55"]')).toHaveClass(/version-locked/);
 });

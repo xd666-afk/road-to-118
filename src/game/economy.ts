@@ -45,3 +45,18 @@ export function probability(z: number, reactorId: number): number {
   const t = REACTORS[reactorId - 1];
   return Math.min(.3, t.p * t.q ** (z - t.anchor) * t.h ** Math.max(0, z - t.softMax));
 }
+
+export function firstDiscoveryRate(r: ReactorState, reactors: readonly ReactorState[], rate = eventRate(r)): Amount {
+  const raw = rate.mul(-Math.log1p(-probability(r.target, r.id)));
+  if (r.target < 11 || raw.isZero()) return raw;
+
+  // From Na, more collisions still help, but the lab must also confirm the
+  // signal. Share the analysis slowdown across instruments on the same target.
+  const analysisSeconds = r.target <= 18 ? 24 : 8;
+  let combined = raw;
+  for (const other of reactors) {
+    if (other.id === r.id || !other.built || !other.active || other.target !== r.target) continue;
+    combined = combined.plus(eventRate(other).mul(-Math.log1p(-probability(other.target, other.id))));
+  }
+  return raw.div(combined.mul(analysisSeconds).plus(1));
+}

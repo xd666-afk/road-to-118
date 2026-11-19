@@ -91,7 +91,7 @@ test('player review: all six sections fit phone widths; pause survives reload', 
   const measurements: unknown[] = [];
   for(const width of [320,360,768,1440]) {
     await page.setViewportSize({width,height:900});
-    for(const name of ['实验室','周期表','科研','成就','统计','教程']) {
+    for(const name of ['实验室','科研','成就','统计','教程']) {
       await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name,exact:true}).click();
       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`${width}px ${name}`).toBe(true);
       measurements.push({width,tab:name,tinyTargets:await page.locator('button:visible').evaluateAll(buttons=>buttons.map(b=>({text:b.textContent?.trim(),w:b.getBoundingClientRect().width,h:b.getBoundingClientRect().height})).filter(b=>b.w<32||b.h<32))});

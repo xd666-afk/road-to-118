@@ -21,7 +21,7 @@ test('He archive submit is above the fold at 360x800 and 1440x1000 and deposits 
   await page.addInitScript(({ key, text }) => localStorage.setItem(key, text), { key: KEY, text: serialize(s) });
   await page.setViewportSize({ width: 360, height: 800 });
   await page.goto('/');
-  await page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '周期表' }).click();
+  await page.locator('#periodic-table').scrollIntoViewIfNeeded();
   await page.locator('[data-z="2"]').click();
 
   const region = page.getByRole('region', { name: '元素收录操作' });

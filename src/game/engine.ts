@@ -1,7 +1,7 @@
 import { D, Big, finiteNumber } from './numbers';
 import { abilityBonuses } from './abilityProgress';
 import { ACHIEVEMENTS, CALCIUM_ELEMENT, FINAL_ELEMENT, MODULES, OFFLINE_LIMIT, PLAYABLE_ELEMENTS, REACTORS, SAVE_VERSION, XENON_ELEMENT, productionParallel } from './config';
-import { coinPerEvent, eventRate, maxAffordable, price, probability, usefulAtomPurchase } from './economy';
+import { coinPerEvent, eventRate, firstDiscoveryRate, maxAffordable, price, probability, usefulAtomPurchase } from './economy';
 import { poisson, random, waitingHazard } from './rng';
 import type { GameState, Module, Notice, ReactorState, Upgrade, WorkMode } from './types';
 import { element } from '../data/elements';
@@ -208,14 +208,15 @@ export class Engine {
     const productionBonus = bonuses?.production ? D(bonuses.production).div(100) : null;
     for (const r of s.reactors) {
       if (!r.built || !r.active) continue;
-      const events = eventRate(r).mul(seconds);
+      const rate = eventRate(r);
+      const events = rate.mul(seconds);
       const baseGain = events.mul(coinPerEvent(r));
       const gain = energyMultiplier ? baseGain.mul(energyMultiplier) : baseGain;
       r.events = r.events.plus(events); s.stats.events = s.stats.events.plus(events);
       s.coins = s.coins.plus(gain); s.stats.earned = s.stats.earned.plus(gain);
       s.data = s.data.plus(dataMultiplier ? events.mul(dataMultiplier) : events);
       if (s.stats.events.gte(1)) this.award('collision');
-      const e = s.elements[r.target - 1], p = probability(r.target, r.id);
+      const e = s.elements[r.target - 1];
       if (!e.discovered) {
         if (!online || r.target !== discoveredMax(s) + 1) continue;
         if (r.id === 1 && r.target === 2 && s.firstRun) {
@@ -230,10 +231,11 @@ export class Engine {
           continue;
         }
         // Exponential survival clock: genuine online probability, independent of visual frames.
-        const hazard = events.mul(-Math.log1p(-p));
+        const hazard = firstDiscoveryRate(r, s.reactors, rate).mul(seconds);
         if (hazard.gte(r.discoveryHazard)) { this.produce(r, D(1), true); r.discoveryHazard = waitingHazard(s); }
         else r.discoveryHazard -= hazard.toNumber();
       } else {
+        const p = probability(r.target, r.id);
         const parallel = s.modules.reaction && s.automation.reaction ? productionParallel(r.id) : 1;
         const expected = events.mul(p).mul(parallel);
         let count;

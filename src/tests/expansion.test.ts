@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Engine, archivedCount, createState, discoveredMax } from '../game/engine';
 import { D } from '../game/numbers';
-import { capacity, eventRate, income, probability } from '../game/economy';
+import { capacity, eventRate, firstDiscoveryRate, income, probability } from '../game/economy';
 import { deserialize, serialize } from '../game/save';
 import { reactorDisplayPool } from '../game/visuals';
 import { ATOMIC_PROFILES } from '../data/atomic';
@@ -76,8 +76,43 @@ describe('H–Xe progression, instrumentation and migration', () => {
     expect(s.stats.milestones.neonArchive).toBe(raw.stats.milestones.complete); expect(s.stats.milestones.complete).toBeUndefined();
     expect(s.achievements).toContain('complete'); expect(s.elements.slice(10).every(e => !e.discovered)).toBe(true);
     expect(s.reactors.slice(3).every(r => !r.built)).toBe(true);
-    const e = new Engine(s); expect(e.build(4)).toBe(true); e.target(4, 11); e.state.reactors[3].discoveryHazard = 0; e.step(.1);
+    const e = new Engine(s);
+    expect(e.build(4)).toBe(false);
+    const balance = s.coins;
+    const price = REACTORS[3];
+    s.data = D(price.buildData);
+    expect(e.build(4)).toBe(true);
+    expect(s.coins.eq(balance.minus(price.buildCoins))).toBe(true);
+    expect(s.data.eq(0)).toBe(true);
+    e.target(4, 11); e.state.reactors[3].discoveryHazard = 0; e.step(.1);
     expect(discoveredMax(s)).toBe(11); expect(s.elements[0].deposited).toBe(38);
+  });
+
+  it('slows the first Na discovery even when upgraded instruments share the target', () => {
+    const e = new Engine(createState(743));
+    discover(e, 10);
+    e.build(3);
+    e.build(4);
+    e.target(3, 11);
+    e.target(4, 11);
+    const reactors = e.state.reactors;
+    const third = reactors[2], fourth = reactors[3];
+    const normal = firstDiscoveryRate(fourth, reactors);
+    for (const reactor of [third, fourth]) {
+      reactor.upgrades.atoms = 1000;
+      reactor.upgrades.capacity = 40;
+      reactor.discoveryHazard = .8;
+    }
+    const boosted = firstDiscoveryRate(fourth, reactors);
+    expect(boosted.gt(normal)).toBe(true);
+    expect(boosted.plus(firstDiscoveryRate(third, reactors)).lt(D(1).div(24))).toBe(true);
+    e.step(5);
+    expect(discoveredMax(e.state)).toBe(10);
+    e.step(60);
+    expect(discoveredMax(e.state)).toBe(11);
+    e.state.elements[10].inventory = D(0);
+    e.step(5, false);
+    expect(e.state.elements[10].inventory.gt(50)).toBe(true);
   });
   it('migrates a released v2 20/5 save without turning its Ca completion into Xe', () => {
     const raw = released20Save(), s = deserialize(JSON.stringify(raw));
