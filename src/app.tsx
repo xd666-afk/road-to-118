@@ -130,15 +130,27 @@ export default function App() {
   }
   const lessonTitles = ['从第一份样本开始', '发现第二种元素', '让样本自动补充', '建造第二代仪器', '开启批量生产', '点亮第一格档案'];
   function upgradeCard(key: Upgrade) {
-    const u = UPGRADES[key], requested = bulk === 'max' ? maxAffordable(r, key, s.coins) : bulk, cost = price(r, key, Math.max(1, requested)), affordable = requested > 0 && s.coins.gte(cost);
-    const singleCost = price(r, key, 1), singleAffordable = s.coins.gte(singleCost);
-    const running = { ...r, active: true }, batchLevels = Math.max(1, requested), batchClone = { ...running, upgrades: { ...r.upgrades, [key]: r.upgrades[key] + batchLevels } };
-    const cappedSpeed = key === 'speed' && eventRate(batchClone).lte(eventRate(running));
-    const fallback = requested > 1 && !affordable && singleAffordable && !cappedSpeed;
-    const levels = fallback ? 1 : batchLevels, clone = fallback ? { ...running, upgrades: { ...r.upgrades, [key]: r.upgrades[key] + 1 } } : batchClone;
+    const u = UPGRADES[key];
+    const levels = bulk === 'max' ? maxAffordable(r, key, s.coins) : bulk;
+    const cost = price(r, key, levels);
+    const affordable = levels > 0 && s.coins.gte(cost);
+    const running = { ...r, active: true };
+    const clone = { ...running, upgrades: { ...r.upgrades, [key]: r.upgrades[key] + levels } };
+    const cappedSpeed = key === 'speed' && eventRate(running).gte(capacity(running));
     const effect = key === 'atoms' ? `样本 +${levels} · 氢库存 +${levels}` : key === 'yield' ? `每次 ${fmt(coinPerEvent(running))} → ${fmt(coinPerEvent(clone))} 碰撞能` : key === 'capacity' ? `上限 ${fmt(capacity(running))} → ${fmt(capacity(clone))} 次/秒` : `${fmt(eventRate(running))} → ${fmt(eventRate(clone))} 次/秒`;
     const Icon = key === 'atoms' ? Atom : key === 'speed' ? Gauge : key === 'yield' ? Zap : Layers3;
-    return <div className="upgrade" key={key}><div className="upgrade-icon"><Icon size={20}/></div><div className="upgrade-copy"><div className="upgrade-title">{u.name}<small>等级 {r.upgrades[key]}</small></div><p className="upgrade-effect">{effect}</p></div><button className={`buy-button${fallback ? ' single-buy' : ''}`} disabled={cappedSpeed || (!fallback && !affordable)} onClick={() => act(e => { e.buy(focus, key, fallback ? 1 : bulk); })} aria-label={fallback ? `购买1级${u.name}` : `购买${u.name}`} title={fallback ? '整批升级暂时买不起，点击仅购买 1 级（单级价）' : undefined}><span><Plus size={12}/>{fallback ? '×1' : bulk === 'max' ? `MAX ${requested}` : `×${bulk}`}</span><strong>{cappedSpeed ? '满负荷' : fmt(fallback ? singleCost : cost)}</strong>{!cappedSpeed && <small>{fallback ? '单级 · 碰撞能' : '碰撞能'}</small>}</button></div>;
+    return <div className="upgrade" key={key}>
+      <div className="upgrade-icon"><Icon size={20}/></div>
+      <div className="upgrade-copy">
+        <div className="upgrade-title">{u.name}<small>等级 {r.upgrades[key]}</small></div>
+        <p className="upgrade-effect">{effect}</p>
+      </div>
+      <button className="buy-button" disabled={cappedSpeed || !affordable} onClick={() => act(e => { e.buy(focus, key, levels); })} aria-label={`购买${u.name}`}>
+        <span><Plus size={12}/>{bulk === 'max' ? `MAX ${levels}` : `×${levels}`}</span>
+        <strong>{cappedSpeed ? '满负荷' : levels === 0 ? '余额不足' : fmt(cost)}</strong>
+        {!cappedSpeed && levels > 0 && <small>{affordable ? '碰撞能' : '碰撞能不足'}</small>}
+      </button>
+    </div>;
   }
   const lab = () => <>
     <div className="section-heading"><div><div className="eyebrow">LABORATORY / 实验日志 {clock(s.elapsed)}</div><h1>每一次碰撞，<span>离未知更近一步。</span></h1></div></div>

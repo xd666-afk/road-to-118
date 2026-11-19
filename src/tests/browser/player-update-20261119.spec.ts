@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { createState } from '../../game/engine';
+import { price } from '../../game/economy';
 import { D } from '../../game/numbers';
 import { serialize } from '../../game/save';
 
@@ -37,29 +38,48 @@ test('He archive submit is above the fold at 360x800 and 1440x1000 and deposits 
   await expect(region.getByRole('button', { name: '提交 0 单位至档案' })).toBeDisabled();
 });
 
-test('an unaffordable batch offers one explicit level without changing the global x10 selection', async ({ page }) => {
+test('fixed batches stay disabled when unaffordable while MAX spends only what it can', async ({ page }) => {
   const s = pausedLab(712);
   s.coins = D(200);
   await page.addInitScript(({ key, text }) => localStorage.setItem(key, text), { key: KEY, text: serialize(s) });
   await page.goto('/');
 
-  await page.getByRole('button', { name: '×10', exact: true }).click();
   const yieldCard = page.locator('.upgrade').filter({ hasText: '单次收益' });
-  const fallback = yieldCard.getByRole('button', { name: '购买1级单次收益' });
-  await expect(fallback).toContainText('×1');
-  await expect(fallback).toContainText('60');
-  await expect(fallback).toContainText('单级');
-  await fallback.click();
+  const buy = yieldCard.getByRole('button', { name: '购买单次收益' });
+  for (const batch of ['×10', '×100']) {
+    await page.getByRole('button', { name: batch, exact: true }).click();
+    await expect(buy).toContainText(batch);
+    await expect(buy).toBeDisabled();
+  }
+  await expect(page.getByTestId('coins')).toHaveText('200');
 
-  await expect(page.getByTestId('coins')).toHaveText('140');
-  await expect(yieldCard.getByText('等级 1', { exact: true })).toBeVisible();
-  await expect(page.locator('.bulk-control button.selected')).toHaveText('×10');
+  await page.getByRole('button', { name: 'MAX', exact: true }).click();
+  await expect(buy).toContainText('MAX 2');
+  await buy.click();
+  await expect(yieldCard.getByText('等级 2', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('coins')).toHaveText('47');
+  await expect(buy).toContainText('MAX 0');
+  await expect(buy).toBeDisabled();
+});
+
+test('x100 buys exactly 100 even when MAX can buy 102', async ({ page }) => {
+  const s = pausedLab(714);
+  s.coins = price(s.reactors[0], 'atoms', 102).plus(1);
+  await page.addInitScript(({ key, text }) => localStorage.setItem(key, text), { key: KEY, text: serialize(s) });
+  await page.goto('/');
 
   const atomsCard = page.locator('.upgrade').filter({ hasText: '补充氢样本' });
-  const atomsBatch = atomsCard.getByRole('button', { name: '购买补充氢样本' });
-  await expect(atomsBatch).toContainText('×10');
-  await atomsBatch.click();
-  await expect(atomsCard.getByText('等级 10', { exact: true })).toBeVisible();
+  const buy = atomsCard.getByRole('button', { name: '购买补充氢样本' });
+  await page.getByRole('button', { name: 'MAX', exact: true }).click();
+  await expect(buy).toContainText('MAX 102');
+  await page.getByRole('button', { name: '×100', exact: true }).click();
+  await buy.click();
+  await expect(atomsCard.getByText('等级 100', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'MAX', exact: true }).click();
+  await expect(buy).toContainText('MAX 2');
+  await buy.click();
+  await expect(atomsCard.getByText('等级 102', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('coins')).toHaveText('1');
 });
 
 test('stage copy reports discovered species and accessible opening checks keep completed He', async ({ page }) => {

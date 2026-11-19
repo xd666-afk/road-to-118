@@ -33,9 +33,11 @@ test('player review: natural opening earns first upgrade, persists it, and expos
 });
 
 test('player review: all six sections fit phone widths; pause survives reload', async ({page}) => {
+  await page.addLocatorHandler(page.getByRole('dialog',{name:/新元素发现/}), async dialog => {
+    await dialog.getByRole('button',{name:'关闭弹窗'}).click();
+  });
   await page.goto('/');
-  // Pause as soon as the UI is ready, keeping this natural new run deterministic
-  // without altering the economy or injecting a midgame save.
+  // Pause the fresh run through the normal control, closing any discovery card first.
   await page.getByRole('button',{name:'运行中',exact:true}).click();
   await expect(page.getByTestId('current-rate')).toHaveText('0 次/秒');
   await page.getByRole('region',{name:'新手实验引导'}).getByRole('button',{name:'跳过引导'}).click();
