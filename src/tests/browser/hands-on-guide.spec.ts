@@ -3,6 +3,19 @@ import { createState } from '../../game/engine';
 import { D } from '../../game/numbers';
 import { serialize } from '../../game/save';
 
+test('a pickup remains under the pointer when pressed with reduced motion', async ({ page }) => {
+  const state = createState(91);
+  state.settings.handsOnGuide = true;
+  state.elements[1].discovered = true;
+  await page.addInitScript(text => localStorage.setItem('road-to-118.save.v1', text), serialize(state));
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+  await page.getByRole('button', { name: '引导操作：放出练习灵感点' }).click();
+  await page.getByRole('button', { name: '拾取灵感点' }).click({ position: { x: 16, y: 24 } });
+  await expect(page.getByRole('complementary', { name: '手动碰撞增益' })).toContainText('×2');
+});
+
 test('new-player practice uses a real drop, collision, reactor construction and module upgrade', async ({ page }) => {
   const now = Date.now();
   const s = createState(79, now);

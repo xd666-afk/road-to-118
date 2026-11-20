@@ -1,5 +1,5 @@
 import type { Module, Upgrade } from './types';
-export const GAME_VERSION = '0.9.0';
+export const GAME_VERSION = '0.9.1';
 /** Current playable range is H–Xe (1–54). Elements 55–118 stay visible as future research. */
 export const PLAYABLE_ELEMENTS = 54;
 export const FINAL_ELEMENT = 54;

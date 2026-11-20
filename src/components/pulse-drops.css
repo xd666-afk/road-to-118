@@ -14,7 +14,7 @@
   position: fixed;
   left: clamp(70px, var(--drop-x), calc(100% - 70px));
   top: clamp(70px, var(--drop-y), calc(100% - 82px));
-  z-index: 50;
+  z-index: 350;
   border-radius: 999px;
   min-height: 48px;
   padding: 8px 15px;
@@ -25,12 +25,13 @@
   animation: pulse-drop-fall 2.4s cubic-bezier(.22, .81, .34, 1) both;
 }
 .pulse-drop:hover, .pulse-drop:focus-visible { background: #2f3e39; }
+.pulse-drop:not(:disabled):active { transform: translate(-50%, -50%); }
 .pulse-drop--practice { box-shadow: 0 0 0 5px #f8d79237, 0 8px 32px #000a; }
 .pulse-drop--practice:not(.pulse-drop--static) { animation-duration: 1.1s; }
 .pulse-drop--static { animation: none; }
 .pulse-boost {
   position: fixed;
-  z-index: 48;
+  z-index: 348;
   bottom: max(12px, env(safe-area-inset-bottom));
   left: 12px;
   max-width: calc(100vw - 24px);
