@@ -13,7 +13,7 @@ type IndustryProps = {
 
 const moduleIcons = { feed: Layers3, reaction: Atom, allocation: ArrowDownToLine };
 
-export function IndustryModules({ state, max, act }: IndustryProps) {
+export function IndustryModules({ state, max, act, guideTarget }: IndustryProps & { guideTarget?: string }) {
   const fmt = (value: number) => format(value, state.settings.scientific);
   return <div className="module-grid">
     {MODULE_ORDER.map((key, index) => {
@@ -25,7 +25,7 @@ export function IndustryModules({ state, max, act }: IndustryProps) {
       const canResearch = prior && max >= info.unlock;
       const canAfford = !!cost && state.coins.gte(cost.coins) && state.data.gte(cost.data);
       const enabled = state.automation[key];
-      return <section className="module" key={key} aria-labelledby={`module-${key}`}>
+      return <section className={`module${guideTarget === `module-${key}` ? ' guide-target' : ''}`} key={key} aria-labelledby={`module-${key}`}>
         <div className="module-top"><h3 id={`module-${key}`}>{info.name}</h3><Icon size={22} aria-hidden="true"/></div>
         <p>{info.description}</p>
         {built && <div className="module-current">

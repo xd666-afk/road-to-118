@@ -73,8 +73,8 @@ test('welcome waits for the player and mobile guide holds each step before advan
   await expect(card.getByRole('button', { name: '提交 1 单位至档案' })).toBeEnabled();
   await card.getByRole('button', { name: '关闭弹窗' }).click();
   await expect(page.locator('#target')).toHaveValue('2');
-  await expect(page.getByRole('region', { name: '下一步', exact: true })).toBeVisible();
-  await expect(page.getByRole('region', { name: '新手实验引导' })).toHaveCount(0);
+  await expect(page.getByRole('region', { name: '下一步', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('region', { name: '新手实验引导' })).toContainText('拾取灵感点');
 });
 
 test('skipping the spotlight switches to the single next-step panel', async ({ page }) => {

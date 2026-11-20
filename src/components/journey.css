@@ -8,6 +8,9 @@
 }
 .lab-guidance .mission-card p { margin: 8px 0 0; }
 .lab-guidance .mission-card .goal-action { margin: 0; }
+.guide-target { outline: 2px solid #e0b879; outline-offset: -2px; scroll-margin: 12px; }
+.research-guidance { margin-bottom: 16px; }
+.research-guide-return { display: flex; justify-content: flex-end; padding: 12px 18px; border-top: 1px solid var(--line); }
 .exploration-requirements {
   margin: 11px 24px 0;
   display: flex;

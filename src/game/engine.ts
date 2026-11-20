@@ -7,6 +7,7 @@ import { coinPerEvent, eventRate, firstDiscoveryRate, maxAffordable, price, prob
 import { poisson, random, waitingHazard } from './rng';
 import type { GameState, Module, Notice, ReactorJob, ReactorState, Upgrade, WorkMode } from './types';
 import { element } from '../data/elements';
+import { PULSE_BOOST_MS, PULSE_BOOSTS, PULSE_DROP_MS, type PulseBoostKind, type PulseDrop } from './pulseBoosts';
 
 export function createState(seed = Date.now() >>> 0, now = Date.now()): GameState {
   const s: GameState = {
@@ -17,7 +18,7 @@ export function createState(seed = Date.now() >>> 0, now = Date.now()): GameStat
     moduleLevels: { feed: 1, reaction: 1, allocation: 1 },
     automation: { feed: false, reaction: false, allocation: false, reserve: D(100), mode: 'custom', target: 1, feedScope: 'latest', allocationScope: 'all' },
     stats: { events: D(0), produced: D(0), earned: D(0), peak: D(0), builds: 1, purchases: 0, lastEvent: '实验室已准备就绪', neonCompletedAt: null, calciumCompletedAt: null, xeCompletedAt: null, completedAt: null, milestones: {} },
-    achievements: [], settings: { scientific: false, reducedMotion: false, guideDismissed: false, mix: [1] },
+    achievements: [], settings: { scientific: false, reducedMotion: false, guideDismissed: false, handsOnGuide: false, mix: [1] },
     notices: [], noticeSeq: 0,
   };
   for (const r of s.reactors) r.discoveryHazard = waitingHazard(s);
@@ -31,6 +32,7 @@ export const FIRST_HELIUM_SECONDS = 5;
 export function createFirstRun(seed?: number, now?: number): GameState {
   const s = createState(seed, now);
   s.firstRun = { step: 'welcome' };
+  s.settings.handsOnGuide = true;
   s.reactors[0].active = false;
   s.reactors[0].target = 1;
   return s;
@@ -38,6 +40,9 @@ export function createFirstRun(seed?: number, now?: number): GameState {
 
 export class Engine {
   state: GameState;
+  pulseDrop?: PulseDrop;
+  private nextPulseDropAt?: number;
+  private dropSequence = 0;
   // UI notifications are transient; achievement/progression flags live in state.
   constructor(state = createState()) { this.state = state; }
   notify(kind: Notice['kind'], text: string, z?: number) {
@@ -86,7 +91,7 @@ export class Engine {
       if (s.firstRun.step === 'welcome' || s.firstRun.step === 'start' || s.firstRun.step === 'charge' || s.firstRun.step === 'sample') return false;
       if (s.firstRun.step !== 'helium') {
         s.firstRun = { step: 'helium', remaining: FIRST_HELIUM_SECONDS };
-        s.settings.guideDismissed = true;
+        if (!s.settings.handsOnGuide) s.settings.guideDismissed = true;
       }
       exploring = false;
     }
@@ -280,8 +285,47 @@ export class Engine {
       && (step === undefined || step === 'free' || (step === 'charge' && reactorId === 1));
   }
 
+  activePulseBoost(now = Date.now()) {
+    const boost = this.state.pulseBoost;
+    return boost && now < boost.expiresAt ? boost : undefined;
+  }
+
+  updatePulseDrop(now: number, randomDropsAllowed: boolean) {
+    if (this.pulseDrop && now >= this.pulseDrop.expiresAt) delete this.pulseDrop;
+    if (!randomDropsAllowed || this.activePulseBoost(now) || this.pulseDrop) {
+      this.nextPulseDropAt = undefined;
+      return;
+    }
+    if (this.nextPulseDropAt === undefined) this.nextPulseDropAt = now + (45 + Math.random() * 45) * 1000;
+    if (now < this.nextPulseDropAt) return;
+    const kinds = Object.keys(PULSE_BOOSTS) as PulseBoostKind[];
+    this.pulseDrop = {
+      id: ++this.dropSequence, kind: kinds[Math.floor(Math.random() * kinds.length)],
+      x: 9 + 82 * Math.random(), y: 23 + 62 * Math.random(), expiresAt: now + PULSE_DROP_MS, practice: false,
+    };
+    this.nextPulseDropAt = undefined;
+  }
+
+  showPracticeDrop(now = Date.now()): boolean {
+    const s = this.state;
+    if (s.firstRun || !s.settings.handsOnGuide || s.settings.guideDismissed ||
+      s.stats.milestones.boostedPulse !== undefined || this.activePulseBoost(now)) return false;
+    if (this.pulseDrop && now < this.pulseDrop.expiresAt) return false;
+    this.pulseDrop = { id: ++this.dropSequence, kind: 'inspiration', x: 50, y: 44, expiresAt: now + PULSE_DROP_MS, practice: true };
+    return true;
+  }
+
+  collectPulseDrop(id: number, now = Date.now()): boolean {
+    const drop = this.pulseDrop;
+    if (!drop || drop.id !== id || now >= drop.expiresAt || this.activePulseBoost(now)) return false;
+    delete this.pulseDrop;
+    this.state.pulseBoost = { kind: drop.kind, expiresAt: now + PULSE_BOOST_MS };
+    this.state.stats.milestones.pulsePickup ??= this.state.elapsed;
+    return true;
+  }
+
   /** Immediate collision energy and research data, independent of simulation time. */
-  manualPulse(reactorId: number): { energy: Amount; data: Amount } | null {
+  manualPulse(reactorId: number, now = Date.now()): { energy: Amount; data: Amount } | null {
     if (!this.canManualPulse(reactorId)) return null;
     const s = this.state;
     const r = s.reactors[reactorId - 1];
@@ -290,8 +334,11 @@ export class Engine {
     const dataMultiplier = bonuses?.data ? D(100 + bonuses.data).div(100) : null;
     const events = Big.max(D(2), eventRate(r).mul(D('0.055')).floor());
     const baseGain = events.mul(coinPerEvent(r));
-    const energy = energyMultiplier ? baseGain.mul(energyMultiplier) : baseGain;
-    const data = dataMultiplier ? events.mul(dataMultiplier) : events;
+    const active = this.activePulseBoost(now);
+    const effect = active && PULSE_BOOSTS[active.kind];
+    const energy = (energyMultiplier ? baseGain.mul(energyMultiplier) : baseGain).mul(effect?.energy ?? 1);
+    const data = (dataMultiplier ? events.mul(dataMultiplier) : events).mul(effect?.data ?? 1);
+    if (active?.kind === 'inspiration') s.stats.milestones.boostedPulse ??= s.elapsed;
     r.events = r.events.plus(events);
     s.stats.events = s.stats.events.plus(events);
     s.coins = s.coins.plus(energy);

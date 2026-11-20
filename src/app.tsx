@@ -16,6 +16,7 @@ import Tutorial from './components/Tutorial';
 import Onboarding from './components/Onboarding';
 import OpeningSpotlight from './components/OpeningSpotlight';
 import SavedGames from './components/SavedGames';
+import PulseDrops from './components/PulseDrops';
 import { recommend, applyAdvice, openingStep } from './game/advisor';
 import './components/journey.css';
 import { AtomicFacts, FurtherScience } from './components/AtomicProfile';
@@ -25,6 +26,7 @@ import { abilityBonuses } from './game/abilityProgress';
 import AutomationControls, { IndustryModules } from './components/AutomationControls';
 import { discoveryStage, observationProgress, observationRate, stageReadiness } from './game/discovery';
 import { ATOMIC_PROFILES } from './data/atomic';
+import { LAB_GUIDE_LENGTH, labGuideResearchTarget, labGuideStep } from './game/labGuide';
 
 const tabs = [ { id: 'lab', name: '实验室', en: 'LABORATORY', icon: FlaskConical }, { id: 'research', name: '科研', en: 'RESEARCH', icon: Cpu }, { id: 'achievements', name: '成就', en: 'ACHIEVEMENTS', icon: Trophy }, { id: 'stats', name: '统计', en: 'OBSERVATORY', icon: Activity }, { id: 'guide', name: '教程', en: 'HANDBOOK', icon: BookOpen } ];
 const TABLE_HASH = '#periodic-table';
@@ -53,6 +55,7 @@ export default function App() {
   const [toasts, setToasts] = useState<Toast[]>([]), [saveStatus, setSaveStatus] = useState(boot.error ? '存档需处理' : '本地存档'), [saveBlocked, setSaveBlocked] = useState(!!boot.error);
   const [message, setMessage] = useState(boot.error || ''), [flash, setFlash] = useState(0), [debug, setDebug] = useState(false);
   const [replayGuide, setReplayGuide] = useState(false);
+  const [researchJump, setResearchJump] = useState<string>();
   const [offline, setOffline] = useState(boot.offline && boot.offline.seconds > 30 ? boot.offline : null);
   const archiveSection = useRef<HTMLElement>(null), tableScroll = useRef<HTMLDivElement>(null), importInput = useRef<HTMLInputElement>(null);
   const engine = engineRef.current, s = engine.state, r = s.reactors[focus - 1], c = REACTORS[focus - 1];
@@ -60,6 +63,13 @@ export default function App() {
   const spotlight = opening === 'welcome' || opening === 'start' || opening === 'charge' || opening === 'sample' || opening === 'explore';
   const visualPool = reactorDisplayPool(s, r);
   const max = discoveredMax(s), archived = archivedCount(s), scientific = s.settings.scientific;
+  const handsOn = s.settings.handsOnGuide && !s.settings.guideDismissed && !s.firstRun && max >= 2 ? labGuideStep(s) : undefined;
+  const waitingForPractice = handsOn?.id === 'pickup' || handsOn?.id === 'pulse';
+  const dropsVisible = tab !== 'guide' && !dialog && !s.firstRun && max >= 2;
+  const canSpawnRandomDrops = useRef(false);
+  canSpawnRandomDrops.current = dropsVisible && !waitingForPractice;
+  const boost = engine.activePulseBoost();
+  const researchTarget = labGuideResearchTarget(handsOn);
   const fmt = (v: Parameters<typeof format>[0]) => format(v, scientific);
   const bonuses = abilityBonuses(s);
   const energyMultiplier = D(100 + bonuses.energy).div(100);
@@ -129,6 +139,14 @@ export default function App() {
     if (destination === 'table' && !openingInProgress) archiveSection.current?.scrollIntoView({ block: 'start' });
   }, [destination, openingInProgress]);
 
+  useEffect(() => {
+    if (tab !== 'research' || !researchJump) return;
+    document.getElementById(researchJump)?.closest('section')?.scrollIntoView({
+      block: 'center', behavior: s.settings.reducedMotion ? 'instant' : 'smooth',
+    });
+    setResearchJump(undefined);
+  }, [tab, researchJump, s.settings.reducedMotion]);
+
   function collect() {
     const notices = engineRef.current.state.notices.splice(0);
     if (notices.length) {
@@ -142,8 +160,11 @@ export default function App() {
   function act<T>(fn: (e: Engine) => T): T {
     const e = engineRef.current;
     const priorStep = e.state.firstRun?.step;
+    const priorBoost = e.state.pulseBoost;
+    const priorBoostedPulse = e.state.stats.milestones.boostedPulse;
     const output = fn(e);
-    if (priorStep !== e.state.firstRun?.step && !saveBlocked) {
+    if ((priorStep !== e.state.firstRun?.step || priorBoost !== e.state.pulseBoost ||
+      priorBoostedPulse !== e.state.stats.milestones.boostedPulse) && !saveBlocked) {
       const result = saveLocal(activeSlot.current.id, e.state);
       if (!result.ok) setMessage(result.message);
     }
@@ -165,14 +186,15 @@ export default function App() {
     const tick = () => {
       const now = Date.now(), seconds = Math.max(0, (now - last) / 1000); last = now;
       if (document.hidden) return;
-      engineRef.current.advance(seconds, seconds < 5); engineRef.current.state.savedAt = now; collect();
+      engineRef.current.advance(seconds, seconds < 5); engineRef.current.state.savedAt = now;
+      engineRef.current.updatePulseDrop(now, canSpawnRandomDrops.current); collect();
       if (now - lastSave >= 12000 && !persistent.current.saveBlocked) { const result = saveLocal(activeSlot.current.id, engineRef.current.state); setSaveStatus(result.ok ? '已自动保存' : '存储不可用'); if (!result.ok) setMessage(result.message); lastSave = now; }
     };
     const timer = window.setInterval(tick, 250);
     let hiddenAt: number | null = document.hidden ? last : null;
     const visibility = () => {
       const now = Date.now();
-      if (document.hidden) { hiddenAt = now; engineRef.current.state.savedAt = now; if (!persistent.current.saveBlocked) saveLocal(activeSlot.current.id, engineRef.current.state); }
+      if (document.hidden) { hiddenAt = now; engineRef.current.updatePulseDrop(now, false); engineRef.current.state.savedAt = now; if (!persistent.current.saveBlocked) saveLocal(activeSlot.current.id, engineRef.current.state); }
       else { if (hiddenAt !== null) { engineRef.current.state.savedAt = hiddenAt; const summary = engineRef.current.offline(now); if (summary.seconds > 3) setOffline(summary); hiddenAt = null; } last = now; collect(); }
     };
     const leaving = () => { if (!persistent.current.saveBlocked) saveLocal(activeSlot.current.id, engineRef.current.state); };
@@ -244,6 +266,7 @@ export default function App() {
     setEndPending(false);
     setToasts([]);
     setReplayGuide(false);
+    setResearchJump(undefined);
     setFocus(1);
     setBulk(1);
     setFlash(0);
@@ -278,7 +301,7 @@ export default function App() {
   } };
   function dismissGuide() {
     setReplayGuide(false);
-    act(e => { e.state.settings.guideDismissed = true; });
+    act(e => { e.state.settings.guideDismissed = true; if (e.pulseDrop?.practice) delete e.pulseDrop; });
     if (!saveBlocked) { const result = saveLocal(activeSlot.current.id, engineRef.current.state); if (!result.ok) setMessage(result.message); }
   }
   function replayTutorial() {
@@ -289,7 +312,58 @@ export default function App() {
     goToTab('lab');
   }
   const lessonTitles = ['从第一份样本开始', '发现第二种元素', '让样本自动补充', '建造第二代仪器', '开启批量生产', '点亮第一格档案'];
-  const showCoach = !s.firstRun && ((!s.settings.guideDismissed && lesson < lessonTitles.length) || replayGuide);
+  const showCoach = !!handsOn || (!s.firstRun && ((!s.settings.guideDismissed && lesson < lessonTitles.length) || replayGuide));
+  function guideAction() {
+    if (!handsOn) return {
+      label: lesson >= lessonTitles.length ? '完成引导' : goal.label,
+      enabled: lesson >= lessonTitles.length || goal.enabled,
+      run: lesson >= lessonTitles.length ? dismissGuide : () => act(goal.run),
+    };
+    if (handsOn.id === 'done') return { label: '完成引导', enabled: true, run: dismissGuide };
+    if (researchTarget) return {
+      label: handsOn.id === 'build' ? '查看建造按钮' : '前往工业自动化', enabled: true,
+      run: () => { goToTab('research'); setResearchJump(researchTarget); },
+    };
+    if (tab === 'research') return { label: '返回实验室继续', enabled: true, run: () => goToTab('lab') };
+    if (waitingForPractice) {
+      if (handsOn.id === 'pulse' && boost?.kind === 'inspiration') return {
+        label: '查看反应容器', enabled: true,
+        run: () => document.querySelector('.manual-pulse__hit')?.scrollIntoView({
+          block: 'center', behavior: s.settings.reducedMotion ? 'instant' : 'smooth',
+        }),
+      };
+      return {
+        label: engine.pulseDrop ? '点击屏幕上的灵感点' : '放出练习灵感点',
+        enabled: !engine.pulseDrop && !boost,
+        run: () => act(e => e.showPracticeDrop()),
+      };
+    }
+    const first = s.reactors[0];
+    if (handsOn.id === 'be') {
+      const running = first.active && first.exploring && first.target === max + 1;
+      return { label: running ? '正在寻找铍' : '用 I 级继续探索', enabled: !running,
+        run: () => act(e => { if (e.target(1, max + 1, true)) e.state.reactors[0].active = true; setFocus(1); }) };
+    }
+    const hydrogen = s.elements[0];
+    const enough = hydrogen.inventory.gte(ARCHIVE_UNITS - hydrogen.deposited);
+    const producing = first.active && first.target === 1;
+    return {
+      label: enough ? '提交并点亮 H' : producing ? '正在生产氢' : '让 I 级生产氢',
+      enabled: enough || !producing,
+      run: () => act(e => {
+        if (enough) e.deposit(1);
+        else if (e.target(1, 1)) { e.state.reactors[0].active = true; setFocus(1); }
+      }),
+    };
+  }
+  const coach = () => {
+    const action = guideAction();
+    return <Onboarding step={handsOn?.step ?? lesson} total={handsOn ? LAB_GUIDE_LENGTH : lessonTitles.length}
+      title={handsOn?.title ?? (lesson >= lessonTitles.length ? '你已掌握实验室的基本操作' : lessonTitles[lesson])}
+      detail={handsOn?.detail ?? (lesson >= lessonTitles.length ? '接下来可以继续探索和收录新元素。' : goal.detail)}
+      actionLabel={action.label} canAct={action.enabled} onAction={action.run}
+      onDismiss={dismissGuide} onGuide={() => goToTab('guide')}/>;
+  };
   const openingMilestones = [
     { name: '发现 He', done: max >= 2 },
     { name: '新容器', done: s.reactors[1].built },
@@ -340,17 +414,7 @@ export default function App() {
     {dialog?.kind !== 'settings' && <OpeningSpotlight key={slotId} step={spotlight ? opening : undefined} onBegin={() => act(e => e.beginOpening())} onSkip={skipOpening} onManageSaves={openSaves}/>}
     <div className="section-heading"><div><div className="eyebrow">LABORATORY / 实验日志 {clock(s.elapsed)}</div><h1>每一次碰撞，<span>离未知更近一步。</span></h1></div></div>
     {!spotlight && opening !== 'helium' && <div className="lab-guidance">
-      {showCoach ? <Onboarding
-        step={lesson}
-        total={lessonTitles.length}
-        title={lesson >= lessonTitles.length ? '你已掌握实验室的基本操作' : lessonTitles[lesson]}
-        detail={lesson >= lessonTitles.length ? '接下来可以继续探索和收录新元素。' : goal.detail}
-        actionLabel={lesson >= lessonTitles.length ? '完成引导' : goal.label}
-        canAct={lesson >= lessonTitles.length || goal.enabled}
-        onAction={lesson >= lessonTitles.length ? dismissGuide : () => act(goal.run)}
-        onDismiss={dismissGuide}
-        onGuide={() => goToTab('guide')}
-      /> : <section className="mission-card" aria-label="下一步">
+      {showCoach ? coach() : <section className="mission-card" aria-label="下一步">
         <div>
           <div className="eyebrow"><span className="tiny-orbit" aria-hidden="true"/>下一步</div>
           {openingMilestones.some(item => !item.done) && <div className="opening-milestones" role="list" aria-label="开局检查清单">
@@ -449,7 +513,7 @@ export default function App() {
     </section>
   );
 
-  const research = () => <><div className="section-heading"><div><div className="eyebrow">RESEARCH & INDUSTRY</div><h1>把偶然的发现，<span>变成持续的能力。</span></h1></div><div className="research-budget"><span>可用研究数据</span><strong>{fmt(s.data)}<small> 点</small></strong></div></div><div className="research-grid">{REACTORS.map(t => { const state = s.reactors[t.id - 1], unlocked = max >= t.unlock, afford = s.coins.gte(t.buildCoins) && s.data.gte(t.buildData), art = advancedReactorArtwork[t.id]; return <section className={`panel research-device ${!unlocked ? 'is-locked' : ''}`} key={t.id}><div className={`research-device-art ${t.id > 3 && t.id <= 5 ? 'expansion-art' : ''} ${art ? 'advanced-art' : ''}`} style={art ? { backgroundImage: `url("${artworkUrl(art.file)}")` } : { backgroundPosition: `${t.id <= 3 ? (t.id - 1) * 50 : (t.id - 4) * 100}% center` }}/><div className="research-device-copy"><div className="eyebrow">{t.roman} 级 / {t.range}</div><h2>{t.name}</h2><div className="spec-line"><span>速度上限</span><strong>{t.cap} 次/秒</strong></div><div className="spec-line"><span>开放条件</span><strong>{t.id === 1 ? '开局可用' : `首次发现 ${element(t.unlock).name}`}</strong></div>{state.built ? <button className="secondary-button full" onClick={() => { setFocus(t.id); goToTab('lab'); }}><Check size={15}/>已建成 · 进入控制台<ArrowRight size={15}/></button> : <><div className="construction-cost"><span className={s.coins.gte(t.buildCoins) ? '' : 'insufficient'}>{fmt(t.buildCoins)} 碰撞能</span><span className={s.data.gte(t.buildData) ? '' : 'insufficient'}>{fmt(t.buildData)} 数据</span></div><button className="primary-button full" disabled={!unlocked || !afford} onClick={() => act(e => { if (e.build(t.id)) { setFocus(t.id); goToTab('lab'); } })}>{!unlocked ? <><LockKeyhole size={15}/>发现 {element(t.unlock).symbol} 后开放</> : <>研发并建造<ArrowRight size={15}/></>}</button>{unlocked && !afford && <p className="cost-shortfall">还差 {shortfall(t.buildCoins, t.buildData)}</p>}</>}</div></section>; })}</div><section className="panel industry-panel"><div className="panel-heading"><div><span className="eyebrow">INDUSTRIAL PIPELINE</span><h2>工业自动化</h2></div><span className="tiny-label">{Object.values(s.modules).filter(Boolean).length} / 3 模块</span></div><IndustryModules state={s} max={max} act={act}/><AutomationControls state={s} max={max} act={act}/></section></>;
+  const research = () => <><div className="section-heading"><div><div className="eyebrow">RESEARCH & INDUSTRY</div><h1>把偶然的发现，<span>变成持续的能力。</span></h1></div><div className="research-budget"><span>可用研究数据</span><strong>{fmt(s.data)}<small> 点</small></strong></div></div>{handsOn && <div className="lab-guidance research-guidance">{coach()}</div>}<div className="research-grid">{REACTORS.map(t => { const state = s.reactors[t.id - 1], unlocked = max >= t.unlock, afford = s.coins.gte(t.buildCoins) && s.data.gte(t.buildData), art = advancedReactorArtwork[t.id]; return <section id={`research-reactor-${t.id}`} className={`panel research-device ${!unlocked ? 'is-locked' : ''}${researchTarget === `research-reactor-${t.id}` ? ' guide-target' : ''}`} key={t.id}><div className={`research-device-art ${t.id > 3 && t.id <= 5 ? 'expansion-art' : ''} ${art ? 'advanced-art' : ''}`} style={art ? { backgroundImage: `url("${artworkUrl(art.file)}")` } : { backgroundPosition: `${t.id <= 3 ? (t.id - 1) * 50 : (t.id - 4) * 100}% center` }}/><div className="research-device-copy"><div className="eyebrow">{t.roman} 级 / {t.range}</div><h2>{t.name}</h2><div className="spec-line"><span>速度上限</span><strong>{t.cap} 次/秒</strong></div><div className="spec-line"><span>开放条件</span><strong>{t.id === 1 ? '开局可用' : `首次发现 ${element(t.unlock).name}`}</strong></div>{state.built ? <button className="secondary-button full" onClick={() => { setFocus(t.id); goToTab('lab'); }}><Check size={15}/>已建成 · 进入控制台<ArrowRight size={15}/></button> : <><div className="construction-cost"><span className={s.coins.gte(t.buildCoins) ? '' : 'insufficient'}>{fmt(t.buildCoins)} 碰撞能</span><span className={s.data.gte(t.buildData) ? '' : 'insufficient'}>{fmt(t.buildData)} 数据</span></div><button className="primary-button full" disabled={!unlocked || !afford} onClick={() => act(e => { if (e.build(t.id)) { setFocus(t.id); goToTab('lab'); } })}>{!unlocked ? <><LockKeyhole size={15}/>发现 {element(t.unlock).symbol} 后开放</> : <>研发并建造<ArrowRight size={15}/></>}</button>{unlocked && !afford && <p className="cost-shortfall">还差 {shortfall(t.buildCoins, t.buildData)}</p>}</>}</div></section>; })}</div><section className="panel industry-panel"><div className="panel-heading"><div><span className="eyebrow">INDUSTRIAL PIPELINE</span><h2>工业自动化</h2></div><span className="tiny-label">{Object.values(s.modules).filter(Boolean).length} / 3 模块</span></div><IndustryModules state={s} max={max} act={act} guideTarget={researchTarget}/>{handsOn && !researchTarget && <div className="research-guide-return"><button className="secondary-button" onClick={() => goToTab('lab')}>回实验室继续引导<ArrowRight size={15}/></button></div>}<AutomationControls state={s} max={max} act={act}/></section></>;
 
   const achievements = () => <><div className="section-heading"><div><div className="eyebrow">MILESTONES & IMPOSSIBILITIES</div><h1>记录突破，<span>也记录那些意外。</span></h1></div><span className="count-badge">{s.achievements.length}<small> / {ACHIEVEMENTS.length}</small></span></div><div className="achievement-grid">{ACHIEVEMENTS.map(a => { const earned = s.achievements.includes(a.id), hidden = a.hidden && !earned; return <section className={`panel achievement ${earned ? 'earned' : ''} ${hidden ? 'secret' : ''}`} key={a.id}><div className="achievement-medal">{hidden ? <LockKeyhole size={23}/> : a.hidden ? <Sparkles size={25}/> : <Trophy size={25}/>}</div><div><span className="eyebrow">{a.hidden ? 'HIDDEN DISCOVERY' : 'LAB MILESTONE'}{earned ? ' / 已达成' : ''}</span><h3>{hidden ? '？？？' : a.name}</h3><p>{hidden ? '在实验室的边界之外，还有意想不到的可能。' : a.description}</p></div>{earned && <Check className="earned-check" size={18}/>}</section>; })}</div><p className="page-note">隐藏成就只记录在线的成功合成；已发现元素的重复生产也可达成。徽章不会改变生产倍率。</p></>;
 
@@ -474,6 +538,8 @@ export default function App() {
   }
 
   return <div className="app-shell"><header className="site-header"><a className="brand" href="#" onClick={e => { e.preventDefault(); goToTab('lab'); }}><span className="brand-mark"><Atom size={30} strokeWidth={1.2}/></span><span><strong>通往<span>118</span></strong><small>ROAD TO 118</small></span><i>v{GAME_VERSION}</i></a><div className="header-right"><span className="save-label"><ShieldCheck size={14}/>{saveStatus}</span><button className="icon-button" aria-label="存档与设置" onClick={openSaves}><Settings2 size={19}/></button></div></header><nav className="main-nav" aria-label="主导航">{tabs.map(t => <button key={t.id} className={tab === t.id ? 'active' : ''} onClick={() => goToTab(t.id)}><t.icon size={17}/><span>{t.name}</span><small>{t.en}</small>{t.id === 'research' && ((max >= MODULES.feed.unlock && !s.modules.feed) || REACTORS.some(t => max >= t.unlock && !s.reactors[t.id - 1].built)) && <i className="nav-dot"/>}</button>)}<div className="nav-caption"><i className="signal-dot"/>探索尚未被点亮的世界</div></nav><main>{tab !== 'guide' && <section className="resource-bar" aria-label="实验室资源"><div className="main-resource"><span className="resource-label"><Zap size={14}/>碰撞能</span><div className="coin-value" data-testid="coins">{fmt(s.coins)}</div><p className="resource-income">收入 <strong>+{fmt(totalIncome)}</strong><small> /秒</small></p></div><div className="resource-item"><span>总实验速度</span><strong>{fmt(totalRate)}<small>次/秒</small></strong></div><div className="resource-item"><span>研究数据</span><strong>{fmt(s.data)}<small>点</small></strong></div><div className="resource-item progress-resource"><span>收集进度</span><strong>{archived}<small>/{PLAYABLE_ELEMENTS} 收录</small><em>{max}/{PLAYABLE_ELEMENTS} 发现</em></strong><progress className="collection-progress" aria-label="元素收集进度" max={PLAYABLE_ELEMENTS} value={archived}/></div></section>}{saveBlocked && <div className="message-banner recovery-warning" role="alert"><span>当前进度尚未保存。请先处理旧存档，刷新会丢失本次进度。</span><button className="secondary-button" onClick={openSaves}>处理存档</button></div>}{message && <div className="message-banner" role="status"><span>{message}</span><button className="text-button" onClick={() => setMessage('')}>关闭</button></div>}{offline && tab !== 'guide' && <div className="offline-banner"><span><RotateCcw size={18}/><strong>欢迎回来。</strong>已结算 {clock(offline.seconds)} 离线实验：+{fmt(offline.coins)} 碰撞能，+{fmt(offline.produced)} 单位已发现元素。最多结算 4 小时。</span><button className="text-button" onClick={() => setOffline(null)}>继续实验<ArrowRight size={14}/></button></div>}<div className="tab-content" key={tab}>{tab === 'lab' ? lab() : tab === 'research' ? research() : tab === 'achievements' ? achievements() : tab === 'guide' ? <><div className="guide-replay"><button className="secondary-button" onClick={replayTutorial}><RotateCcw size={15}/>重看新手引导</button></div><Tutorial onPlay={() => goToTab('lab')}/></> : stats()}</div><footer><span><Atom size={15}/>ROAD TO 118<span className="footer-divider"/>从两颗氢原子开始的旅程</span><button className="text-button" onClick={() => goToTab('guide')}>教程<ArrowRight size={13}/></button></footer></main><div className="toast-stack" aria-live="polite">{toasts.filter(t => tab !== 'guide' && Date.now() - t.time < 6500).slice(-3).map(t => <div className={`toast ${t.kind}`} key={t.id}>{t.kind === 'achievement' ? <Trophy size={17}/> : t.kind === 'archive' ? <BookOpen size={17}/> : <Sparkles size={17}/>}<span>{t.text}</span></div>)}</div><input ref={importInput} type="file" accept=".json,application/json" className="sr-only" aria-label="导入游戏存档" onChange={e => { void importSave(e.target.files?.[0]); }}/>
+    {dropsVisible && <PulseDrops drop={engine.pulseDrop} boost={boost} reduced={s.settings.reducedMotion}
+      onCollect={id => act(e => e.collectPulseDrop(id))}/>}
     {dialog?.kind === 'element' && elementDialog(dialog.z, dialog.discovery)}
     {dialog?.kind === 'settings' && <Modal title="存档与实验室设置" onClose={() => setDialog(null)}>
       <SavedGames slots={slots} activeId={slotId} error={slotError} onCreate={() => changeSave('create')} onSwitch={id => changeSave('switch', id)} onDelete={id => changeSave('delete', id)}/>

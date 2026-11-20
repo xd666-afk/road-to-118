@@ -2,6 +2,7 @@ import { D } from './numbers';
 import { createState, FIRST_HELIUM_SECONDS } from './engine';
 import { ACHIEVEMENTS, ARCHIVE_UNITS, CALCIUM_ELEMENT, MODULE_ORDER, MODULE_UPGRADES, PLAYABLE_ELEMENTS, REACTORS, SAVE_VERSION, XENON_ELEMENT } from './config';
 import type { GameState } from './types';
+import { isPulseBoostKind, PULSE_BOOST_MS } from './pulseBoosts';
 export function serialize(s: GameState, now = Date.now()): string {
   return JSON.stringify({ ...s, savedAt: now, notices: [] });
 }
@@ -89,17 +90,23 @@ export function deserialize(text: string): GameState {
   if ((s.stats.calciumCompletedAt !== null) !== s.elements[CALCIUM_ELEMENT - 1].archived) throw new Error('钙的完成状态与收录进度不一致。');
   if ((s.stats.xeCompletedAt !== null) !== s.elements[XENON_ELEMENT - 1].archived) throw new Error('氙的完成状态与收录进度不一致。');
   if ((s.stats.completedAt !== null) !== (max === PLAYABLE_ELEMENTS && s.elements.every(e => e.archived))) throw new Error('完整收集状态与档案不一致。');
-  const validMilestones = new Set(['complete', 'neonArchive', 'xeArchive', 'stage54', 'firstUpgrade', 'firstArchive', 'module_feed', 'module_reaction', 'module_allocation', ...Array.from({ length: PLAYABLE_ELEMENTS - 1 }, (_, i) => `element${i + 2}`), ...REACTORS.slice(1).map(r => `reactor${r.id}`)]);
+  const validMilestones = new Set(['complete', 'neonArchive', 'xeArchive', 'stage54', 'firstUpgrade', 'firstArchive', 'pulsePickup', 'boostedPulse', 'module_feed', 'module_reaction', 'module_allocation', ...Array.from({ length: PLAYABLE_ELEMENTS - 1 }, (_, i) => `element${i + 2}`), ...REACTORS.slice(1).map(r => `reactor${r.id}`)]);
   s.stats.milestones = {}; for (const [k, v] of Object.entries(raw.stats.milestones || {})) { const key = released10 && k === 'complete' ? 'neonArchive' : k; if (validMilestones.has(key)) s.stats.milestones[key] = num(v); }
   if (released10 && oldStage !== null && s.stats.milestones.neonArchive === undefined) s.stats.milestones.neonArchive = oldStage;
   const valid = new Set<string>(ACHIEVEMENTS.map(a => a.id)); if (!Array.isArray(raw.achievements)) throw new Error('成就数据损坏。');
   s.achievements = [...new Set<string>(raw.achievements.filter((id: unknown) => typeof id === 'string' && valid.has(id)))];
   if (raw.settings && typeof raw.settings === 'object') {
     s.settings.scientific = raw.settings.scientific === true; s.settings.reducedMotion = raw.settings.reducedMotion === true; s.settings.guideDismissed = raw.settings.guideDismissed === true;
+    s.settings.handsOnGuide = raw.settings.handsOnGuide === true || (raw.settings.handsOnGuide === undefined && !!raw.firstRun);
     s.settings.mix = Array.isArray(raw.settings.mix) ? [...new Set<number>(raw.settings.mix.filter((z: unknown) => typeof z === 'number' && Number.isInteger(z) && z >= 1 && z <= max))].slice(0, PLAYABLE_ELEMENTS) : [1];
     if (!s.settings.mix.length) s.settings.mix = [1];
   }
   s.noticeSeq = raw.noticeSeq === undefined ? 0 : num(raw.noticeSeq);
+  const boost = raw.pulseBoost;
+  if (isPulseBoostKind(boost?.kind) && typeof boost.expiresAt === 'number' && Number.isFinite(boost.expiresAt) &&
+    boost.expiresAt > s.savedAt && boost.expiresAt <= s.savedAt + PULSE_BOOST_MS) {
+    s.pulseBoost = { kind: boost.kind, expiresAt: boost.expiresAt };
+  }
   if (max === 1 && raw.firstRun) {
     const { step, remaining } = raw.firstRun;
     if (step === 'welcome' || step === 'start' || step === 'charge' || step === 'sample' || step === 'explore' || step === 'free') s.firstRun = { step };

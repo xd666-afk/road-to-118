@@ -1,4 +1,5 @@
 import type { Amount } from './numbers';
+import type { PulseBoost } from './pulseBoosts';
 export type Upgrade = 'atoms' | 'speed' | 'yield' | 'capacity';
 export type WorkMode = 'explore' | 'produce' | 'archive';
 export type ReactorJob = WorkMode | 'manual';
@@ -23,8 +24,9 @@ export interface GameState {
     /** Full H–Xe collection, not the calcium milestone and not a claim about 118. */
     completedAt: number | null; milestones: Record<string, number>;
   };
-  achievements: string[]; settings: { scientific: boolean; reducedMotion: boolean; guideDismissed: boolean; mix: number[] };
+  achievements: string[]; settings: { scientific: boolean; reducedMotion: boolean; guideDismissed: boolean; handsOnGuide: boolean; mix: number[] };
   notices: Notice[]; noticeSeq: number;
   firstRun?: FirstRun;
+  pulseBoost?: PulseBoost;
   observation?: { z: number; progress: number };
 }
