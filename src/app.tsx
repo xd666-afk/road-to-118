@@ -5,7 +5,8 @@ import { D, format } from './game/numbers';
 import { reactorDisplayPool } from './game/visuals';
 import { activeAtoms, capacity, coinPerEvent, eventRate, firstDiscoveryRate, income, maxAffordable, price, probability } from './game/economy';
 import { ACHIEVEMENTS, ARCHIVE_UNITS, GAME_VERSION, MODULES, PLAYABLE_ELEMENTS, REACTORS, UPGRADES, productionParallel } from './game/config';
-import { deserialize, loadLocal, saveLocal, serialize } from './game/save';
+import { deserialize, serialize } from './game/save';
+import { createLocalSlot, deleteLocalSlot, loadLocal, saveLocal, switchLocalSlot, SAVE_STORAGE_ERROR, type LocalSave } from './game/localSaves';
 import type { GameState, Module, Upgrade } from './game/types';
 import { ELEMENTS, KNOWLEDGE, SCIENCE_NOTE, baikeUrl, element } from './data/elements';
 import Particles from './components/Particles';
@@ -14,6 +15,7 @@ import Modal from './components/Modal';
 import Tutorial from './components/Tutorial';
 import Onboarding from './components/Onboarding';
 import OpeningSpotlight from './components/OpeningSpotlight';
+import SavedGames from './components/SavedGames';
 import { recommend, applyAdvice, openingStep } from './game/advisor';
 import './components/journey.css';
 import { AtomicFacts, FurtherScience } from './components/AtomicProfile';
@@ -32,8 +34,18 @@ type Dialog = { kind: 'element'; z: number; discovery?: boolean } | { kind: 'set
 interface Toast { id: number; text: string; time: number; kind: string; }
 
 export default function App() {
-  const [boot] = useState(() => { const loaded = loadLocal(), engine = new Engine(loaded.state); if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) engine.state.settings.reducedMotion = true; const offline = loaded.error ? null : engine.offline(); return { engine, error: loaded.error, raw: loaded.raw, offline }; });
+  const [boot] = useState(() => {
+    const loaded = loadLocal(), engine = new Engine(loaded.state);
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) engine.state.settings.reducedMotion = true;
+    const offline = loaded.error ? null : engine.offline();
+    return { ...loaded, engine, offline };
+  });
   const engineRef = useRef(boot.engine), [, rerender] = useState(0);
+  const activeSlot = useRef(boot.slot);
+  const slotId = activeSlot.current.id;
+  const [slots, setSlots] = useState(boot.slots);
+  const [rawSave, setRawSave] = useState(boot.raw);
+  const [slotError, setSlotError] = useState('');
   const [destination, setDestination] = useState(() => location.hash.startsWith('#guide') ? 'guide' : location.hash === TABLE_HASH ? 'table' : 'lab');
   const tab = destination === 'table' ? 'lab' : destination;
   const [focus, setFocus] = useState(1), [bulk, setBulk] = useState<number | 'max'>(1);
@@ -132,7 +144,7 @@ export default function App() {
     const priorStep = e.state.firstRun?.step;
     const output = fn(e);
     if (priorStep !== e.state.firstRun?.step && !saveBlocked) {
-      const result = saveLocal(e.state);
+      const result = saveLocal(activeSlot.current.id, e.state);
       if (!result.ok) setMessage(result.message);
     }
     collect();
@@ -142,7 +154,7 @@ export default function App() {
     const e = engineRef.current;
     e.skipOpening();
     if (!saveBlocked) {
-      const result = saveLocal(e.state);
+      const result = saveLocal(activeSlot.current.id, e.state);
       if (!result.ok) setMessage(result.message);
     }
     rerender(v => v + 1);
@@ -154,19 +166,19 @@ export default function App() {
       const now = Date.now(), seconds = Math.max(0, (now - last) / 1000); last = now;
       if (document.hidden) return;
       engineRef.current.advance(seconds, seconds < 5); engineRef.current.state.savedAt = now; collect();
-      if (now - lastSave >= 12000 && !persistent.current.saveBlocked) { const result = saveLocal(engineRef.current.state); setSaveStatus(result.ok ? '已自动保存' : '存储不可用'); if (!result.ok) setMessage(result.message); lastSave = now; }
+      if (now - lastSave >= 12000 && !persistent.current.saveBlocked) { const result = saveLocal(activeSlot.current.id, engineRef.current.state); setSaveStatus(result.ok ? '已自动保存' : '存储不可用'); if (!result.ok) setMessage(result.message); lastSave = now; }
     };
     const timer = window.setInterval(tick, 250);
     let hiddenAt: number | null = document.hidden ? last : null;
     const visibility = () => {
       const now = Date.now();
-      if (document.hidden) { hiddenAt = now; engineRef.current.state.savedAt = now; if (!persistent.current.saveBlocked) saveLocal(engineRef.current.state); }
+      if (document.hidden) { hiddenAt = now; engineRef.current.state.savedAt = now; if (!persistent.current.saveBlocked) saveLocal(activeSlot.current.id, engineRef.current.state); }
       else { if (hiddenAt !== null) { engineRef.current.state.savedAt = hiddenAt; const summary = engineRef.current.offline(now); if (summary.seconds > 3) setOffline(summary); hiddenAt = null; } last = now; collect(); }
     };
-    const leaving = () => { if (!persistent.current.saveBlocked) saveLocal(engineRef.current.state); };
+    const leaving = () => { if (!persistent.current.saveBlocked) saveLocal(activeSlot.current.id, engineRef.current.state); };
     document.addEventListener('visibilitychange', visibility); window.addEventListener('pagehide', leaving);
     return () => { clearInterval(timer); document.removeEventListener('visibilitychange', visibility); window.removeEventListener('pagehide', leaving); };
-  }, []);
+  }, [slotId]);
   useEffect(() => {
     if (dialog || tab === 'guide') return;
     if (queue.length) { setDialog({ kind: 'element', z: queue[0], discovery: true }); setQueue(q => q.slice(1)); }
@@ -178,24 +190,85 @@ export default function App() {
     a.href = url; a.download = `Road-to-118-${new Date().toISOString().slice(0, 10)}.json`; a.click(); URL.revokeObjectURL(url); setMessage('存档已导出。请妥善保留这个文件。');
   }
   function exportRawSave() {
-    if (boot.raw === undefined) return;
-    const blob = new Blob([boot.raw], { type: 'text/plain;charset=utf-8' }), url = URL.createObjectURL(blob), a = document.createElement('a');
+    if (rawSave === undefined) return;
+    const blob = new Blob([rawSave], { type: 'text/plain;charset=utf-8' }), url = URL.createObjectURL(blob), a = document.createElement('a');
     a.href = url; a.download = `Road-to-118-original-${new Date().toISOString().slice(0, 10)}.txt`; a.click(); URL.revokeObjectURL(url);
   }
   function saveCurrent() {
-    if (saveBlocked && boot.raw !== undefined) {
-      try { localStorage.setItem(`road-to-118.recovery.${Date.now()}`, boot.raw); }
+    if (saveBlocked && rawSave !== undefined) {
+      try { localStorage.setItem(`road-to-118.recovery.${Date.now()}`, rawSave); }
       catch { setMessage('原始旧档备份失败，旧档仍保留。请先导出原始旧档和当前进度。'); return; }
     }
-    const result = saveLocal(engineRef.current.state);
-    if (result.ok) setSaveBlocked(false);
+    const result = saveLocal(slotId, engineRef.current.state);
+    if (result.ok) { setSaveBlocked(false); setRawSave(undefined); }
     setSaveStatus(result.ok ? '已手动保存' : '存储不可用'); setMessage(result.message);
   }
   async function importSave(file?: File) {
     if (!file) return;
-    try { if (file.size > 2_000_000) throw new Error('存档文件过大。'); const imported = deserialize(await file.text()), next = new Engine(imported); if (saveBlocked && boot.raw !== undefined) localStorage.setItem(`road-to-118.recovery.${Date.now()}`, boot.raw); const summary = next.offline(); engineRef.current = next; setFocus(1); setOffline(summary.seconds > 3 ? summary : null); setDialog(null); setQueue([]); const result = saveLocal(next.state); setSaveBlocked(!result.ok); setMessage(result.ok ? '存档导入成功，继续你的实验。' : result.message); setSaveStatus(result.ok ? '已保存导入进度' : '存储不可用'); collect(); }
-    catch (e) { setMessage(e instanceof Error ? e.message : '导入失败，当前进度已保留。'); }
-    if (importInput.current) importInput.current.value = '';
+    try {
+      if (file.size > 2_000_000) throw new Error('存档文件过大。');
+      const imported = deserialize(await file.text());
+      if (activeSlot.current.id !== slotId) throw new Error('已切换存档，请重新选择要导入的文件。');
+      if (saveBlocked && rawSave !== undefined) localStorage.setItem(`road-to-118.recovery.${Date.now()}`, rawSave);
+      activateSave({ state: imported, slot: activeSlot.current }, '存档导入成功，继续你的实验。', true);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '导入失败，当前进度已保留。';
+      setSlotError(message);
+      setMessage(message);
+    } finally {
+      if (importInput.current) importInput.current.value = '';
+    }
+  }
+
+  function openSaves() {
+    setSlotError('');
+    setDialog({ kind: 'settings' });
+  }
+
+  function activateSave(save: LocalSave, message = '', persistBeforeSwitch = false) {
+    const next = new Engine(save.state);
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) next.state.settings.reducedMotion = true;
+    const summary = save.error ? null : next.offline();
+    if (persistBeforeSwitch) {
+      const result = saveLocal(save.slot.id, next.state);
+      if (!result.ok) { setDialog(null); setMessage(result.message); return; }
+    }
+    activeSlot.current = save.slot;
+    engineRef.current = next;
+    persistent.current.saveBlocked = !!save.error;
+    setSaveBlocked(!!save.error);
+    setRawSave(save.raw);
+    setSaveStatus(save.error ? '存档需处理' : '本地存档');
+    setMessage(save.error ?? message);
+    setQueue([]);
+    setEndPending(false);
+    setToasts([]);
+    setReplayGuide(false);
+    setFocus(1);
+    setBulk(1);
+    setFlash(0);
+    setDialog(null);
+    setOffline(summary && summary.seconds > 3 ? summary : null);
+    goToTab('lab');
+    rerender(v => v + 1);
+  }
+
+  function changeSave(operation: 'create' | 'switch' | 'delete', id = slotId): boolean {
+    setSlotError('');
+    try {
+      if (operation !== 'delete' && !saveBlocked) {
+        const result = saveLocal(slotId, engineRef.current.state);
+        if (!result.ok) throw new Error(result.message);
+      }
+      const change = operation === 'create' ? createLocalSlot()
+        : operation === 'switch' ? switchLocalSlot(id) : deleteLocalSlot(id, slotId);
+      setSlots(change.slots);
+      if (change.save) activateSave(change.save);
+      return true;
+    } catch (error) {
+      setSlotError(error instanceof Error && !(error instanceof DOMException) ? error.message : SAVE_STORAGE_ERROR);
+      return false;
+    }
   }
   function openElement(z: number) { setDialog({ kind: 'element', z }); }
   const advice = recommend(s), lesson = openingStep(s);
@@ -206,7 +279,7 @@ export default function App() {
   function dismissGuide() {
     setReplayGuide(false);
     act(e => { e.state.settings.guideDismissed = true; });
-    if (!saveBlocked) { const result = saveLocal(engineRef.current.state); if (!result.ok) setMessage(result.message); }
+    if (!saveBlocked) { const result = saveLocal(activeSlot.current.id, engineRef.current.state); if (!result.ok) setMessage(result.message); }
   }
   function replayTutorial() {
     if (!engineRef.current.state.firstRun) {
@@ -264,7 +337,7 @@ export default function App() {
           return reward ? { energy: fmt(reward.energy), data: fmt(reward.data) } : null;
         }}/>;
   const lab = () => <>
-    <OpeningSpotlight step={spotlight ? opening : undefined} onBegin={() => act(e => e.beginOpening())} onSkip={skipOpening}/>
+    {dialog?.kind !== 'settings' && <OpeningSpotlight key={slotId} step={spotlight ? opening : undefined} onBegin={() => act(e => e.beginOpening())} onSkip={skipOpening} onManageSaves={openSaves}/>}
     <div className="section-heading"><div><div className="eyebrow">LABORATORY / 实验日志 {clock(s.elapsed)}</div><h1>每一次碰撞，<span>离未知更近一步。</span></h1></div></div>
     {!spotlight && opening !== 'helium' && <div className="lab-guidance">
       {showCoach ? <Onboarding
@@ -400,9 +473,11 @@ export default function App() {
     return <Modal title={discovery ? `新元素发现 · ${info.name}` : `${info.name} · ${info.english}`} onClose={() => setDialog(null)}><div className="element-card-hero"><div className={`large-element ${state?.archived ? 'archived' : ''}`} style={{ '--element': info.color } as CSSProperties}><span>{z}</span><strong>{info.symbol}</strong><small>{info.english}</small><i>{info.mass || '—'}</i></div>{specimen ? <div className="specimen" role="img" style={specimen} aria-label={info.specimenDescription}/> : <div className="locked-specimen"><LockKeyhole size={32}/><p>{z > PLAYABLE_ELEMENTS ? '未来研究目标' : '等待首次发现'}</p></div>}</div><div className="knowledge-status"><span className={state?.archived ? 'accent' : ''}>{state?.archived ? '✓ 已正式收录' : known ? '已发现 · 尚未收录' : z > PLAYABLE_ELEMENTS ? `v${GAME_VERSION} 版本锁定` : '未发现'}</span><span>第 {z} 号元素</span></div>{inventory}{pendingDiscoveries > 0 && <div className="discovery-queue" role="status"><span>还有 {pendingDiscoveries} 项新发现待查看</span><button className="secondary-button" onClick={() => setDialog(null)}>查看下一个发现</button></div>}{known && <ElementAbility z={z} archived={state.archived}/>}<AtomicFacts info={info} known={known}/>{known && knowledge ? <><div className="knowledge-body"><h3>{knowledge.title}</h3><p>{knowledge.fact}</p><h4>电子与性质</h4><p>{ATOMIC_PROFILES[z]?.chemistry}</p><h4>主要用途</h4><p>{knowledge.application}</p><FurtherScience info={info}/><h4>实验进展</h4><p>{knowledge.unlock}</p></div><dl className="element-history"><div><dt>首次发现</dt><dd>{clock(state.firstDiscoveredAt || 0)} · {state.firstDiscoveredReactor ? `${REACTORS[state.firstDiscoveredReactor - 1].roman} 级` : '初始样本'}</dd></div><div><dt>累计获得</dt><dd>{fmt(state.totalProduced)} 单位</dd></div></dl><p className="specimen-caption">{info.specimenDescription}{z === 10 && '（图为放电发光示意，常温常压下氖气无色。）'}{z >= 21 && z <= PLAYABLE_ELEMENTS && '（图为样本外观示意。）'}</p><p className="science-note">{SCIENCE_NOTE} <a href={baikeUrl(info.name)} target="_blank" rel="noreferrer">百度百科 ↗</a></p></> : <div className="locked-copy"><p>{z > PLAYABLE_ELEMENTS ? z === 118 ? '鿫是《通往118》的长期终点。未来版本中，“100 个 Og”将代表 100 次成功合成且确认的事件记录，并非长期储存的普通气体。' : `它属于未来的旅程。v${GAME_VERSION} 已开放 1—54 号元素（H–Xe）；55–118 号只作为未来研究目标显示，尚未开放或测试。` : `依次发现元素后，你将有机会与${info.name}相遇。当前下一个新元素是 ${element(Math.min(PLAYABLE_ELEMENTS, max + 1)).symbol}。`}</p><button className="secondary-button full" onClick={() => setDialog(null)}>返回实验室</button></div>}</Modal>;
   }
 
-  return <div className="app-shell"><header className="site-header"><a className="brand" href="#" onClick={e => { e.preventDefault(); goToTab('lab'); }}><span className="brand-mark"><Atom size={30} strokeWidth={1.2}/></span><span><strong>通往<span>118</span></strong><small>ROAD TO 118</small></span><i>v{GAME_VERSION}</i></a><div className="header-right"><span className="save-label"><ShieldCheck size={14}/>{saveStatus}</span><button className="icon-button" aria-label="存档与设置" onClick={() => setDialog({ kind: 'settings' })}><Settings2 size={19}/></button></div></header><nav className="main-nav" aria-label="主导航">{tabs.map(t => <button key={t.id} className={tab === t.id ? 'active' : ''} onClick={() => goToTab(t.id)}><t.icon size={17}/><span>{t.name}</span><small>{t.en}</small>{t.id === 'research' && ((max >= MODULES.feed.unlock && !s.modules.feed) || REACTORS.some(t => max >= t.unlock && !s.reactors[t.id - 1].built)) && <i className="nav-dot"/>}</button>)}<div className="nav-caption"><i className="signal-dot"/>探索尚未被点亮的世界</div></nav><main>{tab !== 'guide' && <section className="resource-bar" aria-label="实验室资源"><div className="main-resource"><span className="resource-label"><Zap size={14}/>碰撞能</span><div className="coin-value" data-testid="coins">{fmt(s.coins)}</div><p className="resource-income">收入 <strong>+{fmt(totalIncome)}</strong><small> /秒</small></p></div><div className="resource-item"><span>总实验速度</span><strong>{fmt(totalRate)}<small>次/秒</small></strong></div><div className="resource-item"><span>研究数据</span><strong>{fmt(s.data)}<small>点</small></strong></div><div className="resource-item progress-resource"><span>收集进度</span><strong>{archived}<small>/{PLAYABLE_ELEMENTS} 收录</small><em>{max}/{PLAYABLE_ELEMENTS} 发现</em></strong><progress className="collection-progress" aria-label="元素收集进度" max={PLAYABLE_ELEMENTS} value={archived}/></div></section>}{saveBlocked && <div className="message-banner recovery-warning" role="alert"><span>当前进度尚未保存。请先处理旧存档，刷新会丢失本次进度。</span><button className="secondary-button" onClick={() => setDialog({ kind: 'settings' })}>处理存档</button></div>}{message && <div className="message-banner" role="status"><span>{message}</span><button className="text-button" onClick={() => setMessage('')}>关闭</button></div>}{offline && tab !== 'guide' && <div className="offline-banner"><span><RotateCcw size={18}/><strong>欢迎回来。</strong>已结算 {clock(offline.seconds)} 离线实验：+{fmt(offline.coins)} 碰撞能，+{fmt(offline.produced)} 单位已发现元素。最多结算 4 小时。</span><button className="text-button" onClick={() => setOffline(null)}>继续实验<ArrowRight size={14}/></button></div>}<div className="tab-content" key={tab}>{tab === 'lab' ? lab() : tab === 'research' ? research() : tab === 'achievements' ? achievements() : tab === 'guide' ? <><div className="guide-replay"><button className="secondary-button" onClick={replayTutorial}><RotateCcw size={15}/>重看新手引导</button></div><Tutorial onPlay={() => goToTab('lab')}/></> : stats()}</div><footer><span><Atom size={15}/>ROAD TO 118<span className="footer-divider"/>从两颗氢原子开始的旅程</span><button className="text-button" onClick={() => goToTab('guide')}>教程<ArrowRight size={13}/></button></footer></main><div className="toast-stack" aria-live="polite">{toasts.filter(t => tab !== 'guide' && Date.now() - t.time < 6500).slice(-3).map(t => <div className={`toast ${t.kind}`} key={t.id}>{t.kind === 'achievement' ? <Trophy size={17}/> : t.kind === 'archive' ? <BookOpen size={17}/> : <Sparkles size={17}/>}<span>{t.text}</span></div>)}</div><input ref={importInput} type="file" accept=".json,application/json" className="sr-only" aria-label="导入游戏存档" onChange={e => { void importSave(e.target.files?.[0]); }}/>
+  return <div className="app-shell"><header className="site-header"><a className="brand" href="#" onClick={e => { e.preventDefault(); goToTab('lab'); }}><span className="brand-mark"><Atom size={30} strokeWidth={1.2}/></span><span><strong>通往<span>118</span></strong><small>ROAD TO 118</small></span><i>v{GAME_VERSION}</i></a><div className="header-right"><span className="save-label"><ShieldCheck size={14}/>{saveStatus}</span><button className="icon-button" aria-label="存档与设置" onClick={openSaves}><Settings2 size={19}/></button></div></header><nav className="main-nav" aria-label="主导航">{tabs.map(t => <button key={t.id} className={tab === t.id ? 'active' : ''} onClick={() => goToTab(t.id)}><t.icon size={17}/><span>{t.name}</span><small>{t.en}</small>{t.id === 'research' && ((max >= MODULES.feed.unlock && !s.modules.feed) || REACTORS.some(t => max >= t.unlock && !s.reactors[t.id - 1].built)) && <i className="nav-dot"/>}</button>)}<div className="nav-caption"><i className="signal-dot"/>探索尚未被点亮的世界</div></nav><main>{tab !== 'guide' && <section className="resource-bar" aria-label="实验室资源"><div className="main-resource"><span className="resource-label"><Zap size={14}/>碰撞能</span><div className="coin-value" data-testid="coins">{fmt(s.coins)}</div><p className="resource-income">收入 <strong>+{fmt(totalIncome)}</strong><small> /秒</small></p></div><div className="resource-item"><span>总实验速度</span><strong>{fmt(totalRate)}<small>次/秒</small></strong></div><div className="resource-item"><span>研究数据</span><strong>{fmt(s.data)}<small>点</small></strong></div><div className="resource-item progress-resource"><span>收集进度</span><strong>{archived}<small>/{PLAYABLE_ELEMENTS} 收录</small><em>{max}/{PLAYABLE_ELEMENTS} 发现</em></strong><progress className="collection-progress" aria-label="元素收集进度" max={PLAYABLE_ELEMENTS} value={archived}/></div></section>}{saveBlocked && <div className="message-banner recovery-warning" role="alert"><span>当前进度尚未保存。请先处理旧存档，刷新会丢失本次进度。</span><button className="secondary-button" onClick={openSaves}>处理存档</button></div>}{message && <div className="message-banner" role="status"><span>{message}</span><button className="text-button" onClick={() => setMessage('')}>关闭</button></div>}{offline && tab !== 'guide' && <div className="offline-banner"><span><RotateCcw size={18}/><strong>欢迎回来。</strong>已结算 {clock(offline.seconds)} 离线实验：+{fmt(offline.coins)} 碰撞能，+{fmt(offline.produced)} 单位已发现元素。最多结算 4 小时。</span><button className="text-button" onClick={() => setOffline(null)}>继续实验<ArrowRight size={14}/></button></div>}<div className="tab-content" key={tab}>{tab === 'lab' ? lab() : tab === 'research' ? research() : tab === 'achievements' ? achievements() : tab === 'guide' ? <><div className="guide-replay"><button className="secondary-button" onClick={replayTutorial}><RotateCcw size={15}/>重看新手引导</button></div><Tutorial onPlay={() => goToTab('lab')}/></> : stats()}</div><footer><span><Atom size={15}/>ROAD TO 118<span className="footer-divider"/>从两颗氢原子开始的旅程</span><button className="text-button" onClick={() => goToTab('guide')}>教程<ArrowRight size={13}/></button></footer></main><div className="toast-stack" aria-live="polite">{toasts.filter(t => tab !== 'guide' && Date.now() - t.time < 6500).slice(-3).map(t => <div className={`toast ${t.kind}`} key={t.id}>{t.kind === 'achievement' ? <Trophy size={17}/> : t.kind === 'archive' ? <BookOpen size={17}/> : <Sparkles size={17}/>}<span>{t.text}</span></div>)}</div><input ref={importInput} type="file" accept=".json,application/json" className="sr-only" aria-label="导入游戏存档" onChange={e => { void importSave(e.target.files?.[0]); }}/>
     {dialog?.kind === 'element' && elementDialog(dialog.z, dialog.discovery)}
-    {dialog?.kind === 'settings' && <Modal title="存档与实验室设置" onClose={() => setDialog(null)}><div className="settings-list"><label><span><strong>科学记数法</strong><small>关闭时显示中文大数单位，超过载后自动使用科学记数法</small></span><input type="checkbox" checked={s.settings.scientific} onChange={e => act(() => { s.settings.scientific = e.target.checked; })}/></label><label><span><strong>减少动态效果</strong><small>降低粒子运动，保留全部游戏功能</small></span><input type="checkbox" checked={s.settings.reducedMotion} onChange={e => act(() => { s.settings.reducedMotion = e.target.checked; })}/></label></div>{saveBlocked && boot.raw !== undefined && <button className="secondary-button full" onClick={exportRawSave}><Download size={17}/>导出原始旧档</button>}<div className="save-actions"><button className="secondary-button" onClick={exportSave}><Download size={17}/>导出存档</button><button className="secondary-button" onClick={() => importInput.current?.click()}><Upload size={17}/>导入存档</button></div><button className="primary-button full" onClick={saveCurrent}>{saveBlocked ? '备份旧档并保存当前进度' : '立即保存'}</button><p className="science-note">进度保存在当前浏览器，每 12 秒自动保存。导入会替换当前进度，建议先导出备份。离线仅结算已发现元素与碰撞能，不会自动发现新元素或取得隐藏成就。</p></Modal>}
+    {dialog?.kind === 'settings' && <Modal title="存档与实验室设置" onClose={() => setDialog(null)}>
+      <SavedGames slots={slots} activeId={slotId} error={slotError} onCreate={() => changeSave('create')} onSwitch={id => changeSave('switch', id)} onDelete={id => changeSave('delete', id)}/>
+      <div className="settings-list"><label><span><strong>科学记数法</strong><small>关闭时显示中文大数单位，超过载后自动使用科学记数法</small></span><input type="checkbox" checked={s.settings.scientific} onChange={e => act(() => { s.settings.scientific = e.target.checked; })}/></label><label><span><strong>减少动态效果</strong><small>降低粒子运动，保留全部游戏功能</small></span><input type="checkbox" checked={s.settings.reducedMotion} onChange={e => act(() => { s.settings.reducedMotion = e.target.checked; })}/></label></div>{saveBlocked && rawSave !== undefined && <button className="secondary-button full" onClick={exportRawSave}><Download size={17}/>导出原始旧档</button>}<div className="save-actions"><button className="secondary-button" onClick={exportSave}><Download size={17}/>导出存档</button><button className="secondary-button" onClick={() => importInput.current?.click()}><Upload size={17}/>导入存档</button></div><button className="primary-button full" onClick={saveCurrent}>{saveBlocked ? '备份旧档并保存当前进度' : '立即保存'}</button><p className="science-note">进度保存在当前浏览器，每 12 秒自动保存。导入会替换正在使用的档位。</p></Modal>}
     {dialog?.kind === 'complete' && <Modal title="H–Xe 全收集完成。" onClose={() => setDialog(null)}><div className="completion-emblem"><span>54</span><strong>Xe</strong><small>XENON / 氙</small><i><Check size={17}/>{archived} / {PLAYABLE_ELEMENTS} 已收录</i></div><p className="completion-text">从两颗氢原子，到 H–Xe 五十四格完整档案。<br/>氙是本版终点；锌、氪和钙都只是沿途里程碑。</p><div className="end-stats"><div><span>全收集时间</span><strong>{clock(s.stats.completedAt || 0)}</strong></div><div><span>氙收录时间</span><strong>{s.stats.xeCompletedAt === null ? '—' : clock(s.stats.xeCompletedAt)}</strong></div><div><span>已点亮元素</span><strong>{archived} / {PLAYABLE_ELEMENTS}</strong></div></div><p className="science-note">第 55–118 号为后续研究目标。你仍可继续使用实验室。</p><button className="primary-button full" onClick={() => setDialog(null)}>继续我的实验室<ArrowRight size={16}/></button></Modal>}
   </div>;
 }

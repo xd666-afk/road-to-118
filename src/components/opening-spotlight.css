@@ -49,6 +49,11 @@ html:has(.opening-spotlight) { overflow: hidden; }
   padding: 20px;
   background: rgb(5 11 12 / 86%);
 }
+.opening-spotlight__welcome .welcome-saves {
+  margin-top: 9px;
+  min-height: 44px;
+  justify-content: center;
+}
 
 .opening-spotlight__welcome {
   width: min(100%, 380px);

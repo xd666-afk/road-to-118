@@ -2,7 +2,7 @@ import { REACTORS } from './config';
 import { eventRate } from './economy';
 import type { GameState, ReactorState } from './types';
 
-const STAGES = [
+export const DISCOVERY_STAGES = [
   { from: 11, to: 14, reactor: 4, specimen: 10, capacity: 1, tuning: 3 },
   { from: 15, to: 18, reactor: 4, specimen: 14, capacity: 2, tuning: 6 },
   { from: 19, to: 20, reactor: 5, specimen: 18, capacity: 1, tuning: 3 },
@@ -14,10 +14,10 @@ const STAGES = [
   { from: 49, to: 54, reactor: 7, specimen: 48, capacity: 3, tuning: 10 },
 ] as const;
 
-export type DiscoveryStage = (typeof STAGES)[number];
+export type DiscoveryStage = (typeof DISCOVERY_STAGES)[number];
 
 export function discoveryStage(z: number) {
-  return STAGES.find(stage => stage.from <= z && z <= stage.to);
+  return DISCOVERY_STAGES.find(stage => stage.from <= z && z <= stage.to);
 }
 
 export function stageReadiness(state: GameState, stage: DiscoveryStage) {

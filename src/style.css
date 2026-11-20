@@ -93,6 +93,29 @@
 .module-current small, .module-next small { font-size: 11px; line-height: 1.55; color: #b4c2b8; }
 .module-next { display: grid; gap: 5px; margin-top: auto; padding-top: 14px; }
 .module-next .module-cost { margin-bottom: 2px; }
+.saved-games { margin-top: 17px; }
+.saved-games-heading, .saved-games li, .saved-game-actions, .delete-save-confirm > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.saved-games-heading h3 { font-size: 14px; }
+.saved-games ul { padding: 0; margin: 10px 0 0; list-style: none; border-top: 1px solid var(--line); }
+.saved-games li { min-height: 50px; padding: 4px 0; border-bottom: 1px solid var(--line); }
+.saved-games li strong { font-size: 13px; }
+.saved-game-actions span { color: #a8c0a5; font-size: 11px; }
+.saved-games button { min-height: 40px; }
+.saved-games .delete-save { color: #edb09b; }
+.delete-save-confirm { margin-top: 12px; padding: 12px; background: #2a211e; border: 1px solid #725449; border-radius: 5px; }
+.delete-save-confirm p, .save-slot-error { color: #f3c6b5; font-size: 12px; line-height: 1.6; }
+.delete-save-confirm > div { margin-top: 9px; justify-content: flex-end; }
+.save-slot-error { margin-top: 8px; }
+.tutorial-calibration { width: 100%; border-collapse: collapse; margin: 14px 0; line-height: 1.5; font-size: 13px; }
+.tutorial-calibration :is(th, td) { text-align: left; padding: 8px 7px; border-bottom: 1px solid var(--line); }
+.tutorial-calibration thead th { color: var(--gold); }
+.tutorial-calibration tbody th { color: var(--cream); font-weight: 500; }
+.tutorial-calibration small { display: block; font-size: .85em; color: #96ada1; }
 @media (max-width: 700px) {
   .industry-panel .module-grid { grid-template-columns: minmax(0, 1fr); }
   .industry-panel .module { border-right: 0; border-bottom: 1px solid var(--line); }
@@ -100,6 +123,9 @@
   .industry-panel .module :is(.secondary-button, .toggle-button) { min-height: 44px; }
 }
 @media (max-width: 480px) {
+  .saved-games button { min-height: 44px; }
+  .tutorial-calibration { font-size: 11px; }
+  .tutorial-calibration :is(th, td) { padding: 7px 4px; overflow-wrap: anywhere; }
   .collection-progress { flex: 1; margin-top: 0; }
   .reactor-output strong { font-size: 19px; }
 }

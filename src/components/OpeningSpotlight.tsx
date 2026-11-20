@@ -15,11 +15,14 @@ type GuideStep = 'welcome' | OpeningStep;
 const HOLD_MS = 650;
 const FADE_MS = 250;
 
-export default function OpeningSpotlight({ step, onBegin, onSkip }: { step?: GuideStep; onBegin: () => void; onSkip: () => void }) {
+export default function OpeningSpotlight({ step, onBegin, onSkip, onManageSaves }: {
+  step?: GuideStep; onBegin: () => void; onSkip: () => void; onManageSaves: () => void;
+}) {
   const [bounds, setBounds] = useState<DOMRect>();
   const [shown, setShown] = useState(step);
   const [fading, setFading] = useState(false);
   const welcomeButton = useRef<HTMLButtonElement>(null);
+  const savesButton = useRef<HTMLButtonElement>(null);
   const transitionLock = useRef(false);
   const pending = shown !== step;
 
@@ -42,6 +45,7 @@ export default function OpeningSpotlight({ step, onBegin, onSkip }: { step?: Gui
     const target = welcome ? welcomeButton.current : document.querySelector<HTMLButtonElement>(`[data-opening-target="${shown}"]`);
     const root = document.getElementById('root');
     if (!target || !root) return;
+    const allowedArea = welcome ? target.closest('.opening-spotlight__welcome') ?? target : target;
 
     const blocked = new Set<HTMLElement>();
     const disable = (node: Element) => {
@@ -70,7 +74,7 @@ export default function OpeningSpotlight({ step, onBegin, onSkip }: { step?: Gui
     window.addEventListener('scroll', place, true);
 
     const keepTarget = (event: Event) => {
-      if (transitionLock.current || (event.target instanceof Node && !target.contains(event.target))) {
+      if (transitionLock.current || (event.target instanceof Node && !allowedArea.contains(event.target))) {
         event.preventDefault();
         event.stopPropagation();
       }
@@ -82,7 +86,8 @@ export default function OpeningSpotlight({ step, onBegin, onSkip }: { step?: Gui
         onSkip();
       } else if (event.key === 'Tab') {
         event.preventDefault();
-        target.focus({ preventScroll: true });
+        const next = welcome && document.activeElement === target ? savesButton.current ?? target : target;
+        next.focus({ preventScroll: true });
       } else if ((transitionLock.current || event.repeat) && (event.key === 'Enter' || event.key === ' ')) {
         event.preventDefault();
       }
@@ -122,6 +127,7 @@ export default function OpeningSpotlight({ step, onBegin, onSkip }: { step?: Gui
           <h2 id="opening-welcome-title">欢迎来到《通往118》</h2>
           <p id="opening-welcome-body">我是你的实验助手。在这里，你会从氢出发，逐步发现和收录更多元素。先跟我一起合成第一份氦吧。</p>
           <button ref={welcomeButton} type="button" className="primary-button" onClick={onBegin}>开始引导<ArrowRight size={16} aria-hidden="true" /></button>
+          <button ref={savesButton} type="button" className="text-button welcome-saves" onClick={onManageSaves}>管理存档</button>
         </section>
       </div> : bounds && lesson && <>
         <div className="opening-spotlight__ring" aria-hidden="true" />

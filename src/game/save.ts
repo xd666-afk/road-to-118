@@ -1,8 +1,7 @@
 import { D } from './numbers';
-import { createFirstRun, createState, FIRST_HELIUM_SECONDS } from './engine';
+import { createState, FIRST_HELIUM_SECONDS } from './engine';
 import { ACHIEVEMENTS, ARCHIVE_UNITS, CALCIUM_ELEMENT, MODULE_ORDER, MODULE_UPGRADES, PLAYABLE_ELEMENTS, REACTORS, SAVE_VERSION, XENON_ELEMENT } from './config';
 import type { GameState } from './types';
-const KEY = 'road-to-118.save.v1';
 export function serialize(s: GameState, now = Date.now()): string {
   return JSON.stringify({ ...s, savedAt: now, notices: [] });
 }
@@ -113,13 +112,4 @@ export function deserialize(text: string): GameState {
     if (typeof progress === 'number' && progress >= 0 && progress < 1) s.observation = { z: max + 1, progress };
   }
   s.saveVersion = SAVE_VERSION; s.notices = []; return s;
-}
-export function saveLocal(s: GameState): { ok: boolean; message: string } {
-  try { localStorage.setItem(KEY, serialize(s)); return { ok: true, message: '存档已保存在此浏览器' }; }
-  catch { return { ok: false, message: '浏览器存储不可用。请导出存档以保留进度。' }; }
-}
-export function loadLocal(): { state: GameState; error?: string; raw?: string } {
-  let text: string | null = null;
-  try { text = localStorage.getItem(KEY); return { state: text ? deserialize(text) : createFirstRun() }; }
-  catch (error) { return { state: createState(), raw: text ?? undefined, error: `旧存档未被覆盖。${error instanceof Error ? error.message : '读取失败'}` }; }
 }
