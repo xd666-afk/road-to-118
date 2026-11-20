@@ -7,7 +7,7 @@ import { coinPerEvent, eventRate, firstDiscoveryRate, maxAffordable, price, prob
 import { poisson, random, waitingHazard } from './rng';
 import type { GameState, Module, Notice, ReactorJob, ReactorState, Upgrade, WorkMode } from './types';
 import { element } from '../data/elements';
-import { PULSE_BOOST_MS, PULSE_BOOSTS, PULSE_DROP_MS, type PulseBoostKind, type PulseDrop } from './pulseBoosts';
+import { PULSE_BOOST_MS, PULSE_BOOSTS, PULSE_DROP_MS, PULSE_DROP_RETRACT_MS, type PulseBoostKind, type PulseDrop } from './pulseBoosts';
 
 export function createState(seed = Date.now() >>> 0, now = Date.now()): GameState {
   const s: GameState = {
@@ -293,7 +293,7 @@ export class Engine {
   }
 
   updatePulseDrop(now: number, randomDropsAllowed: boolean) {
-    if (this.pulseDrop && now >= this.pulseDrop.expiresAt) delete this.pulseDrop;
+    if (this.pulseDrop && now >= this.pulseDrop.expiresAt + PULSE_DROP_RETRACT_MS) delete this.pulseDrop;
     if (!randomDropsAllowed || this.activePulseBoost(now) || this.pulseDrop) {
       this.nextPulseDropAt = undefined;
       return;

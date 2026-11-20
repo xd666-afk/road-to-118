@@ -2,6 +2,48 @@ import { expect, test } from '@playwright/test';
 import { createState } from '../../game/engine';
 import { D } from '../../game/numbers';
 import { serialize } from '../../game/save';
+import { PULSE_DROP_MS, PULSE_DROP_RETRACT_MS, PULSE_DROP_WARNING_MS } from '../../game/pulseBoosts';
+
+for (const reduced of [false, true]) {
+  test(`uncollected pickups warn and retract before removal${reduced ? ' with reduced motion' : ''}`, async ({ page }) => {
+    const now = Date.now();
+    const state = createState(92, now);
+    state.settings.handsOnGuide = true;
+    state.elements[1].discovered = true;
+    await page.emulateMedia({ reducedMotion: reduced ? 'reduce' : 'no-preference' });
+    await page.clock.install({ time: now });
+    await page.clock.pauseAt(now + 1000);
+    await page.addInitScript(text => localStorage.setItem('road-to-118.save.v1', text), serialize(state, now + 1000));
+    await page.goto('/');
+
+    const practice = page.getByRole('button', { name: '引导操作：放出练习灵感点' });
+    const flight = page.locator('.pulse-drop-flight');
+    const pickup = page.getByRole('button', { name: '拾取灵感点' });
+    await practice.click();
+    await expect(flight).toHaveAttribute('data-phase', 'available');
+    await page.clock.runFor(PULSE_DROP_MS - PULSE_DROP_WARNING_MS);
+    await expect(flight).toHaveAttribute('data-phase', 'warning');
+    await expect(flight.locator('.pulse-drop-visual')).toHaveCSS('animation-name', reduced ? 'none' : 'pulse-drop-shake');
+    await expect(pickup).toBeEnabled();
+
+    await page.clock.runFor(PULSE_DROP_WARNING_MS);
+    await expect(flight).toHaveAttribute('data-phase', 'retracting');
+    await expect(flight).toHaveCSS('animation-name', reduced ? 'pulse-drop-fade' : 'pulse-drop-retract');
+    await expect(pickup).toBeDisabled();
+    await page.clock.runFor(PULSE_DROP_RETRACT_MS + 250);
+    await expect(flight).toHaveCount(0);
+    await expect(practice).toBeEnabled();
+    await expect(page.getByRole('complementary', { name: '手动碰撞增益' })).toHaveCount(0);
+    if (!reduced) {
+      await practice.click();
+      await page.clock.runFor(PULSE_DROP_MS - PULSE_DROP_WARNING_MS + 250);
+      await expect(flight).toHaveAttribute('data-phase', 'warning');
+      await pickup.click({ position: { x: 16, y: 24 } });
+      await expect(page.getByRole('complementary', { name: '手动碰撞增益' })).toContainText('×2');
+      await expect(flight).toHaveCount(0);
+    }
+  });
+}
 
 test('a pickup remains under the pointer when pressed with reduced motion', async ({ page }) => {
   const state = createState(91);

@@ -1,5 +1,7 @@
 export const PULSE_BOOST_MS = 60_000;
 export const PULSE_DROP_MS = 16_000;
+export const PULSE_DROP_WARNING_MS = 6_000;
+export const PULSE_DROP_RETRACT_MS = 900;
 
 export const PULSE_BOOSTS = {
   inspiration: { name: '灵感点', description: '手动碰撞的碰撞能和研究数据 ×2', energy: 2, data: 2 },

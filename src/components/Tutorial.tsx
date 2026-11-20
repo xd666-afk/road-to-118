@@ -36,7 +36,7 @@ function CollisionDropsGuide() {
     <dl className="tutorial-definitions">{Object.values(PULSE_BOOSTS).map(boost =>
       <div key={boost.name}><dt>{boost.name}</dt><dd>{boost.description}</dd></div>
     )}</dl>
-    <p>没拾取的道具过一会儿就会消失。道具一次只生效一个，增益用于手动点击。新手引导中可以主动放出一个练习灵感点。</p>
+    <p>临近到期时，道具会震动提醒。到期后会自动飞回屏幕上方。道具一次只生效一个，增益用于手动点击。新手引导中可以主动放出一个练习灵感点。</p>
   </>;
 }
 
