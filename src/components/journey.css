@@ -8,6 +8,17 @@
 }
 .lab-guidance .mission-card p { margin: 8px 0 0; }
 .lab-guidance .mission-card .goal-action { margin: 0; }
+.exploration-requirements {
+  margin: 11px 24px 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  color: #b4c2b8;
+  font-size: 12px;
+  line-height: 1.65;
+}
+.exploration-requirements strong { color: var(--gold); font-weight: 600; }
 .goal-detail { font-size: 11px; color: #adb8af; margin: 12px 0; line-height: 1.8; overflow-wrap: anywhere; }
 .guide-replay { display: flex; justify-content: flex-end; margin-bottom: 12px; }
 .lab-archive { margin-top: 28px; scroll-margin-top: 16px; }
@@ -40,6 +51,7 @@
 
 /* Mobile lab controls use a 44px touch target. */
 @media (max-width: 620px) {
+  .exploration-requirements { margin-inline: 16px; }
   .lab-guidance .mission-card { grid-template-columns: minmax(0, 1fr); padding: 12px 14px; }
 
   .app-shell .status-pill { min-height: 44px; padding: 8px 10px; font-size: 11px; }

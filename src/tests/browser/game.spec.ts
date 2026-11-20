@@ -322,6 +322,44 @@ test('320px and 360px knowledge cards keep atomic data readable and distinguish 
   await dialog.screenshot({path:'artifacts/knowledge-fluorine-details-mobile.png',animations:'disabled'});
 });
 
+test('shows each missing VI requirement beside Sc exploration and clears it when fulfilled', async ({ page }) => {
+  const s = createState(125);
+  s.settings.guideDismissed = true;
+  s.coins = D('1e12');
+  s.data = D('1e8');
+  for (const row of s.elements.slice(0, 20)) row.discovered = true;
+  const calcium = s.elements[19];
+  calcium.deposited = 23;
+  calcium.inventory = D(100);
+  calcium.totalProduced = D(123);
+  await page.addInitScript(({key,text}) => localStorage.setItem(key,text), {key:KEY,text:serialize(s)});
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.goto('/');
+
+  const requirements = page.locator('#exploration-requirements');
+  await expect(requirements).toContainText('探索钪前还需');
+  await expect(requirements).toContainText('建造 VI 级同步辐射研究环');
+  await expect(requirements).toContainText('收录钙（已提交 23/100 份）');
+
+  await page.getByRole('button', { name: '研发仪器' }).click();
+  await page.locator('.research-device').filter({ has: page.getByRole('heading', { name: '同步辐射研究环' }) })
+    .getByRole('button', { name: '研发并建造' }).click();
+  await expect(requirements).not.toContainText('建造 VI 级');
+  await expect(requirements).toContainText('设备扩容 0/1 级');
+  await page.getByRole('button', { name: '购买设备扩容' }).click();
+  await expect(requirements).not.toContainText('设备扩容 0/1 级');
+  await expect(requirements).toContainText('扩容＋单次收益合计 1/4 级');
+  for (let level = 0; level < 3; level++) await page.getByRole('button', { name: '购买单次收益' }).click();
+  await expect(requirements).not.toContainText('扩容＋单次收益');
+  const explore = page.getByRole('button', { name: '探索 Sc' });
+  await expect(explore).toBeDisabled();
+  await page.locator('.periodic-cell[data-z="20"]').click();
+  await page.getByRole('button', { name: '提交 77 单位至档案' }).click();
+  await page.keyboard.press('Escape');
+  await expect(requirements).toHaveCount(0);
+  await expect(explore).toBeEnabled();
+});
+
 test('released Ne save upgrades in place and shows a real Na survey after IV tuning',async({page})=>{
   test.setTimeout(45000);
   const start = Date.parse('2026-11-19T00:00:00Z');
@@ -342,12 +380,17 @@ test('released Ne save upgrades in place and shows a real Na survey after IV tun
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.locator('.mission-card').getByRole('button',{name:'建造 IV 级仪器'}).click();
   await expect(page.getByRole('heading',{name:/离子束反应器/})).toBeVisible();
-  await expect(page.locator('.target-copy')).toContainText('需要 IV 级完成校准');
+  const requirements = page.locator('#exploration-requirements');
+  await expect(requirements).toContainText('探索钠前还需');
+  await expect(requirements).toContainText('设备扩容 0/1 级');
+  await expect(requirements).toContainText('扩容＋单次收益合计 0/3 级');
+  await expect(requirements).not.toContainText('收录氖');
   await page.clock.runFor(6000);
   await expect(page.getByRole('dialog')).toHaveCount(0);
   const tuning = page.locator('.mission-card').getByRole('button', { name: /培养 IV 级/ });
   for (let level = 0; level < 3; level++) await tuning.click();
   await page.locator('.mission-card').getByRole('button', { name: '开始研究 · Na' }).click();
+  await expect(requirements).toHaveCount(0);
   const progress = page.getByRole('progressbar', { name: '首次观测进度' });
   await expect(progress).toHaveAttribute('value', '0');
   await page.clock.runFor(6000);
