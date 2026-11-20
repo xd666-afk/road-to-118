@@ -94,7 +94,7 @@ test('opening hints lead from Be to a new reactor, parallel production and a rea
   const e=new Engine(createState(61));e.state.coins=D(100000);
   e.state.settings.guideDismissed = true;
   e.buy(1,'atoms',20);
-  for(let z=2;z<=4;z++){e.target(1,z);e.state.reactors[0].discoveryHazard=0;e.step(.1);}
+  for(let z=2;z<=4;z++){e.target(1,z);e.state.reactors[0].discoveryHazard=0;e.step(e.state.discoveryWait+.1);}
   e.state.coins=D(2000);e.state.data=D(2000);e.state.notices=[];
   for(const r of e.state.reactors)r.discoveryHazard=100;
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(e.state)});
@@ -122,7 +122,7 @@ test('mobile first upgrade is reachable without scrolling',async({page})=>{
 
 test('III displays newly discovered heavier elements while I retains its chosen mixture',async({page})=>{
   const e=new Engine(createState(63));e.state.coins=D(1000000);e.state.data=D(1000000);
-  for(let z=2;z<=9;z++){e.target(1,z);e.state.reactors[0].discoveryHazard=0;e.step(.1);}
+  for(let z=2;z<=9;z++){e.target(1,z);e.state.reactors[0].discoveryHazard=0;e.step(e.state.discoveryWait+.1);}
   e.build(2);e.build(3);e.target(3,9);e.state.settings.mix=[1,2,3,4,5];e.state.notices=[];
   for(const r of e.state.reactors)r.discoveryHazard=100;
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(e.state)});
@@ -364,7 +364,7 @@ test('released Ne save upgrades in place and shows a real Na survey after IV tun
   test.setTimeout(45000);
   const start = Date.parse('2026-11-19T00:00:00Z');
   const e=new Engine(createState(801));e.state.coins=D('1e12');e.state.data=D('1e12');
-  for(let z=2;z<=10;z++){e.target(1,z);e.state.reactors[0].discoveryHazard=0;e.step(.1);}
+  for(let z=2;z<=10;z++){e.target(1,z);e.state.reactors[0].discoveryHazard=0;e.step(e.state.discoveryWait+.1);}
   e.build(2);e.build(3);e.state.elements[9].inventory=D(100);e.state.elements[9].totalProduced=D(100);e.deposit(10);
   e.state.modules.feed=true;e.state.modules.reaction=true;e.state.automation.reaction=false;
   e.state.reactors.forEach(r=>r.active=false);

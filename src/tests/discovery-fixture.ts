@@ -10,7 +10,7 @@ export function discoverThrough(e: Engine, z: number) {
     if (!stage) {
       e.target(1, next);
       e.state.reactors[0].discoveryHazard = 0;
-      e.step(.1);
+      e.step(e.state.discoveryWait + .1);
     } else {
       const status = stageReadiness(e.state, stage);
       if (!status.reactor.built) e.build(stage.reactor);

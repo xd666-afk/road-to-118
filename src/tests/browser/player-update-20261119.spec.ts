@@ -98,35 +98,42 @@ test('a single collection meter and accessible opening checks keep completed He'
   await expect(checklist.getByRole('listitem', { name: '新容器：待完成' })).toBeVisible();
 });
 
-test('Be discovery card stays open while background discovery queues B, then opens the next card', async ({ page }) => {
+test('oxygen stays the only discovery while its card is open and fluorine waits after reading', async ({ page }) => {
+  test.setTimeout(75000);
   const clock = new Date('2026-11-19T00:00:00.000Z').getTime();
   const s = createState(23);
   s.settings.guideDismissed = true;
-  s.elements[1].discovered = true;
-  s.elements[2].discovered = true;
+  s.settings.reducedMotion = true;
+  for (const row of s.elements.slice(0, 7)) row.discovered = true;
   s.reactors.forEach(r => { r.active = false; });
-  const first = s.reactors[0];
-  first.active = true; first.target = 4; first.exploring = true; first.discoveryHazard = 0;
-  first.upgrades.atoms = 300; first.upgrades.speed = 200;
+  const first = s.reactors[0], advanced = s.reactors[2];
+  first.active = true;
+  first.target = 1;
+  advanced.built = advanced.active = advanced.exploring = true;
+  advanced.target = 8;
+  advanced.discoveryHazard = 0;
+  Object.assign(advanced.upgrades, { atoms: 100_000, speed: 100, capacity: 60 });
   await page.clock.install({ time: new Date(clock) });
   await page.clock.pauseAt(new Date(clock + 1000));
   await page.addInitScript(({ key, text }) => localStorage.setItem(key, text), { key: KEY, text: serialize(s, clock + 1000) });
   await page.goto('/');
+  await page.getByLabel('切换反应容器').selectOption('3');
 
-  const beDialog = page.getByRole('dialog', { name: '新元素发现 · 铍' });
+  const oxygen = page.getByRole('dialog', { name: '新元素发现 · 氧' });
   await page.clock.runFor(500);
-  await expect(beDialog).toBeVisible();
+  await expect(oxygen).toBeVisible();
+  const coinsBefore = await page.getByTestId('coins').textContent();
+  await page.clock.runFor(45_000);
+  await expect(oxygen).toBeVisible();
+  await expect(page.getByTestId('coins')).not.toHaveText(coinsBefore!);
+  await expect(page.locator('.progress-resource strong')).toContainText('8/54 发现');
 
-  const next = page.getByRole('button', { name: '查看下一个发现' });
-  // Seed 23 crosses the second discovery threshold after about three virtual seconds.
-  await page.clock.runFor(3500);
-  await expect(next).toBeVisible();
-  await expect(beDialog).toBeVisible();
-  await expect(beDialog).toContainText('还有 1 项新发现待查看');
-  await expect(page.locator('.progress-resource strong')).toContainText('5/54 发现');
-
-  await next.click();
-  await expect(page.getByRole('dialog', { name: '新元素发现 · 硼' })).toBeVisible();
-  await expect(page.locator('.progress-resource strong')).toContainText('5/54 发现');
-  await expect(page.getByRole('button', { name: '查看下一个发现' })).toHaveCount(0);
+  await oxygen.getByRole('button', { name: '知道了，继续探索' }).click();
+  await expect(page.locator('.target-copy')).toContainText('还需 40 秒');
+  const fluorine = page.getByRole('dialog', { name: '新元素发现 · 氟' });
+  await page.clock.runFor(39_000);
+  await expect(fluorine).toHaveCount(0);
+  await expect(page.locator('.progress-resource strong')).toContainText('8/54 发现');
+  await page.clock.runFor(5_000);
+  await expect(fluorine).toBeVisible();
 });

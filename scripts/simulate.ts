@@ -120,10 +120,12 @@ const selected = process.argv.find(a => a.startsWith('--strategy='))?.split('=')
 const destination = process.argv.find(a => a.startsWith('--output='))?.slice('--output='.length) || 'artifacts/simulation-xe54.json';
 if (selected && !STRATEGIES.some(strategy => strategy === selected)) throw new Error('Unknown simulation strategy');
 const limit = 7200, dt = 2;
+const cardReadSeconds = 4;
 const summary: any = {
   runsPerStrategy: count, dtSeconds: dt, limitMinutes: limit / 60,
   generatedAt: new Date().toISOString(),
-  engine: 'Production Decimal.js and Engine.step, fresh game and real tutorial actions. First He uses the same timed synthesis as the game. Archived element abilities take effect automatically.',
+  engine: 'Production Decimal.js and Engine.step, early sample preparation and a four-second read of each discovery card.',
+  cardReadSeconds,
   actionCadenceSeconds: CADENCE,
   seedPolicy: 'seed = (run+1)*2654435761 + strategyOffset mod 2^32', seedOffsets: SEED_OFFSET,
   balance: REACTORS.map(r => ({ id: r.id, roman: r.roman, range: r.range, softMax: r.softMax, anchor: r.anchor, anchorP: r.p, q: r.q, buildCoins: r.buildCoins, buildData: r.buildData, unlock: r.unlock })),
@@ -140,10 +142,13 @@ for (const strategy of STRATEGIES) {
     const seed = (Math.imul(run + 1, 2654435761) + SEED_OFFSET[strategy]) >>> 0;
     const e = new Engine(createFirstRun(seed, 0));
     let nextAction = 0;
+    let resumeDiscoveryAt = 0;
     let opening = { discovered: 1, archived: 0, reactor2: false, feed: false, reaction: false };
     while (e.state.elapsed < limit && e.state.stats.completedAt === null) {
       if (e.state.elapsed + 1e-9 >= nextAction) { pilot(e, strategy); nextAction = e.state.elapsed + CADENCE[strategy]; }
-      e.step(dt, true);
+      const previous = discoveredMax(e.state);
+      e.step(dt, true, e.state.elapsed >= resumeDiscoveryAt);
+      if (discoveredMax(e.state) > previous) resumeDiscoveryAt = e.state.elapsed + cardReadSeconds;
       if (e.state.elapsed === 180) opening = { discovered: discoveredMax(e.state), archived: archivedCount(e.state), reactor2: e.state.reactors[1].built, feed: e.state.modules.feed, reaction: e.state.modules.reaction };
     }
     outcomes.push({ milestones: e.state.stats.milestones, upgrades: e.state.reactors.map(r => ({ ...r.upgrades })), discovered: discoveredMax(e.state), archived: archivedCount(e.state), failed: e.state.stats.completedAt === null, opening });
@@ -160,6 +165,7 @@ for (const strategy of STRATEGIES) {
   summary.strategies[strategy] = {
     stages: Object.fromEntries(stageKeys.map(key => [key, quantiles(key)])),
     sodiumToArgon: durationQuantiles(outcomes.map(({ milestones }) => milestones.element18 - milestones.element11)),
+    oxygenToFluorine: durationQuantiles(outcomes.map(({ milestones }) => milestones.element9 - milestones.element8)),
     keyTargets: { xeDiscovered: quantiles('element54'), xeArchived: quantiles('xeArchive'), all54Collected: quantiles('stage54') },
     opening3Minutes: { reactor2Percent: openingShare(o => o.reactor2), automationPercent: openingShare(o => o.feed), parallelProductionPercent: openingShare(o => o.reaction), firstArchivePercent: openingShare(o => o.archived > 0), averageDiscovered: +(outcomes.reduce((sum, o) => sum + o.opening.discovered, 0) / count).toFixed(2) },
     failedToCollect54: outcomes.filter(o => o.failed).length,

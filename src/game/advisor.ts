@@ -117,7 +117,8 @@ export function recommend(s: GameState): Advice {
         enabled: !running, action: 'explore', target, reactor: device.id };
     }
     const waiting = top.active && top.exploring && top.target === max + 1;
-    return { id: 'explore', label: waiting ? `正在探索 ${element(max + 1).symbol}` : `继续探索 · ${element(max + 1).symbol}`, detail: waiting ? '每次实验都有机会发现新元素。等待期间可升级设备；平均等待并非倒计时。' : '让最高级仪器连续探索新元素，首次发现后自动前往下一种。钙、锌和氪都只是路线节点。', enabled: !waiting, action: 'explore', reactor: top.id, target: max + 1 };
+    const preparation = s.discoveryWait > 0 ? `准备下一轮样本还需 ${Math.ceil(s.discoveryWait)} 秒。准备期间可以升级设备。` : '每次实验都有机会发现新元素。等待期间可以升级设备。';
+    return { id: 'explore', label: waiting ? `正在探索 ${element(max + 1).symbol}` : `继续探索 · ${element(max + 1).symbol}`, detail: waiting ? preparation : '让最高级仪器探索下一种元素。查看首次发现档案时会暂停新发现。', enabled: !waiting, action: 'explore', reactor: top.id, target: max + 1 };
   }
   if (!xe.archived) {
     const producer = s.reactors.filter(r => r.built && REACTORS[r.id - 1].softMax >= XENON_ELEMENT).at(-1) ?? top;

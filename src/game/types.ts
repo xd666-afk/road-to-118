@@ -28,5 +28,6 @@ export interface GameState {
   notices: Notice[]; noticeSeq: number;
   firstRun?: FirstRun;
   pulseBoost?: PulseBoost;
+  discoveryWait: number;
   observation?: { z: number; progress: number };
 }

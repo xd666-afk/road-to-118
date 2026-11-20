@@ -3,6 +3,7 @@ import { createState, FIRST_HELIUM_SECONDS } from './engine';
 import { ACHIEVEMENTS, ARCHIVE_UNITS, CALCIUM_ELEMENT, MODULE_ORDER, MODULE_UPGRADES, PLAYABLE_ELEMENTS, REACTORS, SAVE_VERSION, XENON_ELEMENT } from './config';
 import type { GameState } from './types';
 import { isPulseBoostKind, PULSE_BOOST_MS } from './pulseBoosts';
+import { discoveryPreparation } from './discovery';
 export function serialize(s: GameState, now = Date.now()): string {
   return JSON.stringify({ ...s, savedAt: now, notices: [] });
 }
@@ -43,6 +44,8 @@ export function deserialize(text: string): GameState {
   else if (released20) s.elements.push(...defaults.elements.slice(20));
   if (!s.elements[0].discovered) throw new Error('存档缺少初始氢元素。');
   const max = s.elements.filter(e => e.discovered).length;
+  const preparation = discoveryPreparation(max + 1);
+  s.discoveryWait = raw.discoveryWait === undefined ? preparation : num(raw.discoveryWait, preparation);
   s.reactors = raw.reactors.map((r: any, i: number) => {
     if (r.id !== i + 1 || !r.upgrades) throw new Error('设备数据损坏。');
     const upgrades = {} as GameState['reactors'][0]['upgrades'];

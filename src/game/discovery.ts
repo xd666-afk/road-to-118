@@ -16,6 +16,14 @@ export const DISCOVERY_STAGES = [
 
 export type DiscoveryStage = (typeof DISCOVERY_STAGES)[number];
 
+const EARLY_PREPARATION: Readonly<Record<number, number>> = {
+  3: 8, 4: 12, 5: 16, 6: 21, 7: 24, 8: 30, 9: 40, 10: 48,
+};
+
+export function discoveryPreparation(z: number) {
+  return EARLY_PREPARATION[z] ?? 0;
+}
+
 export function discoveryStage(z: number) {
   return DISCOVERY_STAGES.find(stage => stage.from <= z && z <= stage.to);
 }

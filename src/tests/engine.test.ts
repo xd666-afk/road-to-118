@@ -11,6 +11,40 @@ const rich = () => { const e = new Engine(createState(123, 100000)); e.state.coi
 
 
 describe('authoritative progression', () => {
+  it('keeps oxygen and fluorine apart even with multiple fast reactors, offline time, and reload', () => {
+    const e = rich();
+    discoverThrough(e, 7);
+    e.build(2);
+    e.build(3);
+    for (const r of e.state.reactors.slice(0, 3)) {
+      e.target(r.id, 8, true);
+      r.discoveryHazard = 0;
+      r.upgrades.atoms = 20_000;
+      r.upgrades.capacity = r.id === 1 ? 0 : 30;
+    }
+    e.step(e.state.discoveryWait + 1);
+    expect(discoveredMax(e.state)).toBe(8);
+    expect(e.state.discoveryWait).toBe(40);
+    const funds = e.state.coins;
+    e.state.coins = D(0);
+    e.step(80, true, false);
+    expect(e.state.coins.gt(0)).toBe(true);
+    expect(discoveredMax(e.state)).toBe(8);
+    expect(e.state.discoveryWait).toBe(40);
+    e.state.coins = funds;
+
+    e.step(23);
+    const resumed = new Engine(deserialize(serialize(e.state, 100000)));
+    resumed.offline(180000);
+    expect(resumed.state.discoveryWait).toBe(17);
+    expect(discoveredMax(resumed.state)).toBe(8);
+    const researcher = resumed.state.reactors.find(r => r.built && r.target === 9)!;
+    researcher.discoveryHazard = 0;
+    resumed.step(16.75);
+    expect(discoveredMax(resumed.state)).toBe(8);
+    resumed.step(.5);
+    expect(discoveredMax(resumed.state)).toBe(9);
+  });
   it('first He synthesis waits for the player and resumes after save, offline time, and pause', () => {
     const e = new Engine(createFirstRun());
     expect(e.target(1, 2, true)).toBe(false);
@@ -239,7 +273,7 @@ describe('automation, offline and saves', () => {
   it('automatic feeding stops at useful throughput and preserves construction funds after saturation', () => { const e = rich(); discoverThrough(e,2); e.research('feed'); const r=e.state.reactors[0]; e.state.coins=D(100000); e.state.automation.reserve=D(600); e.step(.1); expect(r.upgrades.atoms).toBeGreaterThan(0); expect(r.upgrades.atoms).toBeLessThan(10); const bought=r.upgrades.atoms, balance=e.state.coins; e.step(1); expect(r.upgrades.atoms).toBe(bought); expect(e.state.coins.gt(balance)).toBe(true); expect(e.state.coins.gte(600)).toBe(true); });
   it('keeps new opening milestones through save/load and accepts prior saves without them', () => { const e=rich(); e.buy(1,'atoms',1); discoverThrough(e,2); e.research('feed'); const loaded=deserialize(serialize(e.state)); expect(loaded.stats.milestones.firstUpgrade).toBe(0); expect(loaded.stats.milestones.module_feed).toBe(e.state.elapsed); const old=JSON.parse(serialize(e.state));delete old.stats.milestones.firstUpgrade;delete old.stats.milestones.module_feed;expect(deserialize(JSON.stringify(old)).stats.milestones.firstUpgrade).toBeUndefined(); });
   it('requires ordered modules; buys inside reserve; allocation stops at one hundred', () => { const e = rich(); discoverThrough(e, 7); expect(e.research('reaction')).toBe(false); expect(e.research('feed')).toBe(true); expect(e.research('reaction')).toBe(true); expect(e.research('allocation')).toBe(true); e.state.coins = D(200); e.state.automation.reserve = D(150); e.state.reactors[0].active = false; const h = e.state.elements[0]; h.inventory = D(125); h.totalProduced = D(125); e.step(1); expect(e.state.coins.gte(150)).toBe(true); expect(h.deposited).toBe(100); expect(h.inventory.gte(25)).toBe(true); const deposited = h.deposited; e.step(1); expect(h.deposited).toBe(deposited); });
-  it('manual exploration remains available under production and archive modes', () => { const e = rich(); discoverThrough(e, 4); e.research('feed'); e.research('reaction'); for (const mode of ['produce','archive'] as const) { e.setMode(mode,2); expect(e.target(1,discoveredMax(e.state)+1,true)).toBe(true); e.state.reactors[0].discoveryHazard=0; e.step(1); } expect(discoveredMax(e.state)).toBe(6); });
+  it('manual exploration remains available under production and archive modes', () => { const e = rich(); discoverThrough(e, 4); e.research('feed'); e.research('reaction'); for (const mode of ['produce','archive'] as const) { e.setMode(mode,2); expect(e.target(1,discoveredMax(e.state)+1,true)).toBe(true); e.state.reactors[0].discoveryHazard=0; e.step(e.state.discoveryWait + 1); } expect(discoveredMax(e.state)).toBe(6); });
   it('offline caps at 4 hours, never discovers or awards hidden achievements, time reversal yields zero', () => { const e = new Engine(createState(5,100000)); const negative = e.offline(90000); expect(negative.seconds).toBe(0); expect(e.state.coins.eq(0)).toBe(true); const summary = e.offline(100000 + 24*3600*1000); expect(summary.seconds).toBe(14400); expect(discoveredMax(e.state)).toBe(1); discoverThrough(e,6); e.state.achievements = []; e.target(1,6); e.state.savedAt=100000; e.offline(100000+14400000); expect(e.state.elements[5].inventory.gt(0)).toBe(true); expect(e.state.achievements).not.toContain('limit'); expect(e.state.achievements).not.toContain('upstream'); });
   it('round-trips fully populated state with RNG state preserved and accepts a structured v0 migration', () => { const e = rich(); discoverThrough(e,7); e.build(2); e.build(3); e.research('feed'); e.research('reaction'); e.state.notices=[]; const text = serialize(e.state,999999), loaded = deserialize(text); expect(JSON.parse(serialize(loaded,999999))).toEqual(JSON.parse(text)); const old = JSON.parse(text); old.saveVersion=0; old.elements=old.elements.slice(0,10); old.reactors=old.reactors.slice(0,3); delete old.stats.neonCompletedAt; delete old.stats.calciumCompletedAt; delete old.stats.xeCompletedAt; expect(deserialize(JSON.stringify(old)).saveVersion).toBe(5); });
   it.each(['{bad','{}','null','[]','{"saveVersion":100}'])('rejects malformed saves safely: %s', text => { expect(() => deserialize(text)).toThrow(); });

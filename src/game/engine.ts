@@ -1,7 +1,7 @@
 import { D, Big, finiteNumber } from './numbers';
 import type { Amount } from './numbers';
 import { abilityBonuses } from './abilityProgress';
-import { discoveryStage, observationProgress, observationRate, stageReadiness } from './discovery';
+import { discoveryPreparation, discoveryStage, observationProgress, observationRate, stageReadiness } from './discovery';
 import { ACHIEVEMENTS, ARCHIVE_UNITS, CALCIUM_ELEMENT, FINAL_ELEMENT, MODULES, MODULE_ORDER, MODULE_UPGRADES, OFFLINE_LIMIT, PLAYABLE_ELEMENTS, REACTORS, SAVE_VERSION, XENON_ELEMENT, feedDiscount, filingDataPerSample, productionParallel } from './config';
 import { coinPerEvent, eventRate, firstDiscoveryRate, maxAffordable, price, probability, usefulAtomPurchase } from './economy';
 import { poisson, random, waitingHazard } from './rng';
@@ -20,6 +20,7 @@ export function createState(seed = Date.now() >>> 0, now = Date.now()): GameStat
     stats: { events: D(0), produced: D(0), earned: D(0), peak: D(0), builds: 1, purchases: 0, lastEvent: '实验室已准备就绪', neonCompletedAt: null, calciumCompletedAt: null, xeCompletedAt: null, completedAt: null, milestones: {} },
     achievements: [], settings: { scientific: false, reducedMotion: false, guideDismissed: false, handsOnGuide: false, mix: [1] },
     notices: [], noticeSeq: 0,
+    discoveryWait: 0,
   };
   for (const r of s.reactors) r.discoveryHazard = waitingHazard(s);
   return s;
@@ -258,6 +259,7 @@ export class Engine {
     if (!e.discovered) {
       if (!online || z !== discoveredMax(s) + 1 || z > PLAYABLE_ELEMENTS) return;
       e.discovered = true; e.firstDiscoveredAt = s.elapsed; e.firstDiscoveredReactor = r.id;
+      s.discoveryWait = discoveryPreparation(z + 1);
       s.stats.milestones[`element${z}`] = s.elapsed;
       this.notify('discovery', `首次发现 · ${element(z).name} ${element(z).symbol}`, z);
       if (!s.settings.mix.includes(z) && s.settings.mix.length < 5) s.settings.mix.push(z);
@@ -350,10 +352,18 @@ export class Engine {
     return { energy, data };
   }
   /** The sole authority for automatic income. Canvas never calls this method. */
-  step(seconds: number, online = true) {
+  step(seconds: number, online = true, allowDiscovery = online) {
     if (!Number.isFinite(seconds) || seconds <= 0) return;
     const s = this.state; s.elapsed += seconds;
     this.routeJobs();
+    // Keep the target fixed during this tick, even when another device has
+    // just discovered it and advances to the next element.
+    const discoveryTarget = online && allowDiscovery ? discoveredMax(s) + 1 : 0;
+    let discoverySeconds = seconds;
+    if (s.discoveryWait > 0 && discoveryTarget && s.reactors.some(r => r.built && r.active && r.target === discoveryTarget)) {
+      discoverySeconds = Math.max(0, seconds - s.discoveryWait);
+      s.discoveryWait = Math.max(0, s.discoveryWait - seconds);
+    }
     const bonuses = abilityBonuses(s);
     const energyMultiplier = bonuses?.energy ? D(100 + bonuses.energy).div(100) : null;
     const dataMultiplier = bonuses?.data ? D(100 + bonuses.data).div(100) : null;
@@ -370,11 +380,11 @@ export class Engine {
       if (s.stats.events.gte(1)) this.award('collision');
       const e = s.elements[r.target - 1];
       if (!e.discovered) {
-        if (!online || r.target !== discoveredMax(s) + 1) continue;
+        if (r.target !== discoveryTarget || discoverySeconds <= 0) continue;
         const stage = discoveryStage(r.target);
         if (stage) {
           if (r.id !== stage.reactor || !stageReadiness(s, stage).ready) continue;
-          const progress = observationProgress(s, r.target) + observationRate(r, stage, r.target, rate) * seconds;
+          const progress = observationProgress(s, r.target) + observationRate(r, stage, r.target, rate) * discoverySeconds;
           if (progress >= 1 - 1e-12) {
             delete s.observation;
             this.produce(r, D(1), true);
@@ -383,7 +393,7 @@ export class Engine {
         }
         if (r.id === 1 && r.target === 2 && s.firstRun) {
           if (s.firstRun.step === 'helium') {
-            s.firstRun.remaining = Math.max(0, s.firstRun.remaining - seconds);
+            s.firstRun.remaining = Math.max(0, s.firstRun.remaining - discoverySeconds);
             if (s.firstRun.remaining <= 1e-9) {
               r.exploring = false;
               this.produce(r, D(1), true);
@@ -393,7 +403,7 @@ export class Engine {
           continue;
         }
         // Exponential survival clock: genuine online probability, independent of visual frames.
-        const hazard = firstDiscoveryRate(r, rate).mul(seconds);
+        const hazard = firstDiscoveryRate(r, rate).mul(discoverySeconds);
         if (hazard.gte(r.discoveryHazard)) { this.produce(r, D(1), true); r.discoveryHazard = waitingHazard(s); }
         else r.discoveryHazard -= hazard.toNumber();
       } else {
@@ -449,12 +459,16 @@ export class Engine {
     const bonus = submitted * filingDataPerSample(z, this.state.moduleLevels.allocation);
     if (bonus > 0) this.state.data = this.state.data.plus(bonus);
   }
-  advance(seconds: number, online = true) {
+  advance(seconds: number, online = true, allowDiscovery = online) {
     const duration = Math.max(0, Math.min(OFFLINE_LIMIT, Number.isFinite(seconds) ? seconds : 0));
     // Online fixed chunks keep automation responsive; offline uses bounded minute chunks.
     const chunk = online ? 1 : 60;
     let remaining = duration;
-    while (remaining > 1e-9) { const dt = Math.min(chunk, remaining); this.step(dt, online); remaining -= dt; }
+    while (remaining > 1e-9) {
+      const dt = Math.min(chunk, remaining);
+      this.step(dt, online, allowDiscovery);
+      remaining -= dt;
+    }
     return duration;
   }
   offline(now = Date.now()) {
