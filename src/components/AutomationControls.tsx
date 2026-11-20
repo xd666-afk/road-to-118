@@ -1,14 +1,56 @@
+import { ArrowDownToLine, Atom, ChevronRight, Layers3 } from 'lucide-react';
 import { ELEMENTS, element } from '../data/elements';
-import { REACTORS } from '../game/config';
+import { MODULES, MODULE_ORDER, MODULE_UPGRADES, REACTORS, moduleEffect } from '../game/config';
 import type { Engine } from '../game/engine';
-import { D } from '../game/numbers';
+import { D, format } from '../game/numbers';
 import type { AllocationScope, FeedScope, GameState, ReactorJob, WorkMode } from '../game/types';
 
-export default function AutomationControls({ state, max, act }: {
+type IndustryProps = {
   state: GameState;
   max: number;
   act: (change: (engine: Engine) => void) => void;
-}) {
+};
+
+const moduleIcons = { feed: Layers3, reaction: Atom, allocation: ArrowDownToLine };
+
+export function IndustryModules({ state, max, act }: IndustryProps) {
+  const fmt = (value: number) => format(value, state.settings.scientific);
+  return <div className="module-grid">
+    {MODULE_ORDER.map((key, index) => {
+      const info = MODULES[key], Icon = moduleIcons[key];
+      const built = state.modules[key], level = state.moduleLevels[key];
+      const next = MODULE_UPGRADES[key][level - 1];
+      const cost = built ? next : info;
+      const prior = index === 0 || state.modules[MODULE_ORDER[index - 1]];
+      const canResearch = prior && max >= info.unlock;
+      const canAfford = !!cost && state.coins.gte(cost.coins) && state.data.gte(cost.data);
+      const enabled = state.automation[key];
+      return <section className="module" key={key} aria-labelledby={`module-${key}`}>
+        <div className="module-top"><h3 id={`module-${key}`}>{info.name}</h3><Icon size={22} aria-hidden="true"/></div>
+        <p>{info.description}</p>
+        {built && <div className="module-current">
+          <strong>等级 {level} / {MODULE_UPGRADES[key].length + 1}</strong>
+          <small>{moduleEffect(key, level)}</small>
+        </div>}
+        {built && <button className={`toggle-button ${enabled ? 'on' : ''}`} aria-pressed={enabled}
+          onClick={() => act(e => { e.state.automation[key] = !enabled; })}>
+          <span/>{enabled ? '模块已启用' : '模块已暂停'}
+        </button>}
+        {cost && <div className="module-next">
+          {built && <small>{moduleEffect(key, level + 1)}</small>}
+          <div className="module-cost">{fmt(cost.coins)} 碰撞能 + {fmt(cost.data)} 数据</div>
+          <button className="secondary-button full" disabled={!canAfford || (!built && !canResearch)}
+            onClick={() => act(e => { if (built) e.upgradeModule(key); else e.research(key); })}>
+            {built ? `升级至 ${level + 1} 级` : !prior ? '先研发上一模块' : max < info.unlock ? `发现 ${element(info.unlock).symbol} 后开放` : '研发模块'}
+            <ChevronRight size={15} aria-hidden="true"/>
+          </button>
+        </div>}
+      </section>;
+    })}
+  </div>;
+}
+
+export default function AutomationControls({ state, max, act }: IndustryProps) {
   if (!state.modules.feed) return null;
   const { automation } = state;
   const options = ELEMENTS.slice(0, max).map(info => (

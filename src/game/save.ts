@@ -1,6 +1,6 @@
 import { D } from './numbers';
 import { createFirstRun, createState, FIRST_HELIUM_SECONDS } from './engine';
-import { ACHIEVEMENTS, ARCHIVE_UNITS, CALCIUM_ELEMENT, PLAYABLE_ELEMENTS, REACTORS, SAVE_VERSION, XENON_ELEMENT } from './config';
+import { ACHIEVEMENTS, ARCHIVE_UNITS, CALCIUM_ELEMENT, MODULE_ORDER, MODULE_UPGRADES, PLAYABLE_ELEMENTS, REACTORS, SAVE_VERSION, XENON_ELEMENT } from './config';
 import type { GameState } from './types';
 const KEY = 'road-to-118.save.v1';
 export function serialize(s: GameState, now = Date.now()): string {
@@ -12,9 +12,9 @@ export function deserialize(text: string): GameState {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('这不是有效的游戏存档。');
   // v0/v1: released ten elements and three instruments.
   // v2: released twenty elements and five instruments.
-  // v3 and v4 share the H–Xe shape; v4 raises the archive goal and adds per-reactor jobs.
-  if (![0, 1, 2, 3, SAVE_VERSION].includes(raw.saveVersion)) throw new Error('存档版本不兼容。请保留原文件。');
-  const legacy = raw.saveVersion < SAVE_VERSION;
+  // v4 raises the archive goal and adds per-reactor jobs; v5 adds industry levels.
+  if (![0, 1, 2, 3, 4, SAVE_VERSION].includes(raw.saveVersion)) throw new Error('存档版本不兼容。请保留原文件。');
+  const legacy = raw.saveVersion < 4;
   const released10 = raw.saveVersion < 2, released20 = raw.saveVersion === 2;
   const expectedElements = released10 ? 10 : released20 ? 20 : PLAYABLE_ELEMENTS;
   const expectedReactors = released10 ? 3 : released20 ? 5 : REACTORS.length;
@@ -55,7 +55,16 @@ export function deserialize(text: string): GameState {
   else if (released20) s.reactors.push(...defaults.reactors.slice(5).map(r => ({ ...r, discoveryHazard: 1 })));
   if (!s.reactors[0].built || s.reactors.some(r => r.built && !s.elements[REACTORS[r.id - 1].unlock - 1].discovered)) throw new Error('设备开放状态不正确。');
   if (!raw.modules || !raw.automation || !raw.stats) throw new Error('存档缺少工业或统计数据。');
-  for (const key of ['feed', 'reaction', 'allocation'] as const) { s.modules[key] = bool(raw.modules[key]); s.automation[key] = bool(raw.automation[key]); if (s.automation[key] && !s.modules[key]) throw new Error('工业模块尚未研发。'); }
+  for (const key of MODULE_ORDER) {
+    s.modules[key] = bool(raw.modules[key]);
+    s.automation[key] = bool(raw.automation[key]);
+    if (s.automation[key] && !s.modules[key]) throw new Error('工业模块尚未研发。');
+    if (raw.saveVersion >= 5) {
+      const level = num(raw.moduleLevels?.[key], MODULE_UPGRADES[key].length + 1);
+      if (!Number.isInteger(level) || level < 1 || (level > 1 && !s.modules[key])) throw new Error('工业模块等级无效。');
+      s.moduleLevels[key] = level;
+    }
+  }
   if ((s.modules.reaction && !s.modules.feed) || (s.modules.allocation && !s.modules.reaction)) throw new Error('工业模块顺序损坏。');
   if (!['explore', 'produce', 'archive', 'custom'].includes(raw.automation.mode)) throw new Error('工作模式损坏。');
   s.automation.mode = raw.automation.mode; s.automation.reserve = amount(raw.automation.reserve); s.automation.target = num(raw.automation.target, max);

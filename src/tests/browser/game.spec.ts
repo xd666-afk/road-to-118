@@ -139,9 +139,10 @@ test('income and speed use distinct units; full explanation is in the separate t
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(state)});
   await page.setViewportSize({width:1440,height:1000});await page.goto('/');
   await expect(page.locator('.resource-income')).toHaveText('收入 +18.9 /秒');
-  await expect(page.locator('.capacity-values')).toContainText('本机速度14 次/秒');
-  await expect(page.locator('.capacity-values')).toContainText('速度上限14 次/秒');
-  await expect(page.locator('.capacity-meter>p')).toHaveText('满负荷');
+  await expect(page.getByTestId('current-rate')).toHaveText('14 次/秒');
+  await expect(page.getByTestId('reactor-energy-rate')).toHaveText('18.9 /秒');
+  await expect(page.getByTestId('reactor-data-rate')).toHaveText('14 点/秒');
+  await expect(page.getByRole('progressbar', { name: '当前速度占上限' })).toHaveCount(0);
   await expect(page.locator('.metric-help, .income-breakdown, .upgrade-hint, .waiting-note')).toHaveCount(0);
   await expect(page.getByRole('button',{name:/解释：/})).toHaveCount(0);
   await page.screenshot({path:'artifacts/simple-laboratory-desktop.png',fullPage:true,animations:'disabled'});
@@ -154,8 +155,8 @@ test('income and speed use distinct units; full explanation is in the separate t
   await page.getByRole('button',{name:'返回实验',exact:true}).click();
   await page.getByRole('button',{name:'运行中'}).click();
   await expect(page.getByTestId('current-rate')).toHaveText('0 次/秒');
-  await expect(page.locator('.capacity-meter>p')).toHaveText('已暂停');
-  await expect(page.locator('.capacity-meter .progress i')).toHaveCSS('width','0px');
+  await expect(page.getByTestId('reactor-energy-rate')).toHaveText('0 /秒');
+  await expect(page.getByTestId('reactor-data-rate')).toHaveText('0 点/秒');
 });
 
 test('total speed sums devices; switching the device only changes its own speed and upgrade effects',async({page})=>{
@@ -269,7 +270,7 @@ test('H–Xe cards show specimen art, neutral electrons and isotope-specific neu
   await expect(dialog.locator('.electron-configuration')).toHaveCount(0);
 });
 
-test('VI–VIII each load distinct art and support a manual pulse through the viewport', async ({ page }) => {
+test('VI–VIII each load distinct art and support a manual pulse at the edge of the picture', async ({ page }) => {
   const state = createState(810);
   state.settings.guideDismissed = true;
   state.elements.forEach(element => { element.discovered = true; });
@@ -285,14 +286,14 @@ test('VI–VIII each load distinct art and support a manual pulse through the vi
     await expect(photo).toHaveCSS('background-image', new RegExp(`reactor-${roman}\\.webp`));
     const image = await page.request.get(`/assets/reactor-${roman}.webp`);
     expect(image.headers()['content-type']).toContain('image/webp');
-    const pulse = photo.getByRole('button', { name: '手动碰撞' });
+    const pulse = device.getByRole('button', { name: '手动碰撞' });
+    await pulse.scrollIntoViewIfNeeded();
     const artBox = (await photo.boundingBox())!;
     const area = (await pulse.boundingBox())!;
     expect(artBox.width).toBeCloseTo(artBox.height, 0);
-    expect((area.x + area.width / 2 - artBox.x) / artBox.width).toBeCloseTo(.5);
-    expect(area.width).toBeGreaterThan(44);
-    await pulse.click();
-    await expect(photo.locator('.mp-fx-group.is-latest')).toContainText('碰撞能');
+    expect(area).toEqual(await device.boundingBox());
+    await pulse.click({ position: { x: artBox.x - area.x + 10, y: 10 } });
+    await expect(device.locator('.mp-fx-group.is-latest')).toContainText('碰撞能');
   }
   await page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '科研' }).click();
   await expect(page.locator('.research-device-art.advanced-art')).toHaveCount(3);

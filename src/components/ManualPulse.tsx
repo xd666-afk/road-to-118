@@ -3,7 +3,6 @@ import {
   useRef,
   useState,
   type MouseEvent as ReactMouseEvent,
-  type PointerEvent as ReactPointerEvent,
 } from 'react';
 import './manual-pulse.css';
 
@@ -13,7 +12,7 @@ export interface ManualPulseProps {
   /** 宿主自己的“减少动态效果”设置；与系统 prefers-reduced-motion 取并集。 */
   reducedMotion: boolean;
   tutorialTarget?: boolean;
-  /** 观察窗底部的短提示，例如“点击观察窗，手动完成一次碰撞”。 */
+  /** 反应容器图片底部的短提示。 */
   label: string;
   /** 每次有效碰撞只调用一次；返回本次真实收益，无法结算时返回 null。 */
   onPulse: () => { energy: string; data: string } | null;
@@ -49,7 +48,6 @@ export default function ManualPulse({ enabled, reducedMotion, tutorialTarget, la
   const fxLayer = useRef<HTMLDivElement>(null);
   const live = useRef<HTMLParagraphElement>(null);
   const comboBadge = useRef<HTMLSpanElement>(null);
-  const pointerPoint = useRef<{ x: number; y: number } | null>(null);
   const combo = useRef({ count: 0, at: Number.NEGATIVE_INFINITY, timer: 0 });
   const timers = useRef(new Map<Element, number>());
   const systemReduced = useSystemReducedMotion();
@@ -70,7 +68,6 @@ export default function ManualPulse({ enabled, reducedMotion, tutorialTarget, la
 
   useEffect(() => {
     if (enabled) return;
-    pointerPoint.current = null;
     combo.current.count = 0;
     combo.current.at = Number.NEGATIVE_INFINITY;
     if (combo.current.timer) {
@@ -83,16 +80,6 @@ export default function ManualPulse({ enabled, reducedMotion, tutorialTarget, la
     }
     if (live.current) live.current.textContent = '';
   }, [enabled]);
-
-  function rememberPointer(event: ReactPointerEvent<HTMLButtonElement>) {
-    if (!enabled) return;
-    const rect = shell.current?.getBoundingClientRect();
-    if (!rect || rect.width === 0 || rect.height === 0) return;
-    pointerPoint.current = {
-      x: clamp(event.clientX - rect.left, 0, rect.width),
-      y: clamp(event.clientY - rect.top, 0, rect.height),
-    };
-  }
 
   function spawnEffect(x: number, y: number, rect: DOMRect, gain: { energy: string; data: string }, streak: number) {
     const host = fxLayer.current;
@@ -161,10 +148,10 @@ export default function ManualPulse({ enabled, reducedMotion, tutorialTarget, la
     const rect = shell.current?.getBoundingClientRect();
     if (!rect) return;
     const keyboard = event.detail === 0;
-    const point = keyboard || !pointerPoint.current
-      ? { x: rect.width / 2, y: rect.height * 0.45 }
-      : pointerPoint.current;
-    pointerPoint.current = null;
+    const point = keyboard ? { x: rect.width / 2, y: rect.height / 2 } : {
+      x: clamp(event.clientX - rect.left, 0, rect.width),
+      y: clamp(event.clientY - rect.top, 0, rect.height),
+    };
 
     // 每个有效激活只调用一次；收益完全以宿主返回值为准。
     const gain = onPulse();
@@ -210,21 +197,11 @@ export default function ManualPulse({ enabled, reducedMotion, tutorialTarget, la
       aria-describedby={describedBy}
       data-opening-target={tutorialTarget ? 'charge' : undefined}
       disabled={!enabled}
-      onPointerDown={rememberPointer}
-      onPointerCancel={() => { pointerPoint.current = null; }}
       onKeyDown={event => {
         if (event.repeat && (event.key === 'Enter' || event.key === ' ')) event.preventDefault();
       }}
       onClick={pulse}
     >
-      <span className="mp-reticle" aria-hidden="true">
-        <i className="mp-reticle-ring"/>
-        <i className="mp-reticle-core"/>
-        <i className="mp-tick mp-tick--n"/>
-        <i className="mp-tick mp-tick--e"/>
-        <i className="mp-tick mp-tick--s"/>
-        <i className="mp-tick mp-tick--w"/>
-      </span>
       <span className="mp-hint" id={hintId}>
         <i className="mp-hint-dot" aria-hidden="true"/>
         <span className="mp-hint-label">{label}</span>

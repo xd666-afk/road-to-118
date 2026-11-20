@@ -1,11 +1,11 @@
 import type { Module, Upgrade } from './types';
-export const GAME_VERSION = '0.6.0';
+export const GAME_VERSION = '0.7.0';
 /** Current playable range is H–Xe (1–54). Elements 55–118 stay visible as future research. */
 export const PLAYABLE_ELEMENTS = 54;
 export const FINAL_ELEMENT = 54;
 export const XENON_ELEMENT = 54;
 export const CALCIUM_ELEMENT = 20;
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 export const ARCHIVE_UNITS = 100;
 export const REACTORS = [
   { id: 1, roman: 'I', name: '自由碰撞容器', subtitle: 'FREE COLLISION CHAMBER', range: 'H — Be', softMax: 4, anchor: 2, p: .075, q: .25, h: .2, k: .65, samples: 2, cap: 14, gain: 1, buildCoins: 0, buildData: 0, unlock: 1, description: '从两颗氢原子开始。观察混合粒子，用自由碰撞积累碰撞能。' },
@@ -17,7 +17,7 @@ export const REACTORS = [
   { id: 7, roman: 'VII', name: '重离子储存环', subtitle: 'HEAVY-ION STORAGE RING', range: 'Rb — Xe', softMax: 54, anchor: 37, p: .00045, q: .86, h: .3, k: 8, samples: 128, cap: 20000, gain: 25000, buildCoins: 110000000000, buildData: 7800000, unlock: 36, description: '重离子束流覆盖铷到氙，把第五周期收束成完整档案。' },
   { id: 8, roman: 'VIII', name: '强子对撞环', subtitle: 'HADRON COLLIDER RING', range: 'Cs — Og', softMax: 86, anchor: 55, p: .0003, q: .9, h: .22, k: 12, samples: 160, cap: 40000, gain: 120000, buildCoins: 360000000000, buildData: 12000000, unlock: 54, description: '为未来的 55–118 号元素预留的更高能级；本版中用于持续生产与补档。' },
 ] as const;
-export const productionParallel = (id: number) => id === 1 ? 8 : 32;
+export const productionParallel = (id: number, level = 1) => (id === 1 ? 8 : 32) * (1 + .25 * (level - 1));
 export const UPGRADES: Record<Upgrade, { name: string; base: number; ratio: number; description: string }> = {
   atoms: { name: '补充氢样本', base: 5, ratio: 1.14, description: '反应样本 +1，氢库存 +1' },
   speed: { name: '粒子加速', base: 20, ratio: 1.35, description: '提高每秒实验次数，达到设备上限后停止增长' },
@@ -28,6 +28,19 @@ export const MODULES: Record<Module, { name: string; description: string; unlock
   feed: { name: '原料补充', description: '在保留预算内给仪器补样，满负荷时停止。', unlock: 2, coins: 60, data: 30 },
   reaction: { name: '自动反应', description: '批量生产，并为各台仪器编排任务。', unlock: 4, coins: 180, data: 80 },
   allocation: { name: '元素分配', description: '按选定范围自动提交样本并激活能力。', unlock: 7, coins: 3000, data: 500 },
+};
+export const MODULE_ORDER = ['feed', 'reaction', 'allocation'] as const;
+export const MODULE_UPGRADES = {
+  feed: [{ coins: 550, data: 240 }, { coins: 8500, data: 2400 }],
+  reaction: [{ coins: 1600, data: 720 }, { coins: 28000, data: 8000 }],
+  allocation: [{ coins: 8500, data: 1700 }, { coins: 120000, data: 18000 }],
+} satisfies Record<Module, { coins: number; data: number }[]>;
+export const feedDiscount = (level: number) => Math.max(0, level - 1) * 15;
+export const filingDataPerSample = (z: number, level: number) => z * Math.max(0, level - 1);
+export const moduleEffect = (key: Module, level: number) => {
+  if (key === 'feed') return level === 1 ? '自动补样按原价' : `自动补样省 ${feedDiscount(level)}%`;
+  if (key === 'reaction') return `批量生产 · I 级 ×${productionParallel(1, level)}，II 级起 ×${productionParallel(2, level)}`;
+  return level === 1 ? '按所选范围自动提交' : `每份自动提交返还 ${level === 2 ? '1 倍' : '2 倍'}原子序数的研究数据`;
 };
 export const ACHIEVEMENTS = [
   { id: 'collision', name: '第一道信号', description: '完成第一次有效碰撞', hidden: false },

@@ -76,7 +76,7 @@ describe('H–Xe progression, instrumentation and migration', () => {
   });
   it.each([0, 1])('preserves released v%i balances, RNG, partial archives and the Ne milestone', version => {
     const raw = released10Save(version), s = deserialize(JSON.stringify(raw));
-    expect(s.saveVersion).toBe(4); expect(s.elements).toHaveLength(54); expect(s.reactors).toHaveLength(8);
+    expect(s.saveVersion).toBe(5); expect(s.elements).toHaveLength(54); expect(s.reactors).toHaveLength(8);
     expect(s.coins.toString()).toBe(raw.coins); expect(s.data.toString()).toBe(raw.data); expect(s.rng).toBe(raw.rng);
     expect(s.elements[0].deposited).toBe(38); expect(s.elements[0].inventory.eq(12)).toBe(true);
     expect(s.stats.neonCompletedAt).toBe(raw.stats.completedAt); expect(s.stats.calciumCompletedAt).toBeNull(); expect(s.stats.xeCompletedAt).toBeNull(); expect(s.stats.completedAt).toBeNull();
@@ -149,7 +149,7 @@ describe('H–Xe progression, instrumentation and migration', () => {
   });
   it('migrates a released v2 20/5 save without turning its Ca completion into Xe', () => {
     const raw = released20Save(), s = deserialize(JSON.stringify(raw));
-    expect(s.saveVersion).toBe(4); expect(s.elements).toHaveLength(54); expect(s.reactors).toHaveLength(8);
+    expect(s.saveVersion).toBe(5); expect(s.elements).toHaveLength(54); expect(s.reactors).toHaveLength(8);
     expect(s.elements[CALCIUM_ELEMENT - 1].archived).toBe(true);
     expect(s.stats.neonCompletedAt).not.toBeNull();
     expect(s.stats.calciumCompletedAt).toBe(raw.stats.completedAt);
@@ -187,7 +187,7 @@ describe('H–Xe progression, instrumentation and migration', () => {
       (r: any) => r.stats.xeCompletedAt = 1,
       (r: any) => r.stats.neonCompletedAt = 1,
       (r: any) => r.elements.pop(),
-      (r: any) => r.saveVersion = 5,
+      (r: any) => r.saveVersion = 6,
     ]) { const copy = structuredClone(raw); mutate(copy); expect(() => deserialize(JSON.stringify(copy))).toThrow(); }
     const old = released20Save(); old.stats.completedAt = null; expect(() => deserialize(JSON.stringify(old))).toThrow();
   });

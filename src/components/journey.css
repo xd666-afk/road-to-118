@@ -8,15 +8,6 @@
 }
 .lab-guidance .mission-card p { margin: 8px 0 0; }
 .lab-guidance .mission-card .goal-action { margin: 0; }
-.journey-stages { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 0 0 22px; }
-.journey-stage { display: flex; align-items: center; gap: 12px; padding: 14px 16px; min-width: 0; text-align: left; background: #172023; border: 1px solid #36433f; border-radius: 5px; }
-.journey-stage:hover { border-color: var(--gold); background: #1c2828; }
-.journey-index { font: 12px var(--mono); color: #acb9b0; width: 24px; flex-shrink: 0; }
-.journey-stage strong { font-size: 12px; font-weight: 500; display: block; }
-.journey-stage small { color: #a6b2ac; font-size: 11px; display: block; margin-top: 3px; }
-.journey-symbol { margin-left: auto; font: 24px var(--mono); color: #819388; }
-.journey-stage.done { border-color: #667b68; background: #1d2e29; }
-.journey-stage.done .journey-index, .journey-stage.done small { color: #b0d4b8; }
 .goal-detail { font-size: 11px; color: #adb8af; margin: 12px 0; line-height: 1.8; overflow-wrap: anywhere; }
 .guide-replay { display: flex; justify-content: flex-end; margin-bottom: 12px; }
 .lab-archive { margin-top: 28px; scroll-margin-top: 16px; }
@@ -29,8 +20,6 @@
 }
 .archive-heading { margin-bottom: 14px; }
 .archive-heading h2 { font-size: 20px; }
-.archive-heading p { color: var(--muted); font-size: 12px; }
-.archive-heading strong { color: var(--gold); font-family: var(--mono); }
 .archive-toolbar { margin-bottom: 10px; }
 .lab-archive .table-key { max-width: none; padding: 0; justify-content: flex-start; gap: 8px 14px; font-size: 11px; }
 .table-caption { margin-bottom: 9px; color: var(--muted); font-size: 11px; line-height: 1.6; }
@@ -47,27 +36,11 @@
   .nexus-coach__actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .nexus-coach__actions .nexus-coach__btn--primary { grid-column: 1 / -1; }
   .nexus-coach__actions .nexus-coach__btn { padding: 0 8px; }
-  .journey-stages { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-bottom: 15px; }
-  .journey-stage { padding: 10px 7px; min-height: 64px; }
-  .journey-stage strong { font-size: 10px; }
-  .journey-stage small { font-size: 9px; }
-  .journey-index, .journey-symbol { display: none; }
 }
 
-/* Mobile: keep the stage symbols, let cards grow with their text, and give
-   lab controls a real 44px touch target. Scoped so the periodic table is untouched. */
+/* Mobile lab controls use a 44px touch target. */
 @media (max-width: 620px) {
   .lab-guidance .mission-card { grid-template-columns: minmax(0, 1fr); padding: 12px 14px; }
-  .app-shell .journey-stages { gap: 6px; margin-bottom: 15px; }
-  .app-shell .journey-stage { flex-direction: column; align-items: stretch; gap: 2px; height: auto; min-height: 0; padding: 9px 8px; }
-  .app-shell .journey-index { display: none; }
-  .app-shell .journey-stage > span:nth-child(2) { min-width: 0; }
-  .app-shell .journey-stage strong { font-size: 10px; line-height: 1.5; overflow-wrap: anywhere; }
-  .app-shell .journey-stage small { font-size: 10px; line-height: 1.5; margin-top: 2px; overflow-wrap: anywhere; }
-  .app-shell .journey-symbol { display: block; align-self: flex-end; margin: 1px 0 0; font: 12px/1.4 var(--mono); color: #a9b9a8; }
-  .app-shell .journey-stage.done .journey-symbol { color: #b0d4b8; }
-  .app-shell .journey-stage:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-color: var(--gold); }
-  .app-shell .journey-stage:active { transform: translateY(1px); background: #243230; border-color: #8b7a58; }
 
   .app-shell .status-pill { min-height: 44px; padding: 8px 10px; font-size: 11px; }
   .app-shell .reactor-switch > button { min-height: 44px; padding: 0 4px; font-size: 10px; }

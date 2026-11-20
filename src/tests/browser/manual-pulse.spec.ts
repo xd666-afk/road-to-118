@@ -21,12 +21,17 @@ test('mouse and keyboard pulses pay exactly once, show feedback and survive relo
   const pulse = page.getByRole('button', { name: '手动碰撞' });
   const coins = page.getByTestId('coins');
   await pulse.scrollIntoViewIfNeeded();
-  await pulse.click();
+  expect(await pulse.boundingBox()).toEqual(await page.locator('.device').boundingBox());
+  await expect(page.locator('.mp-reticle')).toHaveCount(0);
+  await pulse.click({ position: { x: 13, y: 17 } });
   const effects = page.locator('.mp-fx-group');
   await expect(coins).toHaveText('2');
   await expect(effects).toHaveCount(1);
   await expect(effects.last()).toContainText('+2 碰撞能');
   await expect(effects.last()).toContainText('+2 数据');
+  const point = await effects.last().evaluate(el => [parseFloat(el.style.left), parseFloat(el.style.top)]);
+  expect(Math.abs(point[0] - 13)).toBeLessThan(1);
+  expect(Math.abs(point[1] - 17)).toBeLessThan(1);
   await expect(effects.last().locator('.mp-ring').first()).toBeAttached();
   await expect(effects.last().locator('.mp-sparks i')).toHaveCount(8);
   await pulse.press('Space');
@@ -53,7 +58,7 @@ test.describe('mobile pulse', () => {
     const pulse = page.getByRole('button', { name: '手动碰撞' });
     await pulse.scrollIntoViewIfNeeded();
     const before = await page.evaluate(() => window.scrollY);
-    await pulse.tap();
+    await pulse.tap({ position: { x: 12, y: 15 } });
     await expect(page.getByTestId('coins')).toHaveText('2');
     const feedback = page.locator('.manual-pulse[data-reduced-motion="true"] .mp-fx-group');
     await expect(feedback).toHaveCount(1);

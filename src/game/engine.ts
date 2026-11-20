@@ -2,7 +2,7 @@ import { D, Big, finiteNumber } from './numbers';
 import type { Amount } from './numbers';
 import { abilityBonuses } from './abilityProgress';
 import { discoveryStage, observationProgress, observationRate, stageReadiness } from './discovery';
-import { ACHIEVEMENTS, ARCHIVE_UNITS, CALCIUM_ELEMENT, FINAL_ELEMENT, MODULES, OFFLINE_LIMIT, PLAYABLE_ELEMENTS, REACTORS, SAVE_VERSION, XENON_ELEMENT, productionParallel } from './config';
+import { ACHIEVEMENTS, ARCHIVE_UNITS, CALCIUM_ELEMENT, FINAL_ELEMENT, MODULES, MODULE_ORDER, MODULE_UPGRADES, OFFLINE_LIMIT, PLAYABLE_ELEMENTS, REACTORS, SAVE_VERSION, XENON_ELEMENT, feedDiscount, filingDataPerSample, productionParallel } from './config';
 import { coinPerEvent, eventRate, firstDiscoveryRate, maxAffordable, price, probability, usefulAtomPurchase } from './economy';
 import { poisson, random, waitingHazard } from './rng';
 import type { GameState, Module, Notice, ReactorJob, ReactorState, Upgrade, WorkMode } from './types';
@@ -14,6 +14,7 @@ export function createState(seed = Date.now() >>> 0, now = Date.now()): GameStat
     reactors: REACTORS.map(({ id }) => ({ id, built: id === 1, active: true, target: 2, exploring: false, job: 'manual', upgrades: { atoms: 0, speed: 0, yield: 0, capacity: 0 }, events: D(0), discoveryHazard: 1, productionRemainder: D(0), eventRemainder: D(0) })),
     elements: Array.from({ length: PLAYABLE_ELEMENTS }, (_, i) => ({ discovered: i === 0, inventory: D(0), deposited: 0, archived: false, firstDiscoveredAt: i === 0 ? 0 : null, firstDiscoveredReactor: i === 0 ? 1 : null, totalProduced: D(0) })),
     modules: { feed: false, reaction: false, allocation: false },
+    moduleLevels: { feed: 1, reaction: 1, allocation: 1 },
     automation: { feed: false, reaction: false, allocation: false, reserve: D(100), mode: 'custom', target: 1, feedScope: 'latest', allocationScope: 'all' },
     stats: { events: D(0), produced: D(0), earned: D(0), peak: D(0), builds: 1, purchases: 0, lastEvent: '实验室已准备就绪', neonCompletedAt: null, calciumCompletedAt: null, xeCompletedAt: null, completedAt: null, milestones: {} },
     achievements: [], settings: { scientific: false, reducedMotion: false, guideDismissed: false, mix: [1] },
@@ -93,12 +94,16 @@ export class Engine {
     r.target = z; r.exploring = exploring; return true;
   }
   buy(id: number, key: Upgrade, count: number | 'max'): number {
+    return this.purchase(id, key, count);
+  }
+
+  private purchase(id: number, key: Upgrade, count: number | 'max', priceScale = 1): number {
     const s = this.state, r = s.reactors[id - 1];
     if (s.firstRun?.step === 'charge') return 0;
     if (!r?.built || !(key in r.upgrades) || (key === 'capacity' && id === 1)) return 0;
     const n = count === 'max' ? maxAffordable(r, key, s.coins) : Math.max(0, Math.floor(count));
     if (!n || n > 1e7 - r.upgrades[key]) return 0;
-    const cost = price(r, key, n); if (cost.gt(s.coins)) return 0;
+    const cost = price(r, key, n).mul(priceScale); if (cost.gt(s.coins)) return 0;
     s.coins = Big.max(0, s.coins.minus(cost)); r.upgrades[key] += n; s.stats.purchases += n;
     if (s.stats.milestones.firstUpgrade === undefined) s.stats.milestones.firstUpgrade = s.elapsed;
     if (key === 'atoms') { s.elements[0].inventory = s.elements[0].inventory.plus(n); s.elements[0].totalProduced = s.elements[0].totalProduced.plus(n); s.stats.produced = s.stats.produced.plus(n); }
@@ -118,11 +123,23 @@ export class Engine {
   }
   research(key: Module): boolean {
     const s = this.state, c = MODULES[key];
-    const order: Module[] = ['feed', 'reaction', 'allocation'], index = order.indexOf(key);
-    if (!c || s.modules[key] || (index > 0 && !s.modules[order[index - 1]]) || !s.elements[c.unlock - 1].discovered || s.coins.lt(c.coins) || s.data.lt(c.data)) return false;
+    const index = MODULE_ORDER.indexOf(key);
+    if (!c || s.modules[key] || (index > 0 && !s.modules[MODULE_ORDER[index - 1]]) || !s.elements[c.unlock - 1].discovered || s.coins.lt(c.coins) || s.data.lt(c.data)) return false;
     s.coins = s.coins.minus(c.coins); s.data = s.data.minus(c.data); s.modules[key] = true; s.automation[key] = true;
     s.stats.milestones[`module_${key}`] = s.elapsed;
     this.award('automation'); this.notify('info', `${c.name}模块已上线`); return true;
+  }
+
+  upgradeModule(key: Module): boolean {
+    const s = this.state;
+    const level = s.moduleLevels[key];
+    const cost = MODULE_UPGRADES[key]?.[level - 1];
+    if (!s.modules[key] || !cost || s.coins.lt(cost.coins) || s.data.lt(cost.data)) return false;
+    s.coins = s.coins.minus(cost.coins);
+    s.data = s.data.minus(cost.data);
+    s.moduleLevels[key] = level + 1;
+    this.notify('info', `${MODULES[key].name}已升至 ${level + 1} 级`);
+    return true;
   }
   setMode(mode: WorkMode, z = this.state.automation.target) {
     const s = this.state;
@@ -334,7 +351,7 @@ export class Engine {
         else r.discoveryHazard -= hazard.toNumber();
       } else {
         const p = probability(r.target, r.id);
-        const parallel = s.modules.reaction && s.automation.reaction ? productionParallel(r.id) : 1;
+        const parallel = s.modules.reaction && s.automation.reaction ? productionParallel(r.id, s.moduleLevels.reaction) : 1;
         const expected = events.mul(p).mul(parallel);
         let count;
         const fixedProduction = !online || expected.gte(1e8);
@@ -361,20 +378,29 @@ export class Engine {
     s.stats.peak = Big.max(s.stats.peak, s.coins);
     if (s.modules.feed && s.automation.feed) {
       const reactors = s.automation.feedScope === 'all' ? s.reactors.filter(r => r.built && r.active).reverse() : [highestReactor(s)];
+      const priceScale = (100 - feedDiscount(s.moduleLevels.feed)) / 100;
       for (const r of reactors) {
         // Recompute the budget for each line so the combined purchases respect the reserve.
-        const n = usefulAtomPurchase(r, Big.max(0, s.coins.minus(s.automation.reserve)));
-        if (n > 0) this.buy(r.id, 'atoms', n);
+        const budget = Big.max(0, s.coins.minus(s.automation.reserve));
+        let n = usefulAtomPurchase(r, budget.div(priceScale));
+        if (n > 0 && price(r, 'atoms', n).mul(priceScale).gt(budget)) n--;
+        if (n > 0) this.purchase(r.id, 'atoms', n, priceScale);
       }
     }
     if (s.modules.allocation && s.automation.allocation) {
       if (s.automation.allocationScope === 'all') {
-        for (let z = 1; z <= PLAYABLE_ELEMENTS; z++) this.deposit(z, true);
+        for (let z = 1; z <= PLAYABLE_ELEMENTS; z++) this.autoFile(z);
       } else {
         const stage = discoveryStage(discoveredMax(s) + 1);
-        if (stage) this.deposit(stage.specimen, true);
+        if (stage) this.autoFile(stage.specimen);
       }
     }
+  }
+
+  private autoFile(z: number) {
+    const submitted = this.deposit(z, true);
+    const bonus = submitted * filingDataPerSample(z, this.state.moduleLevels.allocation);
+    if (bonus > 0) this.state.data = this.state.data.plus(bonus);
   }
   advance(seconds: number, online = true) {
     const duration = Math.max(0, Math.min(OFFLINE_LIMIT, Number.isFinite(seconds) ? seconds : 0));

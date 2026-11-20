@@ -25,11 +25,7 @@
 .app-shell .resource-item > span { color: #93a39c; }
 .app-shell .resource-item strong { color: #e8e2cf; font-variant-numeric: tabular-nums; }
 .app-shell .resource-item strong small { color: #8fa096; }
-.app-shell .progress-resource strong em { color: #e0bd88; }
-
-.app-shell .segmented-progress i { background: #2b383a; }
-.app-shell .segmented-progress i.discovered { background: #978b68; }
-.app-shell .segmented-progress i.archived { background: #e0bd88; }
+.app-shell .progress-resource strong em { color: #a1b5ae; }
 
 /* —— 当前目标：左侧金色导轨 + 更明确的行动按钮 —— */
 .app-shell .mission-card {
@@ -74,14 +70,6 @@
 
 .app-shell .table-key .key-discovered { background: #8a9b83; }
 .app-shell .table-key .key-archived { background: #d9b17b; }
-
-/* —— 阶段条：已完成的节点更扎实 —— */
-.app-shell .journey-stage.done {
-  border-color: #7c9274;
-  box-shadow: inset 0 0 0 1px #b7d0a51a;
-}
-
-.app-shell .journey-stage.done .journey-symbol { color: #cfe0bd; }
 
 /* —— 窄屏：保留分块感，避免数字挤成一团 —— */
 @media (max-width: 620px) {

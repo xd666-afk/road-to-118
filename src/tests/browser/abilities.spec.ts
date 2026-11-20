@@ -25,6 +25,15 @@ test('instrument roles and module scopes can be set independently in the mobile 
   const preset = page.getByLabel('套用分工预设');
   const feed = page.getByLabel('自动补样范围');
   const allocation = page.getByLabel('自动提交范围');
+  const feedModule = page.getByRole('region', { name: '原料补充' });
+  const reactionModule = page.getByRole('region', { name: '自动反应' });
+  const allocationModule = page.getByRole('region', { name: '元素分配' });
+  await feedModule.getByRole('button', { name: '升级至 2 级' }).click();
+  await reactionModule.getByRole('button', { name: '升级至 2 级' }).click();
+  await allocationModule.getByRole('button', { name: '升级至 2 级' }).click();
+  await expect(feedModule.locator('.module-current')).toContainText('自动补样省 15%');
+  await expect(reactionModule.locator('.module-current')).toContainText('II 级起 ×40');
+  await expect(allocationModule.locator('.module-current')).toContainText('返还 1 倍');
   await preset.selectOption('archive');
   await expect(second).toHaveValue('archive');
   await first.selectOption('produce');
@@ -34,6 +43,9 @@ test('instrument roles and module scopes can be set independently in the mobile 
   await allocation.selectOption('calibration');
   await page.reload();
   await openResearch();
+  await expect(feedModule.locator('.module-current strong')).toHaveText('等级 2 / 3');
+  await expect(reactionModule.locator('.module-current strong')).toHaveText('等级 2 / 3');
+  await expect(allocationModule.locator('.module-current strong')).toHaveText('等级 2 / 3');
   await expect(preset).toHaveValue('custom');
   await expect(first).toHaveValue('produce');
   await expect(second).toHaveValue('archive');
@@ -93,7 +105,7 @@ test('archiving the last unit of Xe completes H–Xe and leaves 55 locked', asyn
   await page.addInitScript(text => localStorage.setItem('road-to-118.save.v1', text), serialize(e.state));
   await page.setViewportSize({ width: 360, height: 800 });
   await page.goto('/');
-  await page.getByRole('button', { name: /氙档案/ }).click();
+  await page.locator('.periodic-cell[data-z="54"]').click();
   await page.getByRole('dialog').getByRole('button', { name: '提交 1 单位至档案' }).click();
   await expect(page.getByRole('dialog')).toContainText('已生效');
   await expect(page.getByRole('dialog')).toContainText('氙闪远光');

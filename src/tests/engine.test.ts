@@ -6,6 +6,7 @@ import { deserialize, serialize } from '../game/save';
 import { ELEMENTS, KNOWLEDGE } from '../data/elements';
 import { discoverThrough } from './discovery-fixture';
 import { abilityBonuses } from '../game/abilityProgress';
+import { MODULE_UPGRADES } from '../game/config';
 const rich = () => { const e = new Engine(createState(123, 100000)); e.state.coins = D('1e100'); e.state.data = D('1e100'); return e; };
 
 
@@ -73,6 +74,103 @@ describe('economy, bulk purchases and huge numbers', () => {
   it('income is independent of dt and rendering frequency', () => { const a = new Engine(createState(30)), b = new Engine(createState(30)); a.state.reactors[0].target = 1; b.state.reactors[0].target = 1; for(let i=0;i<1000;i++) a.step(.1); for(let i=0;i<10;i++) b.step(10); expect(a.state.coins.div(b.state.coins).minus(1).abs().lt('1e-30')).toBe(true); expect(a.state.stats.events.div(b.state.stats.events).minus(1).abs().lt('1e-30')).toBe(true); });
 });
 describe('automation, offline and saves', () => {
+  it('upgrades only researched modules, charges both costs, caps at three, and migrates v4 at level one', () => {
+    const e = rich();
+    expect(e.upgradeModule('feed')).toBe(false);
+    discoverThrough(e, 4);
+    e.research('feed');
+    e.research('reaction');
+    e.setReactorJob(1, 'produce', 1);
+    e.state.automation.feedScope = 'all';
+    const legacy = JSON.parse(serialize(e.state));
+    legacy.saveVersion = 4;
+    delete legacy.moduleLevels;
+    const loaded = new Engine(deserialize(JSON.stringify(legacy)));
+    expect(loaded.state.moduleLevels).toEqual({ feed: 1, reaction: 1, allocation: 1 });
+    expect(loaded.state.reactors[0].job).toBe('produce');
+    expect(loaded.state.automation.feedScope).toBe('all');
+
+    const cost = MODULE_UPGRADES.feed[0];
+    loaded.state.coins = D(cost.coins);
+    loaded.state.data = D(cost.data - 1);
+    expect(loaded.upgradeModule('feed')).toBe(false);
+    expect(loaded.state.coins.eq(cost.coins)).toBe(true);
+    loaded.state.data = D(cost.data);
+    expect(loaded.upgradeModule('feed')).toBe(true);
+    expect(loaded.state.coins.isZero() && loaded.state.data.isZero()).toBe(true);
+    expect(loaded.state.moduleLevels.feed).toBe(2);
+    loaded.state.coins = D(1e8);
+    loaded.state.data = D(1e8);
+    expect(loaded.upgradeModule('feed')).toBe(true);
+    expect(loaded.upgradeModule('feed')).toBe(false);
+    expect(deserialize(serialize(loaded.state)).moduleLevels.feed).toBe(3);
+  });
+
+  it('discounts only automatic sample purchases while respecting the exact reserve', () => {
+    const e = rich();
+    discoverThrough(e, 2);
+    e.research('feed');
+    e.upgradeModule('feed');
+    e.state.automation.reserve = D(200);
+    e.state.coins = D('204.25');
+    expect(e.buy(1, 'atoms', 1)).toBe(1);
+    expect(e.state.coins.eq('199.25')).toBe(true);
+    e.state.coins = D(200).plus(price(e.state.reactors[0], 'atoms').mul('.85'));
+    e.step(.001);
+    expect(e.state.reactors[0].upgrades.atoms).toBe(2);
+    expect(e.state.coins.gte(200) && e.state.coins.lt('200.01')).toBe(true);
+  });
+
+  it('uses upgraded reaction throughput only on known products', () => {
+    const e = rich();
+    discoverThrough(e, 4);
+    e.research('feed');
+    e.research('reaction');
+    e.state.automation.feed = false;
+    e.buy(1, 'atoms', 20);
+    e.target(1, 1);
+    const baseline = new Engine(deserialize(serialize(e.state)));
+    e.upgradeModule('reaction');
+    e.upgradeModule('reaction');
+    const before = e.state.elements[0].inventory;
+    e.step(10, false);
+    baseline.step(10, false);
+    expect(e.state.elements[0].inventory.minus(before).eq(504)).toBe(true);
+    expect(baseline.state.elements[0].inventory.minus(before).eq(336)).toBe(true);
+    for (const run of [e, baseline]) {
+      run.target(1, 5, true);
+      run.state.reactors[0].discoveryHazard = 1e6;
+      run.step(10);
+    }
+    expect(e.state.reactors[0].discoveryHazard).toBe(baseline.state.reactors[0].discoveryHazard);
+  });
+
+  it('credits filing data once for the units automatically deposited', () => {
+    const e = rich();
+    discoverThrough(e, 7);
+    for (const key of ['feed', 'reaction', 'allocation'] as const) e.research(key);
+    e.upgradeModule('allocation');
+    e.state.reactors[0].active = false;
+    e.state.data = D(0);
+    for (const row of e.state.elements) row.inventory = D(0);
+    const he = e.state.elements[1];
+    he.inventory = D(120);
+    he.totalProduced = D(120);
+    expect(e.deposit(2, true)).toBe(100);
+    expect(e.state.data.isZero()).toBe(true);
+    const li = e.state.elements[2];
+    li.inventory = D(41);
+    li.totalProduced = D(41);
+    e.step(1);
+    expect(li.deposited).toBe(41);
+    expect(e.state.data.eq(41 * 3)).toBe(true);
+    li.inventory = D(62);
+    li.totalProduced = D(103);
+    e.step(1);
+    e.step(1);
+    expect(li.archived && li.inventory.eq(3)).toBe(true);
+    expect(e.state.data.eq(100 * 3)).toBe(true);
+  });
   it('runs exploration, fixed production and archive work independently and saves their assignments', () => {
     const e = rich();
     discoverThrough(e, 10);
@@ -143,7 +241,7 @@ describe('automation, offline and saves', () => {
   it('requires ordered modules; buys inside reserve; allocation stops at one hundred', () => { const e = rich(); discoverThrough(e, 7); expect(e.research('reaction')).toBe(false); expect(e.research('feed')).toBe(true); expect(e.research('reaction')).toBe(true); expect(e.research('allocation')).toBe(true); e.state.coins = D(200); e.state.automation.reserve = D(150); e.state.reactors[0].active = false; const h = e.state.elements[0]; h.inventory = D(125); h.totalProduced = D(125); e.step(1); expect(e.state.coins.gte(150)).toBe(true); expect(h.deposited).toBe(100); expect(h.inventory.gte(25)).toBe(true); const deposited = h.deposited; e.step(1); expect(h.deposited).toBe(deposited); });
   it('manual exploration remains available under production and archive modes', () => { const e = rich(); discoverThrough(e, 4); e.research('feed'); e.research('reaction'); for (const mode of ['produce','archive'] as const) { e.setMode(mode,2); expect(e.target(1,discoveredMax(e.state)+1,true)).toBe(true); e.state.reactors[0].discoveryHazard=0; e.step(1); } expect(discoveredMax(e.state)).toBe(6); });
   it('offline caps at 4 hours, never discovers or awards hidden achievements, time reversal yields zero', () => { const e = new Engine(createState(5,100000)); const negative = e.offline(90000); expect(negative.seconds).toBe(0); expect(e.state.coins.eq(0)).toBe(true); const summary = e.offline(100000 + 24*3600*1000); expect(summary.seconds).toBe(14400); expect(discoveredMax(e.state)).toBe(1); discoverThrough(e,6); e.state.achievements = []; e.target(1,6); e.state.savedAt=100000; e.offline(100000+14400000); expect(e.state.elements[5].inventory.gt(0)).toBe(true); expect(e.state.achievements).not.toContain('limit'); expect(e.state.achievements).not.toContain('upstream'); });
-  it('round-trips fully populated state with RNG state preserved and accepts a structured v0 migration', () => { const e = rich(); discoverThrough(e,7); e.build(2); e.build(3); e.research('feed'); e.research('reaction'); e.state.notices=[]; const text = serialize(e.state,999999), loaded = deserialize(text); expect(JSON.parse(serialize(loaded,999999))).toEqual(JSON.parse(text)); const old = JSON.parse(text); old.saveVersion=0; old.elements=old.elements.slice(0,10); old.reactors=old.reactors.slice(0,3); delete old.stats.neonCompletedAt; delete old.stats.calciumCompletedAt; delete old.stats.xeCompletedAt; expect(deserialize(JSON.stringify(old)).saveVersion).toBe(4); });
+  it('round-trips fully populated state with RNG state preserved and accepts a structured v0 migration', () => { const e = rich(); discoverThrough(e,7); e.build(2); e.build(3); e.research('feed'); e.research('reaction'); e.state.notices=[]; const text = serialize(e.state,999999), loaded = deserialize(text); expect(JSON.parse(serialize(loaded,999999))).toEqual(JSON.parse(text)); const old = JSON.parse(text); old.saveVersion=0; old.elements=old.elements.slice(0,10); old.reactors=old.reactors.slice(0,3); delete old.stats.neonCompletedAt; delete old.stats.calciumCompletedAt; delete old.stats.xeCompletedAt; expect(deserialize(JSON.stringify(old)).saveVersion).toBe(5); });
   it.each(['{bad','{}','null','[]','{"saveVersion":100}'])('rejects malformed saves safely: %s', text => { expect(() => deserialize(text)).toThrow(); });
   it('rejects invalid balances, noninteger deposits, out-of-order discoveries and corrupt unlocks', () => { const raw = JSON.parse(serialize(createState(3))); for(const mutate of [(s:any)=>s.coins='Infinity',(s:any)=>s.elements[0].deposited=49.5,(s:any)=>s.elements[3].discovered=true,(s:any)=>s.reactors[2].built=true,(s:any)=>s.elements[0].inventory='1e1000']) { const copy=structuredClone(raw);mutate(copy);expect(()=>deserialize(JSON.stringify(copy))).toThrow(); } });
 });

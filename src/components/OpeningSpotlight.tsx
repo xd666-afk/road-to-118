@@ -6,7 +6,7 @@ import './opening-spotlight.css';
 
 const steps: Record<OpeningStep, { number: number; title: string; detail: string; done?: string }> = {
   start: { number: 1, title: '开始实验', detail: '点击高亮按钮，启动仪器积累碰撞能。', done: '仪器开始运行了。' },
-  charge: { number: 2, title: '手动触发碰撞', detail: '点击高亮的观察窗，立刻获得碰撞能。攒到 5 后，就可以补充一份氢样本。', done: '碰撞能已就绪。' },
+  charge: { number: 2, title: '手动触发碰撞', detail: '点击高亮的反应容器图片，立刻获得碰撞能。攒到 5 后，就可以补充一份氢样本。', done: '碰撞能已就绪。' },
   sample: { number: 3, title: '补充氢样本', detail: '点击高亮按钮，花 5 碰撞能购买一份样本。', done: '已补充一份氢样本。' },
   explore: { number: 4, title: '探索氦', detail: '点击高亮按钮。引导结束后，仪器将合成第一份氦。' },
 };

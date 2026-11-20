@@ -11,9 +11,10 @@ export interface Notice { id: number; kind: 'discovery' | 'archive' | 'achieveme
 export type OpeningStep = 'start' | 'charge' | 'sample' | 'explore';
 export type FirstRun = { step: 'welcome' | OpeningStep | 'free' } | { step: 'helium'; remaining: number };
 export interface GameState {
-  saveVersion: 4; savedAt: number; elapsed: number; seed: number; rng: number; coins: Amount; data: Amount;
+  saveVersion: 5; savedAt: number; elapsed: number; seed: number; rng: number; coins: Amount; data: Amount;
   reactors: ReactorState[]; elements: ElementState[];
   modules: Record<Module, boolean>;
+  moduleLevels: Record<Module, number>;
   automation: { feed: boolean; reaction: boolean; allocation: boolean; reserve: Amount; mode: WorkMode | 'custom'; target: number; feedScope: FeedScope; allocationScope: AllocationScope };
   stats: {
     events: Amount; produced: Amount; earned: Amount; peak: Amount; builds: number; purchases: number; lastEvent: string;

@@ -25,10 +25,12 @@ test('Ne advice archives with a real deposit, then returns the top instrument to
   await page.goto('/');
 
   await expect(page.getByRole('region', { name: '新手实验引导' })).toHaveCount(0);
-  await expect(page.locator('.journey-stage').nth(0).locator('small')).toHaveText('已提交 88/100 份');
+  await expect(page.locator('.mission-card')).toContainText('88/100');
+  const collection = page.getByRole('progressbar', { name: '元素收集进度' });
+  await expect(collection).toHaveAttribute('value', '2');
   await page.locator('.mission-card').getByRole('button', { name: '提交氖的记录' }).click();
-  await expect(page.locator('.journey-stage').nth(0)).toHaveClass(/done/);
-  await expect(page.locator('.journey-stage').nth(0)).toContainText('已完成');
+  await expect(page.locator('.periodic-cell[data-z="10"]')).toHaveClass(/archived/);
+  await expect(collection).toHaveAttribute('value', '3');
 
   await page.locator('.mission-card').getByRole('button', { name: '开始研究 · Ca' }).click();
   await expect(page.locator('#reactor-selector')).toHaveValue('5');
@@ -49,8 +51,7 @@ test('mobile lab controls meet the 44px touch target without overflowing 320px',
       expect(box?.height ?? 0, selector).toBeGreaterThanOrEqual(44);
     }
   }
-  await expect(page.locator('.journey-symbol').first()).toBeVisible();
-  expect(await page.locator('.journey-stage small').first().evaluate(el => parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(10);
+  await expect(page.getByRole('progressbar', { name: '元素收集进度' })).toBeVisible();
 
   await page.getByRole('button', { name: '存档与设置' }).click();
   const close = page.getByRole('dialog').getByRole('button', { name: '关闭弹窗' });

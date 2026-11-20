@@ -82,15 +82,15 @@ test('x100 buys exactly 100 even when MAX can buy 102', async ({ page }) => {
   await expect(page.getByTestId('coins')).toHaveText('1');
 });
 
-test('stage copy reports H–Xe archive checkpoints and accessible opening checks keep completed He', async ({ page }) => {
+test('a single collection meter and accessible opening checks keep completed He', async ({ page }) => {
   const s = pausedLab(713);
   s.elements[1].discovered = true;
   await page.addInitScript(({ key, text }) => localStorage.setItem(key, text), { key: KEY, text: serialize(s) });
   await page.goto('/');
 
-  await expect(page.locator('.journey-stage').first()).toContainText('氖档案');
-  await expect(page.locator('.journey-stage').first()).toContainText('已提交 0/100 份');
-  await expect(page.locator('.journey-stage').nth(1)).toContainText('钙档案 · 第20号');
+  await expect(page.getByRole('progressbar', { name: '元素收集进度' })).toHaveCount(1);
+  await expect(page.getByRole('progressbar', { name: '元素收集进度' })).toHaveAttribute('value', '0');
+  await expect(page.getByRole('button', { name: /钙档案/ })).toHaveCount(0);
   await expect(page.locator('.progress-resource strong')).toContainText('2/54 发现');
   const checklist = page.getByRole('list', { name: '开局检查清单' });
   await expect(checklist).toBeVisible();
