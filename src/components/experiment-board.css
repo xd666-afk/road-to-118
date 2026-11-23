@@ -1,0 +1,12 @@
+.experiment-board { margin: 0 0 17px; }
+.experiment-board summary { padding: 13px 16px; color: var(--gold); cursor: pointer; font-weight: 650; }
+.experiment-board summary small { margin-left: 8px; color: #a4b8ad; font-size: 11px; }
+.experiment-board-body { display: grid; gap: 10px; padding: 0 16px 15px; color: #c4d0c4; font-size: 13px; }
+.experiment-board-header, .experiment-progress, .experiment-board-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.experiment-board-header { justify-content: space-between; }
+.experiment-board-header span, .experiment-coupon { color: var(--gold); }
+.experiment-progress progress { flex: 1; min-width: 100px; accent-color: var(--gold); }
+.experiment-offers { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 165px), 1fr)); gap: 8px; }
+.experiment-offers button { display: grid; text-align: left; gap: 5px; padding: 9px 11px; min-height: 54px; }
+.experiment-offers small { color: #a7b9ae; }
+.experiment-board-actions button { min-height: 42px; }

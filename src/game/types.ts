@@ -1,6 +1,7 @@
 import type { Amount } from './numbers';
 import type { PulseBoost } from './pulseBoosts';
 import type { SampleContract } from './sampleContract';
+import type { ExperimentBoard } from './experiments';
 export type Upgrade = 'atoms' | 'speed' | 'yield' | 'capacity';
 export type WorkMode = 'explore' | 'produce' | 'archive';
 export type ReactorJob = WorkMode | 'manual';
@@ -31,5 +32,6 @@ export interface GameState {
   pulseBoost?: PulseBoost;
   discoveryWait: number;
   sampleContract?: SampleContract;
+  experimentBoard?: ExperimentBoard;
   observation?: { z: number; progress: number };
 }

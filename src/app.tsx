@@ -18,6 +18,7 @@ import OpeningSpotlight from './components/OpeningSpotlight';
 import SavedGames from './components/SavedGames';
 import PulseDrops from './components/PulseDrops';
 import SampleContract from './components/SampleContract';
+import ExperimentBoard from './components/ExperimentBoard';
 import { assignedToSample } from './game/sampleContract';
 import { recommend, applyAdvice, openingStep } from './game/advisor';
 import './components/journey.css';
@@ -171,9 +172,11 @@ export default function App() {
     const priorStep = e.state.firstRun?.step;
     const priorBoost = e.state.pulseBoost;
     const priorContract = e.state.sampleContract;
+    const priorExperiments = e.state.experimentBoard;
     const priorBoostedPulse = e.state.stats.milestones.boostedPulse;
     const output = fn(e);
     if ((priorStep !== e.state.firstRun?.step || priorBoost !== e.state.pulseBoost || priorContract !== e.state.sampleContract ||
+      priorExperiments !== e.state.experimentBoard ||
       priorBoostedPulse !== e.state.stats.milestones.boostedPulse) && !saveBlocked) {
       const result = saveLocal(activeSlot.current.id, e.state);
       if (!result.ok) setMessage(result.message);
@@ -435,6 +438,7 @@ export default function App() {
         <button className="secondary-button goal-action" disabled={!goal.enabled} onClick={() => act(goal.run)}>{goal.label}<ArrowRight size={15}/></button>
       </section>}
     </div>}
+    <ExperimentBoard key={`experiments-${slotId}`} state={s} act={act} openElement={openElement} focusReactor={setFocus}/>
     {max >= 8 && <SampleContract key={slotId} state={s} act={act}/>}
     <div className="lab-grid">
       <section className="panel reactor-panel"><div className="panel-heading"><div><span className="eyebrow">REACTION CHAMBER</span><h2>{c.name}<span className="tiny-label">{c.roman} 级</span></h2></div><button className={`status-pill ${r.active ? '' : 'paused'}`} data-opening-target={focus === 1 ? "start" : undefined} onClick={() => act(e => e.toggleReactor(focus))}>{r.active ? <><i/>运行中 <CirclePause size={13}/></> : <><CirclePlay size={13}/>{opening === "start" ? "开始实验" : "已暂停"}</>}</button></div>

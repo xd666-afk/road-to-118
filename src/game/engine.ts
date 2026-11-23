@@ -2,13 +2,14 @@ import { D, Big, finiteNumber } from './numbers';
 import type { Amount } from './numbers';
 import { abilityBonuses } from './abilityProgress';
 import { discoveryPreparation, discoveryStage, observationProgress, observationRate, stageReadiness } from './discovery';
-import { ACHIEVEMENTS, ARCHIVE_UNITS, CALCIUM_ELEMENT, FINAL_ELEMENT, MODULES, MODULE_ORDER, MODULE_UPGRADES, OFFLINE_LIMIT, PLAYABLE_ELEMENTS, REACTORS, SAVE_VERSION, XENON_ELEMENT, feedDiscount, filingDataPerSample, productionParallel } from './config';
+import { ACHIEVEMENTS, ARCHIVE_UNITS, CALCIUM_ELEMENT, FINAL_ELEMENT, MODULES, MODULE_ORDER, OFFLINE_LIMIT, PLAYABLE_ELEMENTS, REACTORS, SAVE_VERSION, XENON_ELEMENT, feedDiscount, filingDataPerSample, productionParallel } from './config';
 import { coinPerEvent, eventRate, firstDiscoveryRate, maxAffordable, price, probability, usefulAtomPurchase } from './economy';
 import { poisson, random, waitingHazard } from './rng';
 import type { GameState, Module, Notice, ReactorJob, ReactorState, Upgrade, WorkMode } from './types';
 import { element } from '../data/elements';
 import { PULSE_BOOST_MS, PULSE_BOOSTS, PULSE_DROP_MS, PULSE_DROP_RETRACT_MS, type PulseBoostKind, type PulseDrop } from './pulseBoosts';
 import { advanceSampleContract, assignedToSample, isSampleAnswer, isSampleRoute, sampleAnswer, sampleReady, SAMPLE_GUESS_BONUS, SAMPLE_ROUTES, type SampleAnswer, type SampleRoute } from './sampleContract';
+import { availableIndustryUpgrade, EXPERIMENT_SECONDS, industryUpgradePrice, isOfferAvailable, nextExperimentRound, NEXT_EXPERIMENT_SECONDS, type ExperimentBoard, type ExperimentOffer } from './experiments';
 
 export function createState(seed = Date.now() >>> 0, now = Date.now()): GameState {
   const s: GameState = {
@@ -140,11 +141,12 @@ export class Engine {
   upgradeModule(key: Module): boolean {
     const s = this.state;
     const level = s.moduleLevels[key];
-    const cost = MODULE_UPGRADES[key]?.[level - 1];
+    const cost = industryUpgradePrice(s, key);
     if (!s.modules[key] || !cost || s.coins.lt(cost.coins) || s.data.lt(cost.data)) return false;
     s.coins = s.coins.minus(cost.coins);
     s.data = s.data.minus(cost.data);
     s.moduleLevels[key] = level + 1;
+    if (s.experimentBoard?.coupon) s.experimentBoard = { ...s.experimentBoard, coupon: false };
     this.notify('info', `${MODULES[key].name}已升至 ${level + 1} 级`);
     return true;
   }
@@ -230,6 +232,7 @@ export class Engine {
     const n = Math.min(ARCHIVE_UNITS - e.deposited, finiteNumber(e.inventory.floor(), ARCHIVE_UNITS));
     if (n <= 0) return 0;
     e.inventory = Big.max(0, e.inventory.minus(n)); e.deposited += n;
+    this.recordExperiment('archive', n, z);
     if (e.deposited === ARCHIVE_UNITS) {
       e.archived = true; this.award('archive'); this.notify('archive', `${element(z).name}已正式收录 · 元素能力生效`, z);
       if (s.stats.milestones.firstArchive === undefined) s.stats.milestones.firstArchive = s.elapsed;
@@ -273,6 +276,7 @@ export class Engine {
       if (z === XENON_ELEMENT) { this.award('xenon'); this.notify('milestone', '已发现氙 · 收录氙以点亮第五十四号档案。', XENON_ELEMENT); }
     }
     e.inventory = e.inventory.plus(amount); e.totalProduced = e.totalProduced.plus(amount); s.stats.produced = s.stats.produced.plus(amount);
+    this.recordExperiment('production', finiteNumber(amount, ARCHIVE_UNITS), z, r.id);
     if (online) {
       if (r.id === 1 && z === 5) this.award('impossible');
       if (r.id === 1 && z === 6) this.award('limit');
@@ -348,6 +352,7 @@ export class Engine {
     s.stats.earned = s.stats.earned.plus(energy);
     s.data = s.data.plus(data);
     s.stats.peak = Big.max(s.stats.peak, s.coins);
+    this.recordExperiment('pulse', 1);
     if (s.stats.events.gte(1)) this.award('collision');
     if (s.firstRun?.step === 'charge' && s.coins.gte(price(r, 'atoms'))) s.firstRun = { step: 'sample' };
     return { energy, data };
@@ -386,10 +391,83 @@ export class Engine {
     return true;
   }
 
+  startExperiment(index: number): boolean {
+    const board = this.state.experimentBoard;
+    const offer = Number.isInteger(index) && board?.offers[index];
+    if (!board || !offer || board.active || board.cooldown > 0 || !isOfferAvailable(this.state, offer)) return false;
+    this.state.experimentBoard = { ...board, active: { index, remaining: EXPERIMENT_SECONDS, progress: 0 }, result: undefined };
+    return true;
+  }
+
+  prepareExperimentProduction(): boolean {
+    const board = this.state.experimentBoard, active = board?.active;
+    if (!board || !active) return false;
+    const offer = board.offers[active.index];
+    if (offer.kind !== 'production' || active.progress >= offer.goal) return false;
+    const reactor = this.state.reactors[offer.reactor - 1];
+    if (assignedToSample(this.state, reactor) || !this.target(reactor.id, offer.z)) return false;
+    reactor.active = true;
+    return true;
+  }
+
+  cancelExperiment(): boolean {
+    const board = this.state.experimentBoard, active = board?.active;
+    if (!board || !active || active.progress >= board.offers[active.index].goal) return false;
+    this.finishExperiment(board, 'cancelled');
+    return true;
+  }
+
+  claimExperiment(): boolean {
+    const s = this.state, board = s.experimentBoard, active = board?.active;
+    if (!board || !active) return false;
+    const offer = board.offers[active.index];
+    if (active.progress < offer.goal) return false;
+    const { kind, amount } = offer.reward;
+    const coupon = kind === 'discount' && !board.coupon && availableIndustryUpgrade(s);
+    if (kind === 'energy') {
+      s.coins = s.coins.plus(amount);
+      s.stats.earned = s.stats.earned.plus(amount);
+      s.stats.peak = Big.max(s.stats.peak, s.coins);
+    } else if (!coupon) s.data = s.data.plus(amount);
+    this.finishExperiment({ ...board, coupon: board.coupon || coupon }, 'claimed');
+    this.notify('info', coupon ? '试验委托奖励 · 工业升级券已领取' :
+      `试验委托奖励 · +${amount.toLocaleString('zh-CN')} ${kind === 'energy' ? '碰撞能' : '研究数据'}`);
+    return true;
+  }
+
+  private finishExperiment(board: ExperimentBoard, result: NonNullable<ExperimentBoard['result']>) {
+    this.state.experimentBoard = { ...board, active: undefined, cooldown: NEXT_EXPERIMENT_SECONDS, result };
+  }
+
+  private recordExperiment(kind: ExperimentOffer['kind'], amount: number, z?: number, reactor?: number) {
+    const board = this.state.experimentBoard, active = board?.active;
+    if (!board || !active || active.remaining <= 0) return;
+    const offer = board.offers[active.index];
+    if (offer.kind !== kind || ('z' in offer && offer.z !== z) || ('reactor' in offer && offer.reactor !== reactor)) return;
+    active.progress = Math.min(offer.goal, active.progress + amount);
+  }
+
+  private advanceExperiments(seconds: number) {
+    const s = this.state, board = s.experimentBoard;
+    if (!s.reactors[1].built) return;
+    if (!board) {
+      s.experimentBoard = nextExperimentRound(s, 1, false);
+      return;
+    }
+    if (board.cooldown > 0) {
+      board.cooldown = Math.max(0, board.cooldown - seconds);
+      if (board.cooldown <= 1e-9) s.experimentBoard = nextExperimentRound(s, board.round + 1, board.coupon);
+    } else if (board.active && board.active.progress < board.offers[board.active.index].goal) {
+      board.active.remaining = Math.max(0, board.active.remaining - seconds);
+      if (board.active.remaining <= 1e-9) this.finishExperiment(board, 'expired');
+    }
+  }
+
   /** The sole authority for automatic income. Canvas never calls this method. */
   step(seconds: number, online = true, allowDiscovery = online) {
     if (!Number.isFinite(seconds) || seconds <= 0) return;
     const s = this.state; s.elapsed += seconds;
+    if (online) this.advanceExperiments(seconds);
     this.routeJobs();
     // Keep the target fixed during this tick, even when another device has
     // just discovered it and advances to the next element.

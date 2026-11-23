@@ -5,6 +5,7 @@ import type { GameState } from './types';
 import { isPulseBoostKind, PULSE_BOOST_MS } from './pulseBoosts';
 import { discoveryPreparation } from './discovery';
 import { restoreSampleContract } from './sampleContract';
+import { restoreExperimentBoard } from './experiments';
 export function serialize(s: GameState, now = Date.now()): string {
   return JSON.stringify({ ...s, savedAt: now, notices: [] });
 }
@@ -123,5 +124,6 @@ export function deserialize(text: string): GameState {
     if (typeof progress === 'number' && progress >= 0 && progress < 1) s.observation = { z: max + 1, progress };
   }
   s.sampleContract = restoreSampleContract(raw.sampleContract, s);
+  s.experimentBoard = restoreExperimentBoard(raw.experimentBoard, s);
   s.saveVersion = SAVE_VERSION; s.notices = []; return s;
 }
