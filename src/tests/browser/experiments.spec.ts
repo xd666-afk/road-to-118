@@ -3,6 +3,51 @@ import { createState } from '../../game/engine';
 import { nextExperimentRound, NEXT_EXPERIMENT_SECONDS } from '../../game/experiments';
 import { D } from '../../game/numbers';
 import { serialize } from '../../game/save';
+import { element } from '../../data/elements';
+
+test('players can compare production plans and see which instrument delivered', async ({ page }) => {
+  const now = Date.now();
+  const state = createState(78, now);
+  state.settings.guideDismissed = true;
+  state.settings.reducedMotion = true;
+  state.discoveryWait = 40;
+  for (const row of state.elements.slice(0, 8)) row.discovered = true;
+  Object.assign(state.reactors[0], { target: 2 });
+  state.reactors[0].upgrades.atoms = 30;
+  Object.assign(state.reactors[1], { built: true, target: 9, exploring: true, discoveryHazard: 100 });
+  state.experimentBoard = nextExperimentRound(state, 1, false);
+  const offer = state.experimentBoard.offers[1];
+  if (offer.kind !== 'production') throw new Error('Missing sample production offer');
+  offer.z = 1;
+  await page.clock.install({ time: now });
+  await page.clock.pauseAt(now + 1000);
+  await page.addInitScript(text => {
+    const key = 'road-to-118.save.v1';
+    if (!localStorage.getItem(key)) localStorage.setItem(key, text);
+  }, serialize(state, now + 1000));
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.goto('/');
+
+  const board = page.locator('.experiment-board');
+  const assignments = page.getByRole('region', { name: '仪器分工' });
+  await board.locator('summary').click();
+  await expect(board.getByRole('button', { name: /主仪器转产/ })).toContainText(/约 \d+ 秒/);
+  const support = board.getByRole('button', { name: /旧仪器供料/ });
+  await expect(support).toContainText('主仪器继续原任务');
+  await support.click();
+  await expect(assignments).toContainText(`委托供料 ${element(offer.z).symbol} · 0/${offer.goal}`);
+  await expect(assignments).toContainText('探索 F · 样本准备 40 秒');
+  await page.clock.runFor(9000);
+  await expect(board.getByRole('button', { name: '领取奖励' })).toBeVisible();
+  await expect(assignments).toContainText('生产 He');
+  await expect(assignments).toContainText('样本准备 31 秒');
+  await board.getByRole('button', { name: '领取奖励' }).click();
+  await expect(board).toContainText(`I 级仪器交付了 ${offer.goal} 份氢`);
+  await page.reload();
+  await board.locator('summary').click();
+  await expect(board).toContainText(`I 级仪器交付了 ${offer.goal} 份氢`);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+});
 
 test('an archive commission awards a coupon and the next industry upgrade uses it', async ({ page }) => {
   const now = Date.now();
@@ -33,7 +78,7 @@ test('an archive commission awards a coupon and the next industry upgrade uses i
   const board = page.locator('.experiment-board');
   await board.locator('summary').click();
   await expect(board.getByRole('button', { name: /手动碰撞/ })).toBeVisible();
-  await expect(board.getByRole('button', { name: /仪器生产/ })).toBeVisible();
+  await expect(board.getByRole('button', { name: /主仪器转产/ })).toBeVisible();
   await board.getByRole('button', { name: /工业升级费用减免 25%/ }).click();
   await expect(board).toContainText('剩余 120 秒');
   await board.getByRole('button', { name: '打开元素档案' }).click();

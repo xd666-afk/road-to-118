@@ -19,6 +19,8 @@ import SavedGames from './components/SavedGames';
 import PulseDrops from './components/PulseDrops';
 import SampleContract from './components/SampleContract';
 import ExperimentBoard from './components/ExperimentBoard';
+import ReactorAssignments from './components/ReactorAssignments';
+import { experimentProduction } from './game/experiments';
 import { assignedToSample } from './game/sampleContract';
 import { recommend, applyAdvice, openingStep } from './game/advisor';
 import './components/journey.css';
@@ -112,7 +114,9 @@ export default function App() {
   const discoveryRate = targetKnown || targetStage ? D(0) : firstDiscoveryRate(runningReactor, targetSpeed);
   const targetRate = targetKnown ? targetSpeed.mul(productionChance * parallel * (1 + bonuses.production / 100)) : discoveryRate;
   const targetChance = targetKnown ? productionChance : -Math.expm1(-discoveryRate.div(targetSpeed).toNumber());
-  const targetNote = !r.active ? '已暂停' : assignedToSample(s, r) ? '正在执行异常样本委托' : !targetKnown && s.discoveryWait > 0
+  const commission = experimentProduction(s, r);
+  const targetNote = !r.active ? '已暂停' : assignedToSample(s, r) ? '正在执行异常样本委托' :
+    commission ? `正在为委托生产${element(commission.offer.z).name}` : !targetKnown && s.discoveryWait > 0
     ? `正在准备样本 · 还需 ${Math.ceil(s.discoveryWait)} 秒` : targetStage
     ? canExplore
       ? `观测 ${Math.floor(observed * 100)}% · 约 ${Math.ceil((1 - observed) / observationRate(r, targetStage, r.target, targetSpeed))} 秒完成`
@@ -438,7 +442,8 @@ export default function App() {
         <button className="secondary-button goal-action" disabled={!goal.enabled} onClick={() => act(goal.run)}>{goal.label}<ArrowRight size={15}/></button>
       </section>}
     </div>}
-    <ExperimentBoard key={`experiments-${slotId}`} state={s} act={act} openElement={openElement} focusReactor={setFocus}/>
+    <ReactorAssignments state={s}/>
+    <ExperimentBoard key={`experiments-${slotId}`} state={s} act={act} openElement={openElement}/>
     {max >= 8 && <SampleContract key={slotId} state={s} act={act}/>}
     <div className="lab-grid">
       <section className="panel reactor-panel"><div className="panel-heading"><div><span className="eyebrow">REACTION CHAMBER</span><h2>{c.name}<span className="tiny-label">{c.roman} 级</span></h2></div><button className={`status-pill ${r.active ? '' : 'paused'}`} data-opening-target={focus === 1 ? "start" : undefined} onClick={() => act(e => e.toggleReactor(focus))}>{r.active ? <><i/>运行中 <CirclePause size={13}/></> : <><CirclePlay size={13}/>{opening === "start" ? "开始实验" : "已暂停"}</>}</button></div>
@@ -449,7 +454,7 @@ export default function App() {
           <strong>探索{element(max + 1).name}前还需</strong>
           <span>{requirements.join(' · ')}</span>
         </p>}
-        <div className="chamber-footer">{!targetStage && (targetKnown || s.discoveryWait === 0) && <span>{targetKnown ? '单次成功率' : '单次发现率'} {(targetChance * 100).toPrecision(3)}%</span>}<span>{parallel > 1 ? `批量生产 ×${parallel}` : ''}</span></div>
+        <div className="chamber-footer">{!commission && !targetStage && (targetKnown || s.discoveryWait === 0) && <span>{targetKnown ? '单次成功率' : '单次发现率'} {(targetChance * 100).toPrecision(3)}%</span>}<span>{!commission && parallel > 1 ? `批量生产 ×${parallel}` : ''}</span></div>
         <div className="mix-control">
           <span><Atom size={14}/>展示元素</span>
           {focus === 1 ? ELEMENTS.slice(0, max).map(({ z, symbol }) => (

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { element } from '../data/elements';
 import { REACTORS } from '../game/config';
 import type { Engine } from '../game/engine';
+import { experimentProduction } from '../game/experiments';
 import { SAMPLE_CLUES, SAMPLE_GUESS_BONUS, SAMPLE_ROUTES, sampleAnswer, sampleReady, type SampleAnswer, type SampleRoute } from '../game/sampleContract';
 import type { GameState } from '../game/types';
 import './sample-contract.css';
@@ -21,7 +22,7 @@ export default function SampleContract({ state, act }: {
   const [open, setOpen] = useState(() => state.elements[7].discovered && (!state.elements[8].discovered || !!contract));
   if (!state.elements[7].discovered) return null;
 
-  const active = state.reactors.filter(r => r.built && r.active);
+  const active = state.reactors.filter(r => r.built && r.active && !experimentProduction(state, r));
   const lead = active.at(-1);
   const options = active.slice(0, -1);
   const selected = options.find(r => r.id === support) ?? options[0];
@@ -42,7 +43,7 @@ export default function SampleContract({ state, act }: {
             <strong>{SAMPLE_ROUTES[route].name}</strong><small>{route === 'hydrogen' ? '供料较快' : '供料较慢'} · {rewardText(route)}</small>
           </button>
         )}</div>
-      </> : <p>开启两台仪器即可接取。</p>}
+      </> : <p>需要两台运行中且未被委托占用的仪器。</p>}
     </div> : 'answer' in contract ? <div className="sample-contract-body" role="status">
       <p>样本确认是 <strong>{element(contract.answer).name}（{element(contract.answer).symbol}）</strong>。已领取 {rewardText(contract.route)}。
         {contract.guess === contract.answer ? `判断正确，额外获得 ${SAMPLE_GUESS_BONUS} 研究数据。` : `你的判断是${element(contract.guess).name}。 ${SAMPLE_CLUES[contract.answer]}`}</p>

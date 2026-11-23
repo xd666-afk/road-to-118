@@ -10,3 +10,11 @@
 .experiment-offers button { display: grid; text-align: left; gap: 5px; padding: 9px 11px; min-height: 54px; }
 .experiment-offers small { color: #a7b9ae; }
 .experiment-board-actions button { min-height: 42px; }
+.experiment-production-offer { display: grid; gap: 6px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 6px; grid-column: 1 / -1; }
+.experiment-plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr)); gap: 8px; }
+.experiment-delivery { color: #a4b8ad; }
+.reactor-assignments { margin: 0 0 17px; padding: 12px 16px; }
+.reactor-assignments h2 { font-size: 14px; margin-bottom: 8px; }
+.reactor-assignments ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr)); }
+.reactor-assignments li { display: flex; gap: 8px; align-items: baseline; font-size: 12px; color: #a4b8ad; }
+.reactor-assignments strong { color: var(--gold); flex: none; }

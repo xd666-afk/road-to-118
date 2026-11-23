@@ -9,7 +9,7 @@ import type { GameState, Module, Notice, ReactorJob, ReactorState, Upgrade, Work
 import { element } from '../data/elements';
 import { PULSE_BOOST_MS, PULSE_BOOSTS, PULSE_DROP_MS, PULSE_DROP_RETRACT_MS, type PulseBoostKind, type PulseDrop } from './pulseBoosts';
 import { advanceSampleContract, assignedToSample, isSampleAnswer, isSampleRoute, sampleAnswer, sampleReady, SAMPLE_GUESS_BONUS, SAMPLE_ROUTES, type SampleAnswer, type SampleRoute } from './sampleContract';
-import { availableIndustryUpgrade, EXPERIMENT_SECONDS, industryUpgradePrice, isOfferAvailable, nextExperimentRound, NEXT_EXPERIMENT_SECONDS, type ExperimentBoard, type ExperimentOffer } from './experiments';
+import { availableIndustryUpgrade, EXPERIMENT_SECONDS, experimentProduction, industryUpgradePrice, isOfferAvailable, nextExperimentRound, NEXT_EXPERIMENT_SECONDS, productionPlans, type ExperimentBoard, type ExperimentOffer } from './experiments';
 
 export function createState(seed = Date.now() >>> 0, now = Date.now()): GameState {
   const s: GameState = {
@@ -182,7 +182,7 @@ export class Engine {
   private routeJobs() {
     const s = this.state;
     if (!s.modules.reaction || !s.automation.reaction) return;
-    const working = s.reactors.filter(r => r.built && r.active && r.job !== 'manual' && !assignedToSample(s, r));
+    const working = s.reactors.filter(r => r.built && r.active && r.job !== 'manual' && !assignedToSample(s, r) && !experimentProduction(s, r));
     if (!working.length) return;
     const next = discoveredMax(s) + 1;
     const stage = discoveryStage(next);
@@ -257,9 +257,9 @@ export class Engine {
     } else if (!silent) this.notify('info', `已提交 ${n} 单位${element(z).name} · ${e.deposited}/${ARCHIVE_UNITS}`);
     return n;
   }
-  private produce(r: ReactorState, amount: ReturnType<typeof D>, online: boolean) {
+  private produce(r: ReactorState, amount: ReturnType<typeof D>, online: boolean, commissionTarget?: number) {
     if (amount.lte(0)) return;
-    const s = this.state, z = r.target, e = s.elements[z - 1];
+    const s = this.state, z = commissionTarget ?? r.target, e = s.elements[z - 1];
     if (!e.discovered) {
       if (!online || z !== discoveredMax(s) + 1 || z > PLAYABLE_ELEMENTS) return;
       e.discovered = true; e.firstDiscoveredAt = s.elapsed; e.firstDiscoveredReactor = r.id;
@@ -275,15 +275,18 @@ export class Engine {
       if (z === 36) { this.award('krypton'); this.notify('milestone', '已发现氪 · 第四周期结束；VII 级重离子储存环已开放，目标仍是氙。', 36); }
       if (z === XENON_ELEMENT) { this.award('xenon'); this.notify('milestone', '已发现氙 · 收录氙以点亮第五十四号档案。', XENON_ELEMENT); }
     }
-    e.inventory = e.inventory.plus(amount); e.totalProduced = e.totalProduced.plus(amount); s.stats.produced = s.stats.produced.plus(amount);
-    this.recordExperiment('production', finiteNumber(amount, ARCHIVE_UNITS), z, r.id);
+    const delivered = commissionTarget === undefined ? 0 :
+      this.recordExperiment('production', finiteNumber(amount, ARCHIVE_UNITS), z, r.id);
+    e.inventory = e.inventory.plus(amount.minus(delivered));
+    e.totalProduced = e.totalProduced.plus(amount);
+    s.stats.produced = s.stats.produced.plus(amount);
     if (online) {
       if (r.id === 1 && z === 5) this.award('impossible');
       if (r.id === 1 && z === 6) this.award('limit');
       if (r.id === 2 && z >= 8) this.award('old');
       if (z >= REACTORS[r.id - 1].softMax + 2) this.award('upstream');
     }
-    if (online && r.exploring && (r.job === 'manual' || s.automation.reaction) && z < PLAYABLE_ELEMENTS) this.setTarget(r.id, Math.min(PLAYABLE_ELEMENTS, discoveredMax(s) + 1), true);
+    if (commissionTarget === undefined && online && r.exploring && (r.job === 'manual' || s.automation.reaction) && z < PLAYABLE_ELEMENTS) this.setTarget(r.id, Math.min(PLAYABLE_ELEMENTS, discoveredMax(s) + 1), true);
   }
   canManualPulse(reactorId: number): boolean {
     const r = this.state.reactors[reactorId - 1];
@@ -359,10 +362,10 @@ export class Engine {
   }
   startSampleContract(route: SampleRoute, supportId: number): boolean {
     const s = this.state;
-    const lead = s.reactors.filter(r => r.built && r.active).at(-1);
+    const lead = s.reactors.filter(r => r.built && r.active && !experimentProduction(s, r)).at(-1);
     const support = s.reactors[supportId - 1];
     if (!s.elements[7].discovered || s.sampleContract || !isSampleRoute(route) ||
-      !lead || !support?.built || !support.active || support.id >= lead.id) return false;
+      !lead || !support?.built || !support.active || experimentProduction(s, support) || support.id >= lead.id) return false;
     s.sampleContract = { route, lead: lead.id, support: support.id, supply: 0, scan: 0 };
     return true;
   }
@@ -391,22 +394,18 @@ export class Engine {
     return true;
   }
 
-  startExperiment(index: number): boolean {
+  startExperiment(index: number, reactorId?: number): boolean {
     const board = this.state.experimentBoard;
     const offer = Number.isInteger(index) && board?.offers[index];
     if (!board || !offer || board.active || board.cooldown > 0 || !isOfferAvailable(this.state, offer)) return false;
-    this.state.experimentBoard = { ...board, active: { index, remaining: EXPERIMENT_SECONDS, progress: 0 }, result: undefined };
-    return true;
-  }
-
-  prepareExperimentProduction(): boolean {
-    const board = this.state.experimentBoard, active = board?.active;
-    if (!board || !active) return false;
-    const offer = board.offers[active.index];
-    if (offer.kind !== 'production' || active.progress >= offer.goal) return false;
-    const reactor = this.state.reactors[offer.reactor - 1];
-    if (assignedToSample(this.state, reactor) || !this.target(reactor.id, offer.z)) return false;
-    reactor.active = true;
+    const active: NonNullable<ExperimentBoard['active']> = { index, remaining: EXPERIMENT_SECONDS, progress: 0 };
+    if (offer.kind === 'production') {
+      const choice = productionPlans(this.state, offer).find(plan => plan.reactor.id === (reactorId ?? offer.reactor));
+      if (!choice?.enabled) return false;
+      active.reactor = choice.reactor.id;
+      active.fraction = 0;
+    }
+    this.state.experimentBoard = { ...board, active, result: undefined };
     return true;
   }
 
@@ -429,7 +428,9 @@ export class Engine {
       s.stats.earned = s.stats.earned.plus(amount);
       s.stats.peak = Big.max(s.stats.peak, s.coins);
     } else if (!coupon) s.data = s.data.plus(amount);
-    this.finishExperiment({ ...board, coupon: board.coupon || coupon }, 'claimed');
+    const delivery = offer.kind === 'production' && active.reactor
+      ? { reactor: active.reactor, z: offer.z, count: active.progress } : board.delivery;
+    this.finishExperiment({ ...board, coupon: board.coupon || coupon, delivery }, 'claimed');
     this.notify('info', coupon ? '试验委托奖励 · 工业升级券已领取' :
       `试验委托奖励 · +${amount.toLocaleString('zh-CN')} ${kind === 'energy' ? '碰撞能' : '研究数据'}`);
     return true;
@@ -441,10 +442,12 @@ export class Engine {
 
   private recordExperiment(kind: ExperimentOffer['kind'], amount: number, z?: number, reactor?: number) {
     const board = this.state.experimentBoard, active = board?.active;
-    if (!board || !active || active.remaining <= 0) return;
+    if (!board || !active || active.remaining <= 0) return 0;
     const offer = board.offers[active.index];
-    if (offer.kind !== kind || ('z' in offer && offer.z !== z) || ('reactor' in offer && offer.reactor !== reactor)) return;
-    active.progress = Math.min(offer.goal, active.progress + amount);
+    if (offer.kind !== kind || ('z' in offer && offer.z !== z) || (offer.kind === 'production' && active.reactor !== reactor)) return 0;
+    const credit = Math.min(amount, offer.goal - active.progress);
+    active.progress += credit;
+    return credit;
   }
 
   private advanceExperiments(seconds: number) {
@@ -456,7 +459,9 @@ export class Engine {
     }
     if (board.cooldown > 0) {
       board.cooldown = Math.max(0, board.cooldown - seconds);
-      if (board.cooldown <= 1e-9) s.experimentBoard = nextExperimentRound(s, board.round + 1, board.coupon);
+      if (board.cooldown <= 1e-9) {
+        s.experimentBoard = { ...nextExperimentRound(s, board.round + 1, board.coupon), delivery: board.delivery };
+      }
     } else if (board.active && board.active.progress < board.offers[board.active.index].goal) {
       board.active.remaining = Math.max(0, board.active.remaining - seconds);
       if (board.active.remaining <= 1e-9) this.finishExperiment(board, 'expired');
@@ -477,7 +482,7 @@ export class Engine {
     let discoverySeconds = seconds;
     if (s.discoveryWait > 0 && discoveryTarget && (
       (scanFluorine && s.reactors[sample.lead - 1].active) ||
-      s.reactors.some(r => r.built && r.active && r.target === discoveryTarget)
+      s.reactors.some(r => r.built && r.active && r.target === discoveryTarget && !experimentProduction(s, r))
     )) {
       discoverySeconds = Math.max(0, seconds - s.discoveryWait);
       s.discoveryWait = Math.max(0, s.discoveryWait - seconds);
@@ -497,7 +502,9 @@ export class Engine {
       s.data = s.data.plus(dataMultiplier ? events.mul(dataMultiplier) : events);
       if (s.stats.events.gte(1)) this.award('collision');
       if (assignedToSample(s, r)) continue;
-      const e = s.elements[r.target - 1];
+      const commission = experimentProduction(s, r);
+      const target = commission?.offer.z ?? r.target;
+      const e = s.elements[target - 1];
       if (!e.discovered) {
         if (r.target !== discoveryTarget || discoverySeconds <= 0 || scanFluorine) continue;
         const stage = discoveryStage(r.target);
@@ -526,7 +533,7 @@ export class Engine {
         if (hazard.gte(r.discoveryHazard)) { this.produce(r, D(1), true); r.discoveryHazard = waitingHazard(s); }
         else r.discoveryHazard -= hazard.toNumber();
       } else {
-        const p = probability(r.target, r.id);
+        const p = probability(target, r.id);
         const parallel = s.modules.reaction && s.automation.reaction ? productionParallel(r.id, s.moduleLevels.reaction) : 1;
         const expected = events.mul(p).mul(parallel);
         let count;
@@ -544,11 +551,13 @@ export class Engine {
         } else count = D(poisson(s, expected.toNumber()));
         if (fixedProduction || productionBonus) {
           // Online bonuses add to actual production. They never alter first discovery odds.
-          const total = (productionBonus ? count.plus(count.mul(productionBonus)) : count).plus(r.productionRemainder);
+          const total = (productionBonus ? count.plus(count.mul(productionBonus)) : count).plus(commission ? D(commission.active.fraction ?? 0) : r.productionRemainder);
           count = total.floor();
-          r.productionRemainder = total.minus(count);
+          const fraction = total.minus(count);
+          if (commission) commission.active.fraction = Math.min(.9999999999999999, fraction.toNumber());
+          else r.productionRemainder = fraction;
         }
-        this.produce(r, count, online);
+        this.produce(r, count, online, commission?.offer.z);
       }
     }
     if (online) advanceSampleContract(s, seconds);

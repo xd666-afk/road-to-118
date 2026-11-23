@@ -1,6 +1,8 @@
-import { ARCHIVE_UNITS, MODULE_UPGRADES, REACTORS } from './config';
+import { ARCHIVE_UNITS, MODULE_UPGRADES, productionParallel, REACTORS } from './config';
 import { eventRate, probability } from './economy';
-import type { GameState, Module } from './types';
+import { abilityBonuses } from './abilityProgress';
+import { assignedToSample } from './sampleContract';
+import type { GameState, Module, ReactorState } from './types';
 
 export const EXPERIMENT_SECONDS = 120;
 export const NEXT_EXPERIMENT_SECONDS = 15;
@@ -9,14 +11,37 @@ type Reward = { kind: 'energy' | 'data' | 'discount'; amount: number };
 export type ExperimentOffer = { kind: 'pulse'; goal: number; reward: Reward } |
   { kind: 'archive'; z: number; goal: number; reward: Reward } |
   { kind: 'production'; z: number; reactor: number; goal: number; reward: Reward };
+type Delivery = { reactor: number; z: number; count: number };
 export type ExperimentBoard = {
   round: number;
   offers: ExperimentOffer[];
   cooldown: number;
   coupon: boolean;
-  active?: { index: number; progress: number; remaining: number };
+  active?: { index: number; progress: number; remaining: number; reactor?: number; fraction?: number };
+  delivery?: Delivery;
   result?: 'claimed' | 'expired' | 'cancelled';
 };
+
+export function productionPlans(state: GameState, offer: Extract<ExperimentOffer, { kind: 'production' }>) {
+  const lead = state.reactors.filter(r => r.built).at(-1)!;
+  const support = state.reactors[offer.reactor - 1];
+  const productionBoost = 1 + abilityBonuses(state).production / 100;
+  return ([{ kind: 'lead', reactor: lead }, { kind: 'support', reactor: support }] as const)
+    .filter(plan => plan.kind === 'lead' || plan.reactor.id !== lead.id)
+    .map(({ kind, reactor }) => {
+      const enabled = reactor.active && !assignedToSample(state, reactor);
+      const parallel = state.modules.reaction && state.automation.reaction ? productionParallel(reactor.id, state.moduleLevels.reaction) : 1;
+      const rate = eventRate(reactor).toNumber() * probability(offer.z, reactor.id) * parallel * productionBoost;
+      return { kind, reactor, enabled, seconds: enabled && rate > 0 ? Math.max(1, Math.ceil(offer.goal / rate)) : undefined };
+    });
+}
+
+export function experimentProduction(state: GameState, reactor: ReactorState) {
+  const board = state.experimentBoard, active = board?.active;
+  if (!board || !active || active.reactor !== reactor.id || active.remaining <= 0) return;
+  const offer = board.offers[active.index];
+  if (offer.kind === 'production' && active.progress < offer.goal) return { offer, active };
+}
 
 export function availableIndustryUpgrade(state: GameState) {
   return (Object.keys(MODULE_UPGRADES) as Module[]).some(key => state.modules[key] && MODULE_UPGRADES[key][state.moduleLevels[key] - 1]);
@@ -73,10 +98,22 @@ export function restoreExperimentBoard(value: unknown, state: GameState): Experi
   });
   if (offers.length !== raw.offers.length || offers.length < 2 || offers.length > 3) return;
   const board: ExperimentBoard = { round: raw.round, offers, cooldown: raw.cooldown, coupon: raw.coupon };
+  const builtReactor = (id: unknown): id is number => bounded(id, 1, state.reactors.length) && Number.isInteger(id) && state.reactors[id - 1]?.built;
   const active = raw.active as Record<string, unknown> | undefined;
   if (active && board.cooldown === 0 && bounded(active.index, 0, offers.length - 1) && Number.isInteger(active.index) &&
     bounded(active.progress, 0, offers[active.index].goal) && bounded(active.remaining, 0, EXPERIMENT_SECONDS)) {
+    const offer = offers[active.index];
     board.active = { index: active.index, progress: active.progress, remaining: active.remaining };
+    if (offer.kind === 'production') {
+      board.active.reactor = builtReactor(active.reactor) ? active.reactor : offer.reactor;
+      board.active.fraction = bounded(active.fraction, 0, 1) && active.fraction < 1 ? active.fraction : 0;
+    }
+  }
+  const delivery = raw.delivery as Record<string, unknown> | undefined;
+  if (delivery && builtReactor(delivery.reactor) && bounded(delivery.z, 1, state.elements.length) &&
+    Number.isInteger(delivery.z) && state.elements[delivery.z - 1].discovered &&
+    bounded(delivery.count, 1, ARCHIVE_UNITS) && Number.isInteger(delivery.count)) {
+    board.delivery = { reactor: delivery.reactor, z: delivery.z, count: delivery.count };
   }
   if (raw.result === 'claimed' || raw.result === 'expired' || raw.result === 'cancelled') board.result = raw.result;
   return board;

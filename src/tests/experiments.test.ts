@@ -43,22 +43,51 @@ it('counts only accepted objectives, preserves progress, and rotates after one c
 
 it('tracks production on the specified instrument and lets an incomplete assignment expire', () => {
   const e = withBoard();
-  expect(e.startExperiment(1)).toBe(true);
-  expect(e.prepareExperimentProduction()).toBe(true);
   const offer = e.state.experimentBoard!.offers[1];
   if (offer.kind !== 'production') throw new Error('Missing production offer');
-  expect(e.state.reactors[offer.reactor - 1].target).toBe(offer.z);
+  const supplier = e.state.reactors[offer.reactor - 1];
+  supplier.target = offer.z === 1 ? 2 : 1;
+  const originalTarget = supplier.target;
+  expect(e.startExperiment(1)).toBe(true);
+  expect(e.state.experimentBoard?.active?.reactor).toBe(offer.reactor);
   e.step(30, false);
   expect(e.state.experimentBoard?.active?.progress).toBeGreaterThan(0);
   expect(e.state.experimentBoard?.active?.remaining).toBe(EXPERIMENT_SECONDS);
   e.step(90);
   expect(e.state.experimentBoard?.active?.progress).toBe(offer.goal);
+  const product = e.state.elements[offer.z - 1];
+  expect(product.totalProduced.minus(product.inventory).eq(offer.goal)).toBe(true);
+  expect(supplier.target).toBe(originalTarget);
   expect(e.claimExperiment()).toBe(true);
   e.step(NEXT_EXPERIMENT_SECONDS);
+  expect(deserialize(serialize(e.state)).experimentBoard?.delivery).toEqual({ reactor: offer.reactor, z: offer.z, count: offer.goal });
   expect(e.startExperiment(0)).toBe(true);
   e.step(EXPERIMENT_SECONDS);
   expect(e.state.experimentBoard?.result).toBe('expired');
   expect(e.claimExperiment()).toBe(false);
+});
+
+it('diverts the main instrument temporarily and migrates existing supplier assignments', () => {
+  const main = withBoard();
+  main.state.elements[7].discovered = true;
+  const instrument = main.state.reactors[1];
+  instrument.target = 9;
+  instrument.exploring = true;
+  main.state.discoveryWait = 40;
+  expect(main.startExperiment(1, 2)).toBe(true);
+  main.step(.25);
+  expect(main.state.discoveryWait).toBe(40);
+  expect(instrument).toMatchObject({ target: 9, exploring: true });
+  expect(main.cancelExperiment()).toBe(true);
+  main.step(1);
+  expect(main.state.discoveryWait).toBe(39);
+
+  const old = withBoard();
+  old.startExperiment(1);
+  const raw = JSON.parse(serialize(old.state));
+  delete raw.experimentBoard.active.reactor;
+  delete raw.experimentBoard.active.fraction;
+  expect(deserialize(JSON.stringify(raw)).experimentBoard?.active?.reactor).toBe(1);
 });
 
 it('uses a claimed archive coupon for exactly one affordable industry upgrade', () => {
