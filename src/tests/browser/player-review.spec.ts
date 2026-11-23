@@ -21,7 +21,7 @@ test('welcome waits for the player and mobile guide holds each step before advan
   await expect(page.locator('.lab-guidance')).toHaveCount(0);
   await expect(start).toBeInViewport();
   const nav = page.locator('.main-nav');
-  await expect(nav).toHaveAttribute('inert', '');
+  expect(await nav.evaluate(node => !!node.closest('[inert]'))).toBe(true);
   await page.evaluate(() => document.querySelector<HTMLButtonElement>('.main-nav button:nth-child(2)')?.click());
   await expect(start).toBeVisible();
   await page.clock.runFor(10_000);

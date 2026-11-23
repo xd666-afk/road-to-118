@@ -2,6 +2,12 @@
   "generator": "Built-in image generation",
   "assets": [
     {
+      "file": "lab-console.webp",
+      "layout": "Panoramic laboratory banner with quiet negative space on the left",
+      "generator": "Built-in image generation",
+      "prompt": "Original 3:1 photorealistic laboratory banner. A precision spectroscopy apparatus with graphite and brushed steel rings on the far right, a thin cyan beam and one soft amber calibration light. A quiet, nearly black blue-gray left half for interface text. No labels, symbols, interface, logos or watermarks."
+    },
+    {
       "file": "reactor-atlas.png",
       "layout": "3 equal columns, reactors I/II/III",
       "prompt": "Use case: product-mockup / game environment asset. Create one panoramic 3:1 image as an exact three-column sprite atlas for a realistic educational browser game about elements. Three equal square panels, no gutters, same dark charcoal laboratory backdrop, each self-contained and centered, no objects crossing panel boundaries. Left panel: early desktop free-collision demonstration chamber, credible brushed stainless steel frame and circular thick transparent glass viewing port, two side valves and a heavy rectangular base, a few amber status lamps, industrial premium product photograph. Middle panel: more advanced controlled reaction vessel, circular viewport and concentric copper electromagnetic coils, stainless steel vacuum flanges, routed pipes, dark grey housing, slightly larger and more complex. Right panel: advanced accelerator research station, circular central observation chamber embedded in a large segmented metal magnetic ring, precision cabling, substantial scientific instrument enclosure, technical but plausible. Each panel frontal mostly orthographic camera, center of circular empty viewport precisely x=50%, y=44% within its own square; circular empty black viewport radius around 20% of panel width, clear dark inside for later animated particle overlay. Devices occupy central 80% width and 80% height of each panel. Realistic high detail materials, physically based 3D rendering, subtle wear, soft cool-white overhead laboratory lighting, muted bronze highlights, cinematic restrained contrast, sharp tactile metal and glass. Leave viewport empty; no glowing plasma, no atoms, no text, no letters, no logos, no people, no HUD, no infographic labels. Background near #10171a. Render final image in a panoramic 3:1 layout, each individual device square panel suitable for browser responsive interface."

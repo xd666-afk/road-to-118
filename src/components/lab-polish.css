@@ -1,89 +1,293 @@
-/*
- * 实验室界面增强层：只使用现有真实 class，追加层级、对比与窄屏细节。
- * 不改变布局结构、不新增文案；宿主在合并时 import 本文件即可。
- */
+:root {
+  --panel: #141f2e;
+  --line: #2b3e55;
+  --cream: #edf3fc;
+  --gold: #ffc28b;
+  --muted: #a8b7ca;
+}
 
-/* —— 资源区：像资源面板一样分块，增长数字更醒目 —— */
+body {
+  color: #e4ecf7;
+  background: radial-gradient(ellipse 900px 550px at 66% -100px, #172e47, transparent),
+    #0b121d;
+}
+
+.app-shell { --edge: clamp(12px, 3vw, 46px); }
+.app-shell main { padding-inline: var(--edge); }
+.app-shell .site-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: clamp(16px, 4vw, 68px);
+  height: auto;
+  min-height: 70px;
+  margin: 0 var(--edge);
+}
+.app-shell .brand { gap: 10px; }
+.brand .brand-mark { background: #192b3d; border-color: #53667a; color: #8ce4ef; }
+.app-shell .brand strong { color: var(--cream); }
+.app-shell .brand i { color: #b0becf; border-color: var(--line); }
+.app-shell .main-nav {
+  border: 0;
+  padding: 0;
+  height: auto;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+.app-shell .main-nav > button {
+  padding: 0 13px;
+  min-height: 42px;
+  min-width: 0;
+  color: #a8b7ca;
+  border-radius: 7px;
+}
+.app-shell .main-nav > button.active { background: #1c3349; color: #b7f1f5; }
+.app-shell .main-nav > button.active::after { display: none; }
+.app-shell .main-nav small { display: none; }
+.app-shell .save-label { color: #adc1d2; white-space: nowrap; }
+.app-shell .icon-button { background-color: #132233; border-color: #29405a; color: #bdcfe0; }
+
 .app-shell .resource-bar {
-  background: linear-gradient(180deg, #14201f 0%, #101719 88%);
-  border-bottom-color: #3a4b45;
+  grid-template-columns: minmax(0, 1.25fr) repeat(3, minmax(0, 1fr));
+  gap: 9px;
+  align-items: stretch;
+  background: transparent;
+  border: 0;
+  padding: 15px 0 0;
 }
-
-.app-shell .resource-label { color: #b6c3b8; }
-.app-shell .resource-label svg { color: #e0bd88; }
-
+.app-shell .resource-bar > div {
+  min-width: 0;
+  padding: 11px 15px;
+  background: linear-gradient(136deg, #192a3d, #121d2c);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+}
+.app-shell .resource-bar .main-resource {
+  background: linear-gradient(126deg, #3b2d2c, #1b2638 88%);
+  border-color: #634b42;
+}
+.app-shell .resource-label, .app-shell .resource-item > span { color: #bed0e2; font-size: 11px; }
+.app-shell .resource-label svg, .app-shell .coin-value { color: #ffe0ad; }
 .app-shell .coin-value {
-  color: #f0e1c6;
+  font-size: clamp(26px, 3vw, 40px);
+  line-height: 1.1;
+  overflow-wrap: anywhere;
   font-variant-numeric: tabular-nums;
+  margin-top: 3px;
 }
-
-.app-shell .resource-income strong {
-  color: #c4dfc3;
+.app-shell .resource-income { color: #c0ad9d; margin-top: 3px; }
+.app-shell .resource-income strong { color: #ffe0ad; }
+.app-shell .resource-item strong {
+  font-size: clamp(19px, 2.15vw, 29px);
+  color: #e4edf7;
   font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
+.app-shell .resource-item strong small, .app-shell .progress-resource strong em { color: #b7c8dc; }
+.app-shell .resource-item:nth-of-type(3) strong { color: #a9e8f4; }
+.app-shell .progress-resource strong em { display: inline-block; margin: 0 0 0 7px; }
+.collection-progress { background: #293b51; height: 4px; margin-top: 5px; }
+.collection-progress::-webkit-progress-bar { background: #293b51; }
+.collection-progress::-webkit-progress-value { background: linear-gradient(90deg, #5acacf, #a9eaf1); }
+.collection-progress::-moz-progress-bar { background: #7edbe4; }
 
-.app-shell .resource-item > span { color: #93a39c; }
-.app-shell .resource-item strong { color: #e8e2cf; font-variant-numeric: tabular-nums; }
-.app-shell .resource-item strong small { color: #8fa096; }
-.app-shell .progress-resource strong em { color: #a1b5ae; }
+.lab-banner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  min-height: 116px;
+  margin: 13px 0;
+  padding: 15px 25px;
+  overflow: hidden;
+  border: 1px solid #39516a;
+  border-radius: 13px;
+  background: linear-gradient(90deg, #122131 0%, #11223435 58%, #08131b24 100%),
+    url('/assets/lab-console.webp') right 44% / cover no-repeat, #122131;
+  box-shadow: inset 0 1px #ffffff1f;
+  isolation: isolate;
+}
+.lab-banner h1 { font-size: clamp(26px, 3vw, 40px); letter-spacing: .045em; line-height: 1.15; }
+.lab-banner time { margin-top: 8px; font: 13px var(--mono); color: #b4c9d9; }
 
-/* —— 当前目标：左侧金色导轨 + 更明确的行动按钮 —— */
+.app-shell .lab-guidance { margin-bottom: 13px; }
 .app-shell .mission-card {
-  border-left: 3px solid #a88a5a;
-  background: linear-gradient(125deg, #2a2d25, #1a2724 72%);
-  box-shadow: inset 0 1px 0 #ffffff0a;
+  background: linear-gradient(112deg, #203849, #162432 76%);
+  border-color: #365568;
+  border-left: 3px solid #7bdee6;
+  padding-block: 12px;
 }
-
-.app-shell .mission-card .eyebrow { color: #d3b384; }
-.app-shell .mission-card .goal-detail { color: #bcc7ba; }
-.app-shell .mission-card .goal-action { min-height: 44px; }
-
-.app-shell .opening-milestones > span { color: #8a9d91; }
-.app-shell .opening-milestones > span.done { color: #e0c290; }
-
-/* —— 实验舞台：加深仪器边界与观察窗的聚焦感 —— */
-.app-shell .device {
-  box-shadow: inset 0 0 0 1px #46564c, inset 0 -46px 90px #091012b8;
+.app-shell .mission-card .eyebrow { color: #a4ebef; }
+.app-shell .mission-card .goal-detail { color: #c4d4e4; margin-top: 5px; }
+.app-shell .opening-milestones > span.done { color: #a8e1da; }
+.app-shell .nexus-coach { background: linear-gradient(110deg, #263749, #15202e); border-color: #526c83; }
+.app-shell .nexus-coach__title { color: #f0f4fc; }
+.app-shell .nexus-coach__detail { color: #c4d4e4; }
+.app-shell .lab-grid { grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 15px; }
+.app-shell .panel { border-radius: 11px; box-shadow: 0 12px 28px #050a1234, inset 0 1px #ffffff09; }
+.app-shell .reactor-panel {
+  min-width: 0;
+  background: linear-gradient(#172537, #0d1725 73%, #142031);
+  border-color: #435f7a;
 }
+.app-shell :is(.reactor-panel, .upgrades-panel) .panel-heading { padding: 16px 18px 12px; }
+.app-shell :is(.reactor-panel, .upgrades-panel) .panel-heading h2 { margin-top: 0; font-size: clamp(15px, 1.8vw, 20px); letter-spacing: .03em; }
+.app-shell .reactor-switch { padding: 10px 18px; }
+.app-shell :is(.reactor-switch, .target-actions, .industry-settings) select {
+  color: #dceafa;
+  background-color: #101b2b;
+  border-color: #3b546e;
+  font-size: 12px;
+}
+.app-shell .status-pill { background: #163d3c; color: #a9f0da; border-color: #337a6c; }
+.app-shell .status-pill.paused { background: #223144; color: #dbe5f0; border-color: #435b75; }
+.app-shell .target-control {
+  padding: 9px 0;
+  margin-inline: 18px;
+  border-bottom: 0;
+  gap: 12px;
+}
+.app-shell .target-element {
+  height: 53px;
+  width: 51px;
+  background: color-mix(in srgb, var(--element), #0c1b2a 86%);
+  border-radius: 8px;
+}
+.app-shell .target-copy h3 { margin: 2px 0; }
+.app-shell .target-copy p { color: #b9c9dc; font-size: 11px; }
+.app-shell .target-actions { row-gap: 5px; }
+.app-shell .exploration-requirements { margin-top: 0; margin-bottom: 10px; }
+.app-shell .device { margin: 2px auto 0; background: #090f16; box-shadow: inset 0 0 0 1px #38506b; }
+.app-shell .device::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, #0b182998, transparent 22%, transparent 73%, #0812226e);
+}
+.app-shell .device-readout { z-index: 2; padding: 6px 10px; border: 1px solid #92dbea3f; border-radius: 7px; background: #0b1927dc; }
+.app-shell .device-readout strong { line-height: 1.18; color: #d7f5fa; }
+.app-shell .device-readout small { color: #bbd0de; }
+.app-shell .manual-pulse__hit .mp-hint { background: #101a2bf2; border-color: #a1e9f093; color: #e7f5ff; font-size: 11px; padding: 5px 10px; }
+.app-shell .manual-pulse__hit:hover .mp-hint { background: #21384e; border-color: #a7f4fc; }
+.app-shell .mp-hint-dot { background: #9deaf1; }
+.app-shell .chamber-footer { padding-block: 10px; color: #b3c4d5; }
+.app-shell .mix-control { color: #a9b8cd; }
 
-.app-shell .device-readout strong { color: #d2ddd1; }
-.app-shell .chamber-footer { color: #9cad9f; }
+.app-shell .control-column { min-width: 0; gap: 12px; }
+.app-shell .upgrades-panel { background: linear-gradient(158deg, #1b293d, #111c2d); }
+.app-shell .bulk-control { padding: 0 15px 12px; color: #b8cadd; }
+.app-shell .bulk-control button { background: #121d2b; color: #a8bdd3; min-height: 34px; }
+.app-shell .bulk-control button.selected { background: #507285; color: #f5fbff; }
+.app-shell .upgrade { min-height: 76px; padding: 11px 14px; gap: 9px; }
+.app-shell .upgrade-icon { color: #a5e2f0; background: #20364d; border-color: #44607b; border-radius: 8px; }
+.app-shell .upgrade-title { font-size: 13px; }
+.app-shell .upgrade-title small, .app-shell .upgrade-effect { color: #aabdce; font-size: 10px; }
+.app-shell .buy-button {
+  min-width: 72px;
+  background: linear-gradient(135deg, #49382d, #362a27);
+  border-color: #a47c59;
+  color: #ffe0b7;
+}
+.app-shell .buy-button:not(:disabled):hover { background: #684936; border-color: #ffd09b; }
+.app-shell .buy-button:disabled { opacity: 1; color: #9eaebf; background: #182334; border-color: #36475a; }
+.app-shell .buy-button strong { font-size: 13px; }
+.app-shell .reactor-output { background: #101b2b; border-radius: 0 0 11px 11px; padding-block: 12px; }
+.app-shell .reactor-output strong { color: #b6e5ee; }
+.lab-operations { display: grid; gap: 9px; }
+.lab-operations:empty { display: none; }
+.lab-operations :is(.experiment-board, .sample-contract, .reactor-assignments) { margin: 0; background: #152235; }
+.lab-operations summary { color: #cce4f1; }
+.lab-operations summary small { color: #99b1cb; }
+.lab-operations .experiment-offers { grid-template-columns: minmax(0, 1fr); }
+.lab-operations .reactor-assignments ul { grid-template-columns: minmax(0, 1fr); }
 
-/* —— 周期表：已发现与已点亮一眼可分 —— */
+.app-shell .lab-archive {
+  margin-top: 33px;
+  border-top: 1px solid #3b5a75;
+  padding-top: 20px;
+}
+.app-shell .archive-heading h2 { font-size: clamp(21px, 2.6vw, 30px); color: #e0edfa; }
+.app-shell .table-panel {
+  background: radial-gradient(ellipse at 24% 20%, #1d3348, transparent 56%),
+    repeating-linear-gradient(0deg, #6890b00c 0 1px, transparent 1px 20px), #111d2d;
+}
+.app-shell .periodic-cell.locked, .app-shell .periodic-cell.version-locked { background: #101b2b; border-color: #2c3f56; }
 .app-shell .periodic-cell.discovered {
-  background: color-mix(in srgb, var(--element) 9%, #131e20);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--element) 30%, transparent);
+  background: color-mix(in srgb, var(--element) 17%, #142237);
+  border-color: color-mix(in srgb, var(--element) 45%, #273f56);
+  box-shadow: inset 0 2px color-mix(in srgb, var(--element) 65%, #1b2a3d);
 }
-
 .app-shell .periodic-cell.archived {
-  background: linear-gradient(150deg, #4b4733, #38392b);
-  border-color: #d3b37c;
-  box-shadow: inset 0 0 0 1px #d3b37c38, inset 0 1px 0 #f6dda826;
+  background: linear-gradient(150deg, color-mix(in srgb, var(--element) 35%, #1a293c), #1e2c3a);
+  border-color: #f1ba83;
+  box-shadow: inset 0 2px #f0ba82;
 }
+.app-shell .periodic-cell.next { background: #273f52; border-color: #85d9e7; box-shadow: inset 0 0 15px #81dbe326; }
+.app-shell .periodic-cell.next i { color: #a7ecf1; }
+.app-shell .table-key .key-discovered { background: #80ceda; }
+.app-shell .table-key .key-archived { background: #ffc28b; }
 
-.app-shell .periodic-cell.archived:hover { border-color: #ecd09a; }
+.app-shell .section-heading { margin: 19px 0 17px; }
+.app-shell .section-heading h1 { color: #eaf2fc; line-height: 1.35; font-size: clamp(25px, 3vw, 36px); }
+.research-shortcut { display: inline-flex; gap: 5px; align-items: center; min-height: 34px; color: #a6e5f2; font-size: 12px; }
+#industry-panel { scroll-margin-top: 14px; }
+.app-shell .research-device { background: linear-gradient(#1b2c43, #141e2d); }
+.app-shell .research-device.is-locked { background: #111b2a; }
+.app-shell .research-device-art { border-bottom: 1px solid #3b5570; }
+.app-shell .research-device-copy { padding: 16px; }
+.app-shell .research-device-copy .eyebrow { color: #a8dcf0; }
+.app-shell .module { background: #132034; }
+.app-shell .tutorial-document { background: #142234; color: #c5d2e2; }
+.app-shell .icon-button:hover, .app-shell .secondary-button:hover:not(:disabled) { background: #294460; border-color: #6a99b6; }
+.app-shell .primary-button { color: #2b1a11; background: #ffc28b; border-color: #ffc28b; }
+.app-shell .primary-button:hover:not(:disabled) { background: #ffdab1; }
+.app-shell .secondary-button { color: #dcf0fa; background: #1d3047; border-color: #3b5876; }
+.app-shell .text-button, .app-shell .accent { color: #ade5f1; }
+.app-shell .modal { background: linear-gradient(158deg, #1c2e44, #121f31 42%); border-color: #506d8a; border-radius: 13px; }
+.app-shell .modal::backdrop { background: #060d19ca; }
+.app-shell .modal :is(.knowledge-status, .inventory-block) { border-color: #3a566e; }
 
-.app-shell .periodic-cell:not(.version-locked):focus-visible {
-  outline: 2px solid #d9b17b;
-  outline-offset: 1px;
+@media (max-width: 1000px) {
+  .app-shell .site-header { gap: 17px; }
+  .app-shell .main-nav > button { padding-inline: 9px; }
 }
-
-.app-shell .table-key .key-discovered { background: #8a9b83; }
-.app-shell .table-key .key-archived { background: #d9b17b; }
-
-/* —— 窄屏：保留分块感，避免数字挤成一团 —— */
-@media (max-width: 620px) {
-  .app-shell .resource-bar { background: linear-gradient(180deg, #13201e, #101719 92%); }
-  .app-shell .coin-value { font-size: 35px; }
-  .app-shell .resource-item strong { font-variant-numeric: tabular-nums; }
-  .app-shell .mission-card { border-left-width: 2px; }
-  .app-shell .periodic-cell.archived { box-shadow: inset 0 0 0 1px #d3b37c4d; }
+@media (max-width: 800px) {
+  .app-shell .site-header { grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px; padding: 10px 0 7px; }
+  .app-shell .main-nav {
+    grid-row: 2;
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  .app-shell .main-nav > button { flex-direction: row; justify-content: center; padding: 4px; gap: 5px; }
+  .app-shell .header-right { grid-column: 2; grid-row: 1; }
+  .app-shell .lab-grid { grid-template-columns: minmax(0, 1fr); }
 }
-
-@media (max-width: 360px) {
-  .app-shell .coin-value { font-size: 32px; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .app-shell .periodic-cell:hover { transform: none; }
+@media (max-width: 570px) {
+  .app-shell .site-header { padding-top: 8px; }
+  .app-shell .main-nav > button { font-size: 11px; }
+  .app-shell .main-nav > button svg { width: 14px; height: 14px; }
+  .app-shell .resource-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; padding-top: 8px; }
+  .app-shell .resource-bar > div { padding: 7px 9px; }
+  .app-shell .resource-bar .progress-resource { grid-column: auto; display: block; }
+  .app-shell .progress-resource > span { margin-bottom: 3px; }
+  .app-shell .coin-value { font-size: 25px; }
+  .app-shell .resource-item strong { font-size: 20px; }
+  .app-shell .progress-resource strong em { font-size: 9px; margin-left: 4px; }
+  .lab-banner { min-height: 78px; padding: 10px 14px; margin: 9px 0; }
+  .lab-banner time { margin-top: 4px; font-size: 11px; }
+  .app-shell .lab-guidance .mission-card { grid-template-columns: minmax(0, 1fr) auto; gap: 9px; }
+  .app-shell .mission-card .goal-action { max-width: 104px; text-align: start; padding-inline: 7px; }
+  .app-shell .target-control { margin-inline: 12px; padding: 7px 0; }
+  .app-shell .target-actions { width: 100%; }
+  .app-shell .target-copy p { max-width: none; }
+  .app-shell .reactor-switch { padding-inline: 12px; }
+  .app-shell .device-readout { padding: 5px; }
+  .app-shell :is(.readout-left, .visual-note) { left: 12px; }
+  .app-shell .readout-right { right: 12px; }
+  .app-shell .upgrade { min-height: 73px; }
+  .app-shell .bulk-control button { min-height: 44px; }
+  .app-shell .buy-button { min-height: 46px; }
 }
