@@ -1,0 +1,43 @@
+import { expect, test } from '@playwright/test';
+import { createState } from '../../game/engine';
+import { serialize } from '../../game/save';
+
+test('players can choose a supply plan, see both jobs, and reveal an unknown sample', async ({ page }) => {
+  const now = Date.now();
+  const state = createState(8, now);
+  state.settings.guideDismissed = true;
+  state.settings.reducedMotion = true;
+  state.discoveryWait = 40;
+  for (const row of state.elements.slice(0, 8)) row.discovered = true;
+  state.reactors[0].target = 1;
+  state.reactors[0].upgrades.atoms = 30;
+  state.reactors[1].built = true;
+  state.reactors[1].target = 9;
+  state.reactors[1].discoveryHazard = 10000;
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.clock.install({ time: now });
+  await page.clock.pauseAt(now + 1000);
+  await page.addInitScript(text => {
+    const key = 'road-to-118.save.v1';
+    if (!localStorage.getItem(key)) localStorage.setItem(key, text);
+  }, serialize(state, now + 1000));
+  await page.goto('/');
+  const panel = page.locator('.sample-contract');
+  await expect(panel).toBeVisible();
+  await expect(panel.getByRole('button', { name: /氢供料.*1,800 碰撞能/ })).toBeVisible();
+  await panel.getByRole('button', { name: /氦供料.*320 研究数据/ }).click();
+  await expect(panel).toContainText('I 级仪器 · 制备 He 校准样本');
+  await expect(panel).toContainText('II 级仪器 · 分析异常样本');
+  await page.clock.runFor(7000);
+  await expect(panel.getByRole('progressbar', { name: '供料进度' })).not.toHaveAttribute('value', '0');
+  await page.reload();
+  await expect(panel.getByRole('progressbar', { name: '供料进度' })).not.toHaveAttribute('value', '0');
+  await page.clock.runFor(27000);
+  await expect(panel).toContainText('最外层电子比氖少 1 个');
+  await panel.getByRole('radio', { name: '氟 F' }).check();
+  await panel.getByRole('button', { name: '确认样本' }).click();
+  await expect(panel.getByRole('status')).toContainText('额外获得 100 研究数据');
+  await page.reload();
+  await expect(panel.getByRole('status')).toContainText('样本确认是 氟（F）');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+});

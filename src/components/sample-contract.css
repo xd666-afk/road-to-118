@@ -1,0 +1,20 @@
+.sample-contract { margin: 0 0 17px; }
+.sample-contract summary { padding: 13px 16px; cursor: pointer; color: var(--gold); font-weight: 650; }
+.sample-contract-body { display: grid; gap: 11px; padding: 0 16px 15px; color: #c4d0c4; font-size: 13px; }
+.sample-contract-assignment, .sample-contract-choices, .sample-contract-guess, .sample-contract-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+.sample-contract-assignment label { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.sample-contract-assignment select { min-height: 38px; }
+.sample-contract-choices button { display: grid; gap: 3px; min-width: 125px; min-height: 48px; text-align: left; }
+.sample-contract-actions .text-button { min-height: 44px; }
+.sample-contract-progress { display: grid; gap: 8px; }
+.sample-contract-progress > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(60px, 200px) 3ch; align-items: center; gap: 8px; }
+.sample-contract-progress progress { width: 100%; accent-color: var(--gold); }
+.sample-contract-guess { border: 0; padding: 0; }
+.sample-contract-guess legend { margin-bottom: 5px; }
+.sample-contract-guess label { display: flex; align-items: center; gap: 6px; min-height: 40px; }
+.sample-contract-guess input { accent-color: var(--gold); }

@@ -4,6 +4,7 @@ import { ACHIEVEMENTS, ARCHIVE_UNITS, CALCIUM_ELEMENT, MODULE_ORDER, MODULE_UPGR
 import type { GameState } from './types';
 import { isPulseBoostKind, PULSE_BOOST_MS } from './pulseBoosts';
 import { discoveryPreparation } from './discovery';
+import { restoreSampleContract } from './sampleContract';
 export function serialize(s: GameState, now = Date.now()): string {
   return JSON.stringify({ ...s, savedAt: now, notices: [] });
 }
@@ -121,5 +122,6 @@ export function deserialize(text: string): GameState {
     const progress = raw.observation.progress;
     if (typeof progress === 'number' && progress >= 0 && progress < 1) s.observation = { z: max + 1, progress };
   }
+  s.sampleContract = restoreSampleContract(raw.sampleContract, s);
   s.saveVersion = SAVE_VERSION; s.notices = []; return s;
 }

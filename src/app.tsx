@@ -17,6 +17,8 @@ import Onboarding from './components/Onboarding';
 import OpeningSpotlight from './components/OpeningSpotlight';
 import SavedGames from './components/SavedGames';
 import PulseDrops from './components/PulseDrops';
+import SampleContract from './components/SampleContract';
+import { assignedToSample } from './game/sampleContract';
 import { recommend, applyAdvice, openingStep } from './game/advisor';
 import './components/journey.css';
 import { AtomicFacts, FurtherScience } from './components/AtomicProfile';
@@ -109,7 +111,7 @@ export default function App() {
   const discoveryRate = targetKnown || targetStage ? D(0) : firstDiscoveryRate(runningReactor, targetSpeed);
   const targetRate = targetKnown ? targetSpeed.mul(productionChance * parallel * (1 + bonuses.production / 100)) : discoveryRate;
   const targetChance = targetKnown ? productionChance : -Math.expm1(-discoveryRate.div(targetSpeed).toNumber());
-  const targetNote = !r.active ? '已暂停' : !targetKnown && s.discoveryWait > 0
+  const targetNote = !r.active ? '已暂停' : assignedToSample(s, r) ? '正在执行异常样本委托' : !targetKnown && s.discoveryWait > 0
     ? `正在准备样本 · 还需 ${Math.ceil(s.discoveryWait)} 秒` : targetStage
     ? canExplore
       ? `观测 ${Math.floor(observed * 100)}% · 约 ${Math.ceil((1 - observed) / observationRate(r, targetStage, r.target, targetSpeed))} 秒完成`
@@ -168,9 +170,10 @@ export default function App() {
     const e = engineRef.current;
     const priorStep = e.state.firstRun?.step;
     const priorBoost = e.state.pulseBoost;
+    const priorContract = e.state.sampleContract;
     const priorBoostedPulse = e.state.stats.milestones.boostedPulse;
     const output = fn(e);
-    if ((priorStep !== e.state.firstRun?.step || priorBoost !== e.state.pulseBoost ||
+    if ((priorStep !== e.state.firstRun?.step || priorBoost !== e.state.pulseBoost || priorContract !== e.state.sampleContract ||
       priorBoostedPulse !== e.state.stats.milestones.boostedPulse) && !saveBlocked) {
       const result = saveLocal(activeSlot.current.id, e.state);
       if (!result.ok) setMessage(result.message);
@@ -432,6 +435,7 @@ export default function App() {
         <button className="secondary-button goal-action" disabled={!goal.enabled} onClick={() => act(goal.run)}>{goal.label}<ArrowRight size={15}/></button>
       </section>}
     </div>}
+    {max >= 8 && <SampleContract key={slotId} state={s} act={act}/>}
     <div className="lab-grid">
       <section className="panel reactor-panel"><div className="panel-heading"><div><span className="eyebrow">REACTION CHAMBER</span><h2>{c.name}<span className="tiny-label">{c.roman} 级</span></h2></div><button className={`status-pill ${r.active ? '' : 'paused'}`} data-opening-target={focus === 1 ? "start" : undefined} onClick={() => act(e => e.toggleReactor(focus))}>{r.active ? <><i/>运行中 <CirclePause size={13}/></> : <><CirclePlay size={13}/>{opening === "start" ? "开始实验" : "已暂停"}</>}</button></div>
         <div className="reactor-switch"><label htmlFor="reactor-selector">仪器</label><select id="reactor-selector" aria-label="切换反应容器" value={focus} onChange={e => setFocus(+e.target.value)}>{REACTORS.filter(t => s.reactors[t.id - 1].built).map(t => <option key={t.id} value={t.id}>{t.roman} 级 · {t.name}{!s.reactors[t.id - 1].active && ' · 已暂停'}</option>)}</select><button className="text-button" onClick={() => goToTab('research')}>研发仪器<ArrowRight size={13}/></button></div>

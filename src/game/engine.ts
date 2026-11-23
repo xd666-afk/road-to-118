@@ -8,6 +8,7 @@ import { poisson, random, waitingHazard } from './rng';
 import type { GameState, Module, Notice, ReactorJob, ReactorState, Upgrade, WorkMode } from './types';
 import { element } from '../data/elements';
 import { PULSE_BOOST_MS, PULSE_BOOSTS, PULSE_DROP_MS, PULSE_DROP_RETRACT_MS, type PulseBoostKind, type PulseDrop } from './pulseBoosts';
+import { advanceSampleContract, assignedToSample, isSampleAnswer, isSampleRoute, sampleAnswer, sampleReady, SAMPLE_GUESS_BONUS, SAMPLE_ROUTES, type SampleAnswer, type SampleRoute } from './sampleContract';
 
 export function createState(seed = Date.now() >>> 0, now = Date.now()): GameState {
   const s: GameState = {
@@ -179,7 +180,7 @@ export class Engine {
   private routeJobs() {
     const s = this.state;
     if (!s.modules.reaction || !s.automation.reaction) return;
-    const working = s.reactors.filter(r => r.built && r.active && r.job !== 'manual');
+    const working = s.reactors.filter(r => r.built && r.active && r.job !== 'manual' && !assignedToSample(s, r));
     if (!working.length) return;
     const next = discoveredMax(s) + 1;
     const stage = discoveryStage(next);
@@ -351,6 +352,40 @@ export class Engine {
     if (s.firstRun?.step === 'charge' && s.coins.gte(price(r, 'atoms'))) s.firstRun = { step: 'sample' };
     return { energy, data };
   }
+  startSampleContract(route: SampleRoute, supportId: number): boolean {
+    const s = this.state;
+    const lead = s.reactors.filter(r => r.built && r.active).at(-1);
+    const support = s.reactors[supportId - 1];
+    if (!s.elements[7].discovered || s.sampleContract || !isSampleRoute(route) ||
+      !lead || !support?.built || !support.active || support.id >= lead.id) return false;
+    s.sampleContract = { route, lead: lead.id, support: support.id, supply: 0, scan: 0 };
+    return true;
+  }
+
+  cancelSampleContract(): boolean {
+    if (!this.state.sampleContract || 'answer' in this.state.sampleContract) return false;
+    delete this.state.sampleContract;
+    return true;
+  }
+
+  revealSampleContract(guess: SampleAnswer): boolean {
+    const s = this.state, contract = s.sampleContract;
+    if (!contract || 'answer' in contract || !sampleReady(contract) || !isSampleAnswer(guess)) return false;
+    const answer = sampleAnswer(s.seed);
+    const reward = SAMPLE_ROUTES[contract.route].reward;
+    if (contract.route === 'hydrogen') {
+      s.coins = s.coins.plus(reward);
+      s.stats.earned = s.stats.earned.plus(reward);
+      s.stats.peak = Big.max(s.stats.peak, s.coins);
+    } else {
+      s.data = s.data.plus(reward);
+    }
+    if (guess === answer) s.data = s.data.plus(SAMPLE_GUESS_BONUS);
+    s.sampleContract = { route: contract.route, answer, guess };
+    this.notify('info', `异常样本已确认 · ${element(answer).name}`);
+    return true;
+  }
+
   /** The sole authority for automatic income. Canvas never calls this method. */
   step(seconds: number, online = true, allowDiscovery = online) {
     if (!Number.isFinite(seconds) || seconds <= 0) return;
@@ -359,8 +394,13 @@ export class Engine {
     // Keep the target fixed during this tick, even when another device has
     // just discovered it and advances to the next element.
     const discoveryTarget = online && allowDiscovery ? discoveredMax(s) + 1 : 0;
+    const sample = s.sampleContract;
+    const scanFluorine = discoveryTarget === 9 && sample && !('answer' in sample) && !sampleReady(sample);
     let discoverySeconds = seconds;
-    if (s.discoveryWait > 0 && discoveryTarget && s.reactors.some(r => r.built && r.active && r.target === discoveryTarget)) {
+    if (s.discoveryWait > 0 && discoveryTarget && (
+      (scanFluorine && s.reactors[sample.lead - 1].active) ||
+      s.reactors.some(r => r.built && r.active && r.target === discoveryTarget)
+    )) {
       discoverySeconds = Math.max(0, seconds - s.discoveryWait);
       s.discoveryWait = Math.max(0, s.discoveryWait - seconds);
     }
@@ -378,9 +418,10 @@ export class Engine {
       s.coins = s.coins.plus(gain); s.stats.earned = s.stats.earned.plus(gain);
       s.data = s.data.plus(dataMultiplier ? events.mul(dataMultiplier) : events);
       if (s.stats.events.gte(1)) this.award('collision');
+      if (assignedToSample(s, r)) continue;
       const e = s.elements[r.target - 1];
       if (!e.discovered) {
-        if (r.target !== discoveryTarget || discoverySeconds <= 0) continue;
+        if (r.target !== discoveryTarget || discoverySeconds <= 0 || scanFluorine) continue;
         const stage = discoveryStage(r.target);
         if (stage) {
           if (r.id !== stage.reactor || !stageReadiness(s, stage).ready) continue;
@@ -432,6 +473,7 @@ export class Engine {
         this.produce(r, count, online);
       }
     }
+    if (online) advanceSampleContract(s, seconds);
     s.stats.peak = Big.max(s.stats.peak, s.coins);
     if (s.modules.feed && s.automation.feed) {
       const reactors = s.automation.feedScope === 'all' ? s.reactors.filter(r => r.built && r.active).reverse() : [highestReactor(s)];
