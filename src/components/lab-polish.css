@@ -288,6 +288,7 @@ body {
   .app-shell :is(.readout-left, .visual-note) { left: 12px; }
   .app-shell .readout-right { right: 12px; }
   .app-shell .upgrade { min-height: 73px; }
-  .app-shell .bulk-control button { min-height: 44px; }
-  .app-shell .buy-button { min-height: 46px; }
+  .app-shell :is(.bulk-control button, .buy-button, .status-pill, .reactor-switch > button, .reactor-switch select, .target-actions select, .target-actions .text-button) {
+    min-height: 46px;
+  }
 }
