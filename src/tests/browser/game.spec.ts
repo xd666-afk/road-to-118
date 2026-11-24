@@ -314,6 +314,9 @@ test('I–VIII each load an integrated scene with a visible window and support p
     sources.add(await photo.getAttribute('src') ?? '');
     const aperture = page.locator('.scene-aperture canvas');
     await expect(aperture).toBeInViewport({ ratio: 1 });
+    const squareImage = await photo.evaluate((image: HTMLImageElement) =>
+      image.naturalWidth > 0 && image.naturalWidth === image.naturalHeight);
+    expect(squareImage).toBe(true);
     const window = (await aperture.boundingBox())!;
     expect(window.width).toBeGreaterThan(70);
     expect(window.x).toBeGreaterThan(0);

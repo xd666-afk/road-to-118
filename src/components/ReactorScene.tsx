@@ -3,8 +3,7 @@ import { artworkUrl, reactorScene } from '../data/artwork';
 
 export default function ReactorScene({ id, children }: { id: number; children: ReactNode }) {
   const [loaded, setLoaded] = useState(false);
-  const { file, aperture } = reactorScene(id);
-  const [x, y, diameter] = aperture;
+  const { file, aperture: { x, y, diameter } } = reactorScene(id);
   const viewport = { left: `${x}%`, top: `${y}%`, width: `${diameter}%` } satisfies CSSProperties;
   return <div className="scene-art">
     <div className="scene-frame">
