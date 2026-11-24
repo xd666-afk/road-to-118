@@ -3,6 +3,7 @@ import { createState, FIRST_HELIUM_SECONDS } from './engine';
 import { ACHIEVEMENTS, ARCHIVE_UNITS, CALCIUM_ELEMENT, MODULE_ORDER, MODULE_UPGRADES, PLAYABLE_ELEMENTS, REACTORS, SAVE_VERSION, XENON_ELEMENT } from './config';
 import type { GameState } from './types';
 import { isPulseBoostKind, PULSE_BOOST_MS } from './pulseBoosts';
+import { ECHO_HITS, isTechniqueElement, LITHIUM_CHARGE, type TechniqueElement } from './pulseTechniques';
 import { discoveryPreparation } from './discovery';
 import { restoreSampleContract } from './sampleContract';
 import { restoreExperimentBoard } from './experiments';
@@ -102,11 +103,22 @@ export function deserialize(text: string): GameState {
   s.achievements = [...new Set<string>(raw.achievements.filter((id: unknown) => typeof id === 'string' && valid.has(id)))];
   if (raw.settings && typeof raw.settings === 'object') {
     s.settings.scientific = raw.settings.scientific === true; s.settings.reducedMotion = raw.settings.reducedMotion === true; s.settings.guideDismissed = raw.settings.guideDismissed === true;
+    s.settings.collisionSound = raw.settings.collisionSound === true;
     s.settings.handsOnGuide = raw.settings.handsOnGuide === true || (raw.settings.handsOnGuide === undefined && !!raw.firstRun);
     s.settings.mix = Array.isArray(raw.settings.mix) ? [...new Set<number>(raw.settings.mix.filter((z: unknown) => typeof z === 'number' && Number.isInteger(z) && z >= 1 && z <= max))].slice(0, PLAYABLE_ELEMENTS) : [1];
     if (!s.settings.mix.length) s.settings.mix = [1];
   }
   s.noticeSeq = raw.noticeSeq === undefined ? 0 : num(raw.noticeSeq);
+  const tech = raw.pulseTech;
+  if (Number.isInteger(tech?.echoHits) && tech.echoHits >= 0 && tech.echoHits < ECHO_HITS && s.elements[1].archived) {
+    s.pulseTech.echoHits = tech.echoHits;
+  }
+  if (Number.isInteger(tech?.lithium) && tech.lithium >= 0 && tech.lithium <= LITHIUM_CHARGE && s.elements[2].archived) {
+    s.pulseTech.lithium = tech.lithium;
+  }
+  if (Array.isArray(tech?.tried)) {
+    s.pulseTech.tried = [...new Set<TechniqueElement>(tech.tried.filter((z: unknown) => isTechniqueElement(z) && z <= max))];
+  }
   const boost = raw.pulseBoost;
   if (isPulseBoostKind(boost?.kind) && typeof boost.expiresAt === 'number' && Number.isFinite(boost.expiresAt) &&
     boost.expiresAt > s.savedAt && boost.expiresAt <= s.savedAt + PULSE_BOOST_MS) {

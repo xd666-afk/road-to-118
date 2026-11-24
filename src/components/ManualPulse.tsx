@@ -3,6 +3,7 @@ import {
   useRef,
   useState,
   type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
 } from 'react';
 import './manual-pulse.css';
 
@@ -15,7 +16,7 @@ export interface ManualPulseProps {
   /** 反应容器图片底部的短提示。 */
   label: string;
   /** 每次有效碰撞只调用一次；返回本次真实收益，无法结算时返回 null。 */
-  onPulse: () => { energy: string; data: string } | null;
+  onPulse: (bearing: number) => { energy: string; data: string; technique?: string } | null;
 }
 
 const COMBO_WINDOW = 900;
@@ -48,6 +49,8 @@ export default function ManualPulse({ enabled, reducedMotion, tutorialTarget, la
   const fxLayer = useRef<HTMLDivElement>(null);
   const live = useRef<HTMLParagraphElement>(null);
   const comboBadge = useRef<HTMLSpanElement>(null);
+  const contact = useRef<HTMLSpanElement>(null);
+  const contactAnimation = useRef<Animation | null>(null);
   const combo = useRef({ count: 0, at: Number.NEGATIVE_INFINITY, timer: 0 });
   const timers = useRef(new Map<Element, number>());
   const systemReduced = useSystemReducedMotion();
@@ -81,7 +84,20 @@ export default function ManualPulse({ enabled, reducedMotion, tutorialTarget, la
     if (live.current) live.current.textContent = '';
   }, [enabled]);
 
-  function spawnEffect(x: number, y: number, rect: DOMRect, gain: { energy: string; data: string }, streak: number) {
+  function press(event: ReactPointerEvent<HTMLButtonElement>) {
+    const marker = contact.current;
+    if (!enabled || !marker || !event.isPrimary || event.button !== 0) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    marker.style.left = `${event.clientX - rect.left}px`;
+    marker.style.top = `${event.clientY - rect.top}px`;
+    contactAnimation.current?.cancel();
+    contactAnimation.current = marker.animate?.(
+      [{ opacity: .92, scale: reduced ? 1 : .65 }, { opacity: 0, scale: reduced ? 1 : 1.65 }],
+      { duration: 140, easing: 'ease-out' },
+    ) ?? null;
+  }
+
+  function spawnEffect(x: number, y: number, rect: DOMRect, gain: NonNullable<ReturnType<ManualPulseProps['onPulse']>>, streak: number) {
     const host = fxLayer.current;
     if (!host) return;
 
@@ -126,6 +142,12 @@ export default function ManualPulse({ enabled, reducedMotion, tutorialTarget, la
     data.className = 'mp-gain mp-gain--data';
     data.textContent = `+${gain.data} 数据`;
     gains.append(energy, data);
+    if (gain.technique) {
+      const special = document.createElement('b');
+      special.className = 'mp-gain mp-gain--technique';
+      special.textContent = gain.technique;
+      gains.prepend(special);
+    }
     group.append(gains);
 
     host.append(group);
@@ -154,7 +176,8 @@ export default function ManualPulse({ enabled, reducedMotion, tutorialTarget, la
     };
 
     // 每个有效激活只调用一次；收益完全以宿主返回值为准。
-    const gain = onPulse();
+    const bearing = Math.atan2(point.y - rect.height / 2, point.x - rect.width / 2) * 180 / Math.PI;
+    const gain = onPulse(bearing);
     if (!gain) return;
 
     const now = performance.now();
@@ -177,7 +200,7 @@ export default function ManualPulse({ enabled, reducedMotion, tutorialTarget, la
     }
 
     if (live.current) {
-      live.current.textContent = `碰撞 +${gain.energy} 碰撞能，+${gain.data} 数据。`;
+      live.current.textContent = `碰撞 +${gain.energy} 碰撞能，+${gain.data} 数据。${gain.technique ?? ''}`;
     }
 
     spawnEffect(point.x, point.y, rect, gain, state.count);
@@ -200,6 +223,7 @@ export default function ManualPulse({ enabled, reducedMotion, tutorialTarget, la
       onKeyDown={event => {
         if (event.repeat && (event.key === 'Enter' || event.key === ' ')) event.preventDefault();
       }}
+      onPointerDown={press}
       onClick={pulse}
     >
       <span className="mp-hint" id={hintId}>
@@ -208,6 +232,7 @@ export default function ManualPulse({ enabled, reducedMotion, tutorialTarget, la
         <span ref={comboBadge} className="mp-combo" aria-hidden="true"/>
       </span>
     </button>
+    <span ref={contact} className="mp-contact" aria-hidden="true"/>
     <div ref={fxLayer} className="mp-fx" aria-hidden="true"/>
     <p ref={live} className="mp-sr" aria-live="polite" aria-atomic="true"/>
     {reduced && <span id={reducedId} className="mp-sr">已根据减少动态效果偏好简化碰撞特效。</span>}

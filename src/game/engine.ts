@@ -8,6 +8,7 @@ import { poisson, random, waitingHazard } from './rng';
 import type { GameState, Module, Notice, ReactorJob, ReactorState, Upgrade, WorkMode } from './types';
 import { element } from '../data/elements';
 import { PULSE_BOOST_MS, PULSE_BOOSTS, PULSE_DROP_MS, PULSE_DROP_RETRACT_MS, type PulseBoostKind, type PulseDrop } from './pulseBoosts';
+import { canTryTechnique, ECHO_DATA_LIMIT, ECHO_HITS, LITHIUM_CHARGE, LITHIUM_SAMPLES, TRIAL_ECHO_DATA, TRIAL_LITHIUM_SAMPLES, type TechniqueElement } from './pulseTechniques';
 import { advanceSampleContract, assignedToSample, isSampleAnswer, isSampleRoute, sampleAnswer, sampleReady, SAMPLE_GUESS_BONUS, SAMPLE_ROUTES, type SampleAnswer, type SampleRoute } from './sampleContract';
 import { availableIndustryUpgrade, EXPERIMENT_SECONDS, experimentProduction, industryUpgradePrice, isOfferAvailable, nextExperimentRound, NEXT_EXPERIMENT_SECONDS, productionPlans, type ExperimentBoard, type ExperimentOffer } from './experiments';
 
@@ -20,9 +21,10 @@ export function createState(seed = Date.now() >>> 0, now = Date.now()): GameStat
     moduleLevels: { feed: 1, reaction: 1, allocation: 1 },
     automation: { feed: false, reaction: false, allocation: false, reserve: D(100), mode: 'custom', target: 1, feedScope: 'latest', allocationScope: 'all' },
     stats: { events: D(0), produced: D(0), earned: D(0), peak: D(0), builds: 1, purchases: 0, lastEvent: '实验室已准备就绪', neonCompletedAt: null, calciumCompletedAt: null, xeCompletedAt: null, completedAt: null, milestones: {} },
-    achievements: [], settings: { scientific: false, reducedMotion: false, guideDismissed: false, handsOnGuide: false, mix: [1] },
+    achievements: [], settings: { scientific: false, reducedMotion: false, collisionSound: false, guideDismissed: false, handsOnGuide: false, mix: [1] },
     notices: [], noticeSeq: 0,
     discoveryWait: 0,
+    pulseTech: { echoHits: 0, lithium: 0, tried: [] },
   };
   for (const r of s.reactors) r.discoveryHazard = waitingHazard(s);
   return s;
@@ -277,9 +279,7 @@ export class Engine {
     }
     const delivered = commissionTarget === undefined ? 0 :
       this.recordExperiment('production', finiteNumber(amount, ARCHIVE_UNITS), z, r.id);
-    e.inventory = e.inventory.plus(amount.minus(delivered));
-    e.totalProduced = e.totalProduced.plus(amount);
-    s.stats.produced = s.stats.produced.plus(amount);
+    this.storeSamples(z, amount, delivered);
     if (online) {
       if (r.id === 1 && z === 5) this.award('impossible');
       if (r.id === 1 && z === 6) this.award('limit');
@@ -287,6 +287,12 @@ export class Engine {
       if (z >= REACTORS[r.id - 1].softMax + 2) this.award('upstream');
     }
     if (commissionTarget === undefined && online && r.exploring && (r.job === 'manual' || s.automation.reaction) && z < PLAYABLE_ELEMENTS) this.setTarget(r.id, Math.min(PLAYABLE_ELEMENTS, discoveredMax(s) + 1), true);
+  }
+  private storeSamples(z: number, count: Amount, delivered = 0) {
+    const sample = this.state.elements[z - 1];
+    sample.inventory = sample.inventory.plus(count.minus(delivered));
+    sample.totalProduced = sample.totalProduced.plus(count);
+    this.state.stats.produced = this.state.stats.produced.plus(count);
   }
   canManualPulse(reactorId: number): boolean {
     const r = this.state.reactors[reactorId - 1];
@@ -335,7 +341,7 @@ export class Engine {
   }
 
   /** Immediate collision energy and research data, independent of simulation time. */
-  manualPulse(reactorId: number, now = Date.now()): { energy: Amount; data: Amount } | null {
+  manualPulse(reactorId: number, now = Date.now()) {
     if (!this.canManualPulse(reactorId)) return null;
     const s = this.state;
     const r = s.reactors[reactorId - 1];
@@ -347,7 +353,13 @@ export class Engine {
     const active = this.activePulseBoost(now);
     const effect = active && PULSE_BOOSTS[active.kind];
     const energy = (energyMultiplier ? baseGain.mul(energyMultiplier) : baseGain).mul(effect?.energy ?? 1);
-    const data = (dataMultiplier ? events.mul(dataMultiplier) : events).mul(effect?.data ?? 1);
+    if (s.elements[1].archived) s.pulseTech.echoHits = (s.pulseTech.echoHits + 1) % ECHO_HITS;
+    const echo = s.elements[1].archived && s.pulseTech.echoHits === 0;
+    const priorCharge = s.pulseTech.lithium;
+    if (s.elements[2].archived) s.pulseTech.lithium = Math.min(priorCharge + 1, LITHIUM_CHARGE);
+    const charged = priorCharge < LITHIUM_CHARGE && s.pulseTech.lithium === LITHIUM_CHARGE;
+    const echoData = echo ? Big.min(events, ECHO_DATA_LIMIT) : D(0);
+    const data = (dataMultiplier ? events.mul(dataMultiplier) : events).mul(effect?.data ?? 1).plus(echoData);
     if (active?.kind === 'inspiration') s.stats.milestones.boostedPulse ??= s.elapsed;
     r.events = r.events.plus(events);
     s.stats.events = s.stats.events.plus(events);
@@ -358,7 +370,27 @@ export class Engine {
     this.recordExperiment('pulse', 1);
     if (s.stats.events.gte(1)) this.award('collision');
     if (s.firstRun?.step === 'charge' && s.coins.gte(price(r, 'atoms'))) s.firstRun = { step: 'sample' };
-    return { energy, data };
+    return { energy, data, echo, charged };
+  }
+  canReleaseLithium(reactorId: number) {
+    const s = this.state;
+    return this.canManualPulse(reactorId) && s.elements[2].archived && s.pulseTech.lithium === LITHIUM_CHARGE
+      && s.elements[s.reactors[reactorId - 1].target - 1].discovered;
+  }
+  releaseLithium(reactorId: number) {
+    if (!this.canReleaseLithium(reactorId)) return;
+    const target = this.state.reactors[reactorId - 1].target;
+    this.state.pulseTech.lithium = 0;
+    this.storeSamples(target, D(LITHIUM_SAMPLES));
+    return { target, count: LITHIUM_SAMPLES };
+  }
+  completeTechniqueTrial(z: TechniqueElement, reactorId: number) {
+    const s = this.state;
+    if (!this.canManualPulse(reactorId) || !canTryTechnique(s, z)) return false;
+    s.pulseTech.tried.push(z);
+    if (z === 2) s.data = s.data.plus(TRIAL_ECHO_DATA);
+    else this.storeSamples(3, D(TRIAL_LITHIUM_SAMPLES));
+    return true;
   }
   startSampleContract(route: SampleRoute, supportId: number): boolean {
     const s = this.state;

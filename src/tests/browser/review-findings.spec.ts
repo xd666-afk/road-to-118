@@ -62,7 +62,8 @@ test('damaged local save remains protected until its original text is exported a
   expect(readFileSync(downloadedPath!,'utf8')).toBe(raw);
   expect(await page.evaluate(key=>localStorage.getItem(key),KEY)).toBe(raw);
 
-  await page.getByRole('dialog').getByRole('checkbox').first().check();
+  const scientificNotation = page.getByRole('dialog').getByRole('checkbox', { name: /科学记数法/ });
+  await scientificNotation.check();
   await page.getByRole('button',{name:'备份旧档并保存当前进度',exact:true}).click();
   const saved = await page.evaluate(key=>({main:JSON.parse(localStorage.getItem(key)!),backups:Object.keys(localStorage).filter(k=>k.startsWith('road-to-118.recovery.')).map(k=>localStorage.getItem(k))}),KEY);
   expect(saved.backups).toEqual([raw]);
@@ -74,7 +75,7 @@ test('damaged local save remains protected until its original text is exported a
   await page.reload();
   await expect(alert).toHaveCount(0);
   await page.getByRole('button',{name:'存档与设置'}).click();
-  await expect(page.getByRole('dialog').getByRole('checkbox').first()).toBeChecked();
+  await expect(scientificNotation).toBeChecked();
 });
 
 test('importing a valid save backs up protected damaged text before replacing it', async ({page}) => {

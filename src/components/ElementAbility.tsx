@@ -1,5 +1,6 @@
 import { Check, Cpu, Layers3, LockKeyhole, Zap } from 'lucide-react';
 import { getElementAbility, type AbilityChannel } from '../game/elementAbilities';
+import { isTechniqueElement, techniques } from '../game/pulseTechniques';
 import './element-ability.css';
 
 const CHANNEL_LABEL: Record<AbilityChannel, string> = {
@@ -35,6 +36,9 @@ export default function ElementAbility({ z, archived }: { z: number; archived: b
         </span>
       </header>
       <p className="ea-description">{ability.description}</p>
+      {isTechniqueElement(z) && <p className="ea-description">
+        <strong>{techniques[z].name}</strong> · {techniques[z].description}
+      </p>}
       <footer className="ea-foot">
         <p className="ea-value"><strong>+{ability.percent}%</strong><span>{CHANNEL_LABEL[ability.channel]}增益</span></p>
         {archived ? (

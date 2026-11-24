@@ -12,6 +12,8 @@ import { ELEMENTS, KNOWLEDGE, SCIENCE_NOTE, baikeUrl, element } from './data/ele
 import Particles from './components/Particles';
 import ManualPulse from './components/ManualPulse';
 import ReactorScene from './components/ReactorScene';
+import ElementPulseControls, { type TechniqueTrial } from './components/ElementPulseControls';
+import { useCollisionSound, type ImpactKind, type ReactorImpact } from './components/collisionEffects';
 import Modal from './components/Modal';
 import Onboarding from './components/Onboarding';
 import OpeningSpotlight from './components/OpeningSpotlight';
@@ -34,6 +36,7 @@ import AutomationControls, { IndustryModules } from './components/AutomationCont
 import { discoveryPreparation, discoveryStage, observationProgress, observationRate, stageReadiness } from './game/discovery';
 import { ATOMIC_PROFILES } from './data/atomic';
 import { labGuideStep } from './game/labGuide';
+import { canTryTechnique, ECHO_HITS, isTechniqueElement, LITHIUM_CHARGE, techniques, TRIAL_ECHO_DATA, TRIAL_LITHIUM_CHARGE, type TechniqueElement } from './game/pulseTechniques';
 
 const Tutorial = lazy(() => import('./components/Tutorial'));
 
@@ -68,6 +71,8 @@ export default function App() {
   const tab = destination === 'table' ? 'lab' : destination;
   const [focus, setFocus] = useState(() => initialReactor(boot.engine.state)), [bulk, setBulk] = useState<number | 'max'>(1);
   const [dialog, setDialog] = useState<Dialog>(null), [queue, setQueue] = useState<number[]>([]), [endPending, setEndPending] = useState(false);
+  const [trial, setTrial] = useState<TechniqueTrial>();
+  const [impact, setImpact] = useState<ReactorImpact>();
   const holdDiscoveries = useRef(false);
   const [toasts, setToasts] = useState<Toast[]>([]), [saveStatus, setSaveStatus] = useState(boot.error ? '存档需处理' : '本地存档'), [saveBlocked, setSaveBlocked] = useState(!!boot.error);
   const [message, setMessage] = useState(boot.error || ''), [flash, setFlash] = useState(0), [debug, setDebug] = useState(false);
@@ -77,11 +82,12 @@ export default function App() {
   const opening = s.firstRun?.step;
   const visualPool = reactorDisplayPool(s, r);
   const max = discoveredMax(s), archived = archivedCount(s), scientific = s.settings.scientific;
-  holdDiscoveries.current = !!dialog || queue.length > 0 || tab === 'guide';
+  const playCollision = useCollisionSound(s.settings.collisionSound);
+  holdDiscoveries.current = !!dialog || !!trial || queue.length > 0 || tab === 'guide';
   const handsOn = s.settings.handsOnGuide && !s.settings.guideDismissed && !s.firstRun && max >= 2 ? labGuideStep(s) : undefined;
   const dropsVisible = tab !== 'guide' && !dialog && !s.firstRun && max >= 2;
   const canSpawnRandomDrops = useRef(false);
-  canSpawnRandomDrops.current = dropsVisible && !handsOn;
+  canSpawnRandomDrops.current = dropsVisible && !handsOn && !trial;
   const boost = engine.activePulseBoost();
   const fmt = (v: Parameters<typeof format>[0]) => format(v, scientific);
   const bonuses = abilityBonuses(s);
@@ -132,12 +138,13 @@ export default function App() {
       : `平均等待${intervalLabel(1 / targetRate.toNumber()).replace(' / 次', '')} · 随机触发`;
   const shortfall = (coins: number, data: number) => [s.coins.lt(coins) ? `${fmt(D(coins).minus(s.coins))} 碰撞能` : '', s.data.lt(data) ? `${fmt(D(data).minus(s.data))} 点数据` : ''].filter(Boolean).join('、');
   const practiceDrop = !!engine.pulseDrop?.practice;
-  const spotlight = tab === 'guide' ? undefined : spotlightStep(s, handsOn, tab, focus, practiceDrop, boost?.kind === 'inspiration', shortfall);
+  const spotlight = tab === 'guide' || trial ? undefined : spotlightStep(s, handsOn, tab, focus, practiceDrop, boost?.kind === 'inspiration', shortfall);
 
   const guidedDrawer = spotlight?.id === 'sample' ? 'upgrades' : spotlight?.id === 'archive' ? 'archive' : undefined;
   const activeDrawer = guidedDrawer ?? (destination === 'table' ? 'archive' : drawer);
 
   function goToTab(next: string) {
+    if (next !== 'lab' && next !== 'table') setTrial(undefined);
     setDestination(next);
     setDrawer(undefined);
     const hash = next === 'guide' ? '#guide' : next === 'table' ? TABLE_HASH : '';
@@ -161,7 +168,10 @@ export default function App() {
   useEffect(() => {
     const followHash = () => {
       setDrawer(undefined);
-      if (location.hash.startsWith('#guide')) setDestination('guide');
+      if (location.hash.startsWith('#guide')) {
+        setTrial(undefined);
+        setDestination('guide');
+      }
       else if (location.hash === TABLE_HASH) setDestination('table');
       else if (!location.hash) setDestination('lab');
     };
@@ -191,6 +201,9 @@ export default function App() {
         holdDiscoveries.current = true;
         setQueue(old => [...old, ...discoveries]);
         setFlash(v => v + 1);
+        const z = discoveries[0];
+        const at = Date.now();
+        setImpact(previous => ({ serial: (previous?.serial ?? 0) + 1, kind: 'discovery', at, symbol: element(z).symbol }));
       }
       if (notices.some(n => n.kind === 'complete')) setEndPending(true);
       setToasts(old => [...old, ...notices.filter(n => n.kind !== 'discovery').map(n => ({ ...n, time: Date.now() }))].slice(-4));
@@ -204,6 +217,8 @@ export default function App() {
     const priorContract = e.state.sampleContract;
     const priorExperiments = e.state.experimentBoard;
     const priorBoostedPulse = e.state.stats.milestones.boostedPulse;
+    const priorCharge = e.state.pulseTech.lithium;
+    const priorTrials = e.state.pulseTech.tried.length;
     const checkpoint = handsOn && labGuideStep(e.state).id;
     const priorTarget = handsOn && e.state.reactors[0].target;
     const priorExploring = handsOn && e.state.reactors[0].exploring;
@@ -211,6 +226,8 @@ export default function App() {
     if ((priorStep !== e.state.firstRun?.step || priorBoost !== e.state.pulseBoost || priorContract !== e.state.sampleContract ||
       priorExperiments !== e.state.experimentBoard ||
       priorBoostedPulse !== e.state.stats.milestones.boostedPulse ||
+      priorTrials !== e.state.pulseTech.tried.length ||
+      (priorCharge !== e.state.pulseTech.lithium && (priorCharge === LITHIUM_CHARGE || e.state.pulseTech.lithium === LITHIUM_CHARGE)) ||
       (checkpoint && (checkpoint !== labGuideStep(e.state).id || priorTarget !== e.state.reactors[0].target ||
         priorExploring !== e.state.reactors[0].exploring))) && !saveBlocked) {
       const result = saveLocal(activeSlot.current.id, e.state);
@@ -244,10 +261,19 @@ export default function App() {
     return () => { clearInterval(timer); document.removeEventListener('visibilitychange', visibility); window.removeEventListener('pagehide', leaving); };
   }, [slotId]);
   useEffect(() => {
-    if (dialog || tab === 'guide') return;
-    if (queue.length) { setDialog({ kind: 'element', z: queue[0], discovery: true }); setQueue(q => q.slice(1)); }
-    else if (endPending) { setDialog({ kind: 'complete' }); setEndPending(false); }
-  }, [dialog, queue, endPending, tab]);
+    if (dialog || trial || tab === 'guide') return;
+    if (queue.length) {
+      const reveal = () => {
+        setDialog({ kind: 'element', z: queue[0], discovery: true });
+        setQueue(q => q.slice(1));
+      };
+      if (tab === 'lab' && isTechniqueElement(queue[0])) {
+        const delay = window.setTimeout(reveal, 550);
+        return () => window.clearTimeout(delay);
+      }
+      reveal();
+    } else if (endPending) { setDialog({ kind: 'complete' }); setEndPending(false); }
+  }, [dialog, queue, endPending, tab, trial]);
 
   function exportSave() {
     const blob = new Blob([serialize(engineRef.current.state)], { type: 'application/json' }), url = URL.createObjectURL(blob), a = document.createElement('a');
@@ -305,6 +331,8 @@ export default function App() {
     setSaveStatus(save.error ? '存档需处理' : '本地存档');
     setMessage(save.error ?? message);
     setQueue([]);
+    setTrial(undefined);
+    setImpact(undefined);
     setEndPending(false);
     setToasts([]);
     setFocus(initialReactor(next.state));
@@ -390,12 +418,61 @@ export default function App() {
       </button>
     </div>;
   }
-  const collisionControl = <ManualPulse key={focus} enabled={engine.canManualPulse(focus)} reducedMotion={s.settings.reducedMotion}
-        tutorialTarget label={r.active ? '点击触发碰撞' : '仪器已暂停'}
-        onPulse={() => {
-          const reward = act(e => e.manualPulse(focus));
-          return reward ? { energy: fmt(reward.energy), data: fmt(reward.data) } : null;
-        }}/>;
+  function showImpact(kind: ImpactKind, bearing?: number) {
+    const at = Date.now();
+    setImpact(previous => ({ serial: (previous?.serial ?? 0) + 1, kind, at, reactor: focus, bearing }));
+    playCollision(kind);
+  }
+
+  function beginTrial(z: TechniqueElement) {
+    if (!canTryTechnique(s, z)) return;
+    const available = s.reactors.find(reactor => engine.canManualPulse(reactor.id));
+    if (!engine.canManualPulse(focus) && available) setFocus(available.id);
+    setTrial({ z, taps: 0, complete: false });
+    setDialog(null);
+    goToTab('lab');
+  }
+
+  function collide(bearing: number) {
+    const practicing = trial && !trial.complete ? trial : undefined;
+    const taps = practicing ? Math.min(practicing.taps + 1, practicing.z === 2 ? ECHO_HITS : TRIAL_LITHIUM_CHARGE) : 0;
+    const reward = act(e => {
+      const pulse = e.manualPulse(focus);
+      if (!pulse) return;
+      const triedEcho = practicing?.z === 2 && taps === ECHO_HITS && e.completeTechniqueTrial(2, focus);
+      return { ...pulse, triedEcho };
+    });
+    if (!reward) return null;
+    if (practicing) setTrial({ ...practicing, taps, complete: !!reward.triedEcho });
+    const echo = reward.echo || reward.triedEcho;
+    const charged = reward.charged || (practicing?.z === 3 && taps === TRIAL_LITHIUM_CHARGE && taps !== practicing.taps);
+    showImpact(echo ? 'echo' : charged ? 'charged' : 'pulse', bearing);
+    return {
+      energy: fmt(reward.energy),
+      data: fmt(reward.triedEcho ? reward.data.plus(TRIAL_ECHO_DATA) : reward.data),
+      technique: echo ? '氦回波' : charged ? '锂蓄能就绪' : undefined,
+    };
+  }
+
+  const canRelease = trial ? trial.z === 3 && !trial.complete && trial.taps === TRIAL_LITHIUM_CHARGE && engine.canManualPulse(focus)
+    : engine.canReleaseLithium(focus);
+  function discharge() {
+    if (!canRelease) return;
+    if (trial) {
+      if (!act(e => e.completeTechniqueTrial(3, focus))) return;
+      setTrial({ ...trial, complete: true });
+      showImpact('release');
+      return;
+    }
+    if (act(e => {
+      const reward = e.releaseLithium(focus);
+      if (reward) e.notify('info', `锂蓄能 · +${reward.count} 份${element(reward.target).name}`, reward.target);
+      return reward;
+    })) showImpact('release');
+  }
+
+  const collisionControl = <ManualPulse key={focus} enabled={(!!trial || queue.length === 0) && engine.canManualPulse(focus)} reducedMotion={s.settings.reducedMotion}
+    tutorialTarget label={r.active ? '点击触发碰撞' : '仪器已暂停'} onPulse={collide}/>;
   const targetInfo = element(r.target);
   const nextInfo = max < PLAYABLE_ELEMENTS ? element(max + 1) : undefined;
   const tracking = r.active && r.exploring && r.target === nextInfo?.z;
@@ -471,7 +548,7 @@ export default function App() {
   };
 
   const lab = () => <section className="lab-scene" aria-label="实验室" data-guiding={!!spotlight}>
-    <ReactorScene key={focus} id={focus}>
+    <ReactorScene key={focus} id={focus} impact={impact} reduced={s.settings.reducedMotion}>
       <Particles count={Math.min(60, activeAtoms(r).toNumber())} mix={visualPool}
         speed={r.upgrades.speed} reduced={s.settings.reducedMotion} active={r.active} flash={flash}/>
     </ReactorScene>
@@ -506,6 +583,13 @@ export default function App() {
       </div>
       <button type="button" className="scene-icon-button" aria-label="下一步" title="下一步" aria-expanded={activeDrawer === 'next'} aria-controls="experiment-drawer" onClick={() => toggleDrawer('next')}><Compass size={22}/></button>
     </aside>
+    {!spotlight && <div inert={!!activeDrawer}>
+      <ElementPulseControls trial={trial} echo={s.elements[1].archived ? s.pulseTech.echoHits : undefined}
+        lithium={s.elements[2].archived ? s.pulseTech.lithium : undefined} canRelease={canRelease}
+        releaseHint={!targetKnown ? '切换至已发现的实验目标即可释放。' : !r.active ? '启动容器后即可释放。' : techniques[3].description}
+        onRelease={discharge} onChooseTarget={!targetKnown && s.pulseTech.lithium === LITHIUM_CHARGE ? () => toggleDrawer('instrument') : undefined}
+        onCloseTrial={() => setTrial(undefined)}/>
+    </div>}
     <div className="scene-actions" inert={!!activeDrawer}>
       {handsOn && (handsOn.id === 'pickup' || handsOn.id === 'pulse') && <button type="button" className="scene-action" data-guide-target="release-drop"
         disabled={practiceDrop || !!boost} onClick={() => act(e => e.showPracticeDrop())}>放出练习灵感点</button>}
@@ -515,11 +599,12 @@ export default function App() {
       })}>让 I 级生产氢</button>}
       <button type="button" className="scene-target" aria-label={`实验目标 ${targetInfo.name}`} aria-expanded={activeDrawer === 'instrument'} aria-controls="experiment-drawer" onClick={() => toggleDrawer('instrument')} title={targetNote ?? requirements.join(' · ')}>
         <HudRing label={targetLabel} value={targetProgress} max={1}><strong>{targetInfo.symbol}</strong></HudRing>
-        <span><strong>{targetInfo.name}</strong><small>{targetStatus}</small></span>
+        <span><strong>{targetInfo.name}</strong><small>{!targetKnown && !remainingPreparation && isTechniqueElement(r.target) ? techniques[r.target].hint : targetStatus}</small></span>
       </button>
       {nextInfo && !tracking && <button type="button" className="scene-action scene-explore" disabled={!canExplore} data-guide-target="explore" onClick={() => act(e => { e.target(focus, nextInfo.z, true); })}
         title={!canExplore ? requirements.join(' · ') : undefined}>
         {canExplore ? <ArrowRight size={16}/> : <LockKeyhole size={15}/>}探索 {nextInfo.symbol}
+        {isTechniqueElement(nextInfo.z) && <small aria-hidden="true">· {techniques[nextInfo.z].hint}</small>}
       </button>}
     </div>
     {activeDrawer && <div className="scene-shade" aria-hidden="true" onClick={closeDrawer}/>}
@@ -598,6 +683,10 @@ export default function App() {
 
   function elementDialog(z: number, discovery = false) {
     const info = element(z), state = s.elements[z - 1], known = !!state?.discovered, knowledge = KNOWLEDGE[z];
+    const trialOffer = isTechniqueElement(z) && canTryTechnique(s, z) && <div className="guided-dialog-note">
+      <p>{techniques[z].description}</p>
+      <button type="button" className="secondary-button" onClick={() => beginTrial(z)}>试用{techniques[z].name}<ArrowRight size={15}/></button>
+    </div>;
     const guidedArchive = !discovery && z === 1 && handsOn?.id === 'archive';
     const pendingDiscoveries = discovery && queue.length > 0 ? queue.length : 0;
     const archiveGoal = state?.archived ? state.deposited : ARCHIVE_UNITS;
@@ -620,13 +709,14 @@ export default function App() {
       <p className="guided-dialog-note">{z === 2
         ? '你合成了第一份氦（He）。周期表已经记录这次发现。点击「继续引导」，试试实验室的限时增益。'
         : `你发现了${info.name}（${info.symbol}）。点击「继续引导」，返回实验室。`}</p>
+      {trialOffer}
       <button className="primary-button full" data-guide-dialog-action onClick={() => setDialog(null)}>继续引导<ArrowRight size={16}/></button>
     </Modal>;
     if (guidedArchive) return <Modal title="收录氢（H）" guided onClose={() => setDialog(null)}>
       <p className="guided-dialog-note">点击高亮的提交按钮。累计提交 {ARCHIVE_UNITS} 份氢，就会点亮周期表里的 H，并自动激活它的能力。</p>
       {inventory}
     </Modal>;
-    return <Modal title={discovery ? `新元素发现 · ${info.name}` : `${info.name} · ${info.english}`} onClose={() => setDialog(null)}><div className="element-card-hero"><div className={`large-element ${state?.archived ? 'archived' : ''}`} style={{ '--element': info.color } as CSSProperties}><span>{z}</span><strong>{info.symbol}</strong><small>{info.english}</small><i>{info.mass || '—'}</i></div>{specimen ? <div className="specimen" role="img" style={specimen} aria-label={info.specimenDescription}/> : <div className="locked-specimen"><LockKeyhole size={32}/><p>{z > PLAYABLE_ELEMENTS ? '未来研究目标' : '等待首次发现'}</p></div>}</div><div className="knowledge-status"><span className={state?.archived ? 'accent' : ''}>{state?.archived ? '✓ 已正式收录' : known ? '已发现 · 尚未收录' : z > PLAYABLE_ELEMENTS ? `v${GAME_VERSION} 版本锁定` : '未发现'}</span><span>第 {z} 号元素</span></div>{discovery && pendingDiscoveries === 0 && <div className="discovery-queue"><span>查看档案期间，已知元素和资源继续产出。</span><button className="secondary-button" onClick={() => setDialog(null)}>知道了，继续探索</button></div>}{inventory}{pendingDiscoveries > 0 && <div className="discovery-queue" role="status"><span>还有 {pendingDiscoveries} 项新发现待查看</span><button className="secondary-button" onClick={() => setDialog(null)}>查看下一个发现</button></div>}{known && <ElementAbility z={z} archived={state.archived}/>}<AtomicFacts info={info} known={known}/>{known && knowledge ? <><div className="knowledge-body"><h3>{knowledge.title}</h3><p>{knowledge.fact}</p><h4>电子与性质</h4><p>{ATOMIC_PROFILES[z]?.chemistry}</p><h4>主要用途</h4><p>{knowledge.application}</p><FurtherScience info={info}/><h4>实验进展</h4><p>{knowledge.unlock}</p></div><dl className="element-history"><div><dt>首次发现</dt><dd>{clock(state.firstDiscoveredAt || 0)} · {state.firstDiscoveredReactor ? `${REACTORS[state.firstDiscoveredReactor - 1].roman} 级` : '初始样本'}</dd></div><div><dt>累计获得</dt><dd>{fmt(state.totalProduced)} 单位</dd></div></dl><p className="specimen-caption">{info.specimenDescription}{z === 10 && '（图为放电发光示意，常温常压下氖气无色。）'}{z >= 21 && z <= PLAYABLE_ELEMENTS && '（图为样本外观示意。）'}</p><p className="science-note">{SCIENCE_NOTE} <a href={baikeUrl(info.name)} target="_blank" rel="noreferrer">百度百科 ↗</a></p></> : <div className="locked-copy"><p>{z > PLAYABLE_ELEMENTS ? z === 118 ? '鿫是《通往118》的长期终点。未来版本中，“100 个 Og”将代表 100 次成功合成且确认的事件记录，并非长期储存的普通气体。' : `它属于未来的旅程。v${GAME_VERSION} 已开放 1—54 号元素（H–Xe）；55–118 号只作为未来研究目标显示，尚未开放或测试。` : `依次发现元素后，你将有机会与${info.name}相遇。当前下一个新元素是 ${element(Math.min(PLAYABLE_ELEMENTS, max + 1)).symbol}。`}</p><button className="secondary-button full" onClick={() => setDialog(null)}>返回实验室</button></div>}</Modal>;
+    return <Modal title={discovery ? `新元素发现 · ${info.name}` : `${info.name} · ${info.english}`} onClose={() => setDialog(null)}><div className="element-card-hero"><div className={`large-element ${state?.archived ? 'archived' : ''}`} style={{ '--element': info.color } as CSSProperties}><span>{z}</span><strong>{info.symbol}</strong><small>{info.english}</small><i>{info.mass || '—'}</i></div>{specimen ? <div className="specimen" role="img" style={specimen} aria-label={info.specimenDescription}/> : <div className="locked-specimen"><LockKeyhole size={32}/><p>{z > PLAYABLE_ELEMENTS ? '未来研究目标' : '等待首次发现'}</p></div>}</div><div className="knowledge-status"><span className={state?.archived ? 'accent' : ''}>{state?.archived ? '✓ 已正式收录' : known ? '已发现 · 尚未收录' : z > PLAYABLE_ELEMENTS ? `v${GAME_VERSION} 版本锁定` : '未发现'}</span><span>第 {z} 号元素</span></div>{discovery && pendingDiscoveries === 0 && <div className="discovery-queue"><span>查看档案期间，已知元素和资源继续产出。</span><button className="secondary-button" onClick={() => setDialog(null)}>知道了，继续探索</button></div>}{trialOffer}{inventory}{pendingDiscoveries > 0 && <div className="discovery-queue" role="status"><span>还有 {pendingDiscoveries} 项新发现待查看</span><button className="secondary-button" onClick={() => setDialog(null)}>查看下一个发现</button></div>}{known && <ElementAbility z={z} archived={state.archived}/>}<AtomicFacts info={info} known={known}/>{known && knowledge ? <><div className="knowledge-body"><h3>{knowledge.title}</h3><p>{knowledge.fact}</p><h4>电子与性质</h4><p>{ATOMIC_PROFILES[z]?.chemistry}</p><h4>主要用途</h4><p>{knowledge.application}</p><FurtherScience info={info}/><h4>实验进展</h4><p>{knowledge.unlock}</p></div><dl className="element-history"><div><dt>首次发现</dt><dd>{clock(state.firstDiscoveredAt || 0)} · {state.firstDiscoveredReactor ? `${REACTORS[state.firstDiscoveredReactor - 1].roman} 级` : '初始样本'}</dd></div><div><dt>累计获得</dt><dd>{fmt(state.totalProduced)} 单位</dd></div></dl><p className="specimen-caption">{info.specimenDescription}{z === 10 && '（图为放电发光示意，常温常压下氖气无色。）'}{z >= 21 && z <= PLAYABLE_ELEMENTS && '（图为样本外观示意。）'}</p><p className="science-note">{SCIENCE_NOTE} <a href={baikeUrl(info.name)} target="_blank" rel="noreferrer">百度百科 ↗</a></p></> : <div className="locked-copy"><p>{z > PLAYABLE_ELEMENTS ? z === 118 ? '鿫是《通往118》的长期终点。未来版本中，“100 个 Og”将代表 100 次成功合成且确认的事件记录，并非长期储存的普通气体。' : `它属于未来的旅程。v${GAME_VERSION} 已开放 1—54 号元素（H–Xe）；55–118 号只作为未来研究目标显示，尚未开放或测试。` : `依次发现元素后，你将有机会与${info.name}相遇。当前下一个新元素是 ${element(Math.min(PLAYABLE_ELEMENTS, max + 1)).symbol}。`}</p><button className="secondary-button full" onClick={() => setDialog(null)}>返回实验室</button></div>}</Modal>;
   }
 
   const brand = () => <a className="brand" href="#" onClick={e => { e.preventDefault(); goToTab('lab'); }}><span className="brand-mark"><Atom size={30} strokeWidth={1.2}/></span><span><strong>通往<span>118</span></strong><small>ROAD TO 118</small></span><i>v{GAME_VERSION}</i></a>;
@@ -643,7 +733,7 @@ export default function App() {
     {dialog?.kind === 'element' && elementDialog(dialog.z, dialog.discovery)}
     {dialog?.kind === 'settings' && <Modal title="存档与实验室设置" onClose={() => setDialog(null)}>
       <SavedGames slots={slots} activeId={slotId} error={slotError} onCreate={() => changeSave('create')} onSwitch={id => changeSave('switch', id)} onDelete={id => changeSave('delete', id)}/>
-      <div className="settings-list"><label><span><strong>科学记数法</strong><small>关闭时显示中文大数单位，超过载后自动使用科学记数法</small></span><input type="checkbox" checked={s.settings.scientific} onChange={e => act(() => { s.settings.scientific = e.target.checked; })}/></label><label><span><strong>减少动态效果</strong><small>降低粒子运动，保留全部游戏功能</small></span><input type="checkbox" checked={s.settings.reducedMotion} onChange={e => act(() => { s.settings.reducedMotion = e.target.checked; })}/></label></div>{saveBlocked && rawSave !== undefined && <button className="secondary-button full" onClick={exportRawSave}><Download size={17}/>导出原始旧档</button>}<div className="save-actions"><button className="secondary-button" onClick={exportSave}><Download size={17}/>导出存档</button><button className="secondary-button" onClick={() => importInput.current?.click()}><Upload size={17}/>导入存档</button></div><button className="primary-button full" onClick={saveCurrent}>{saveBlocked ? '备份旧档并保存当前进度' : '立即保存'}</button><p className="science-note">进度保存在当前浏览器，每 12 秒自动保存。导入会替换正在使用的档位。</p></Modal>}
+      <div className="settings-list"><label><span><strong>碰撞音效</strong><small>播放碰撞、回波与释放电芯的声音</small></span><input type="checkbox" checked={s.settings.collisionSound} onChange={e => act(() => { s.settings.collisionSound = e.target.checked; })}/></label><label><span><strong>科学记数法</strong><small>关闭时显示中文大数单位，超过载后自动使用科学记数法</small></span><input type="checkbox" checked={s.settings.scientific} onChange={e => act(() => { s.settings.scientific = e.target.checked; })}/></label><label><span><strong>减少动态效果</strong><small>降低粒子运动，保留全部游戏功能</small></span><input type="checkbox" checked={s.settings.reducedMotion} onChange={e => act(() => { s.settings.reducedMotion = e.target.checked; })}/></label></div>{saveBlocked && rawSave !== undefined && <button className="secondary-button full" onClick={exportRawSave}><Download size={17}/>导出原始旧档</button>}<div className="save-actions"><button className="secondary-button" onClick={exportSave}><Download size={17}/>导出存档</button><button className="secondary-button" onClick={() => importInput.current?.click()}><Upload size={17}/>导入存档</button></div><button className="primary-button full" onClick={saveCurrent}>{saveBlocked ? '备份旧档并保存当前进度' : '立即保存'}</button><p className="science-note">进度保存在当前浏览器，每 12 秒自动保存。导入会替换正在使用的档位。</p></Modal>}
     {dialog?.kind === 'complete' && <Modal title="H–Xe 全收集完成。" onClose={() => setDialog(null)}><div className="completion-emblem"><span>54</span><strong>Xe</strong><small>XENON / 氙</small><i><Check size={17}/>{archived} / {PLAYABLE_ELEMENTS} 已收录</i></div><p className="completion-text">从两颗氢原子，到 H–Xe 五十四格完整档案。<br/>氙是本版终点；锌、氪和钙都只是沿途里程碑。</p><div className="end-stats"><div><span>全收集时间</span><strong>{clock(s.stats.completedAt || 0)}</strong></div><div><span>氙收录时间</span><strong>{s.stats.xeCompletedAt === null ? '—' : clock(s.stats.xeCompletedAt)}</strong></div><div><span>已点亮元素</span><strong>{archived} / {PLAYABLE_ELEMENTS}</strong></div></div><p className="science-note">第 55–118 号为后续研究目标。你仍可继续使用实验室。</p><button className="primary-button full" onClick={() => setDialog(null)}>继续我的实验室<ArrowRight size={16}/></button></Modal>}
   </div>;
 }

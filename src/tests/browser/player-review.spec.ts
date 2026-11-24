@@ -69,6 +69,8 @@ test('welcome waits for the player and mobile guide holds each step before advan
   await page.clock.runFor(3750);
   await expect(page.locator('.progress-resource strong')).toContainText('1/54 发现');
   await page.clock.runFor(250);
+  await expect(page.locator('.scene-aperture .reactor-impact[data-kind="discovery"]')).toContainText('He');
+  await page.clock.runFor(550);
   const card = page.getByRole('dialog', { name: '新元素发现 · 氦' });
   await expect(card).toBeVisible();
   await expect(card.getByRole('button', { name: '继续引导' })).toBeFocused();
