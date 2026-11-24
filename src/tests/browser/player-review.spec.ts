@@ -15,7 +15,7 @@ test('welcome waits for the player and mobile guide holds each step before advan
   await expect(welcome).toBeVisible();
   await welcome.getByRole('button', { name: '开始引导' }).click();
   await page.clock.runFor(1000);
-  const guide = page.getByRole('region', { name: '开局操作引导' });
+  const guide = page.getByRole('region', { name: '新手实验引导' });
   const start = page.getByRole('button', { name: '开始实验', exact: true });
   await expect(guide).toContainText('第 1 步');
   await expect(page.locator('.lab-guidance')).toHaveCount(0);
@@ -63,18 +63,18 @@ test('welcome waits for the player and mobile guide holds each step before advan
   await expect(page.locator('.progress-resource strong')).toContainText('1/54 发现');
   await page.getByRole('button', { name: '探索 He' }).click();
   await page.clock.runFor(1000);
-  await expect(guide).toHaveCount(0);
+  await expect(guide).toContainText('正在合成氦');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.clock.runFor(3750);
   await expect(page.locator('.progress-resource strong')).toContainText('1/54 发现');
   await page.clock.runFor(250);
   const card = page.getByRole('dialog', { name: '新元素发现 · 氦' });
   await expect(card).toBeVisible();
-  await expect(card.getByRole('button', { name: '提交 1 单位至档案' })).toBeEnabled();
-  await card.getByRole('button', { name: '关闭弹窗' }).click();
+  await expect(card.getByRole('button', { name: '继续引导' })).toBeFocused();
+  await card.getByRole('button', { name: '继续引导' }).click();
   await expect(page.locator('#target')).toHaveValue('2');
   await expect(page.getByRole('region', { name: '下一步', exact: true })).toHaveCount(0);
-  await expect(page.getByRole('region', { name: '新手实验引导' })).toContainText('拾取灵感点');
+  await expect(page.getByRole('region', { name: '新手实验引导' })).toContainText('认识灵感点');
 });
 
 test('skipping the spotlight switches to the single next-step panel', async ({ page }) => {

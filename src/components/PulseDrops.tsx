@@ -22,7 +22,7 @@ export default function PulseDrops({ drop, boost, reduced, onCollect }: {
       className={`pulse-drop-flight pulse-drop--${drop.kind}${drop.practice ? ' pulse-drop--practice' : ''}${reduced ? ' pulse-drop--static' : ''}`}
       style={{ '--drop-x': `${drop.x}%`, '--drop-y': `${drop.y}%` } as CSSProperties}
       data-phase={phase}>
-      <button type="button" className="pulse-drop" disabled={phase === 'retracting'}
+      <button type="button" className="pulse-drop" data-guide-target={drop.practice ? 'drop' : undefined} disabled={phase === 'retracting'}
         aria-label={`拾取${PULSE_BOOSTS[drop.kind].name}`} onClick={() => onCollect(drop.id)}>
         <span className="pulse-drop-visual">
           <DropIcon size={20} aria-hidden="true"/><span>{PULSE_BOOSTS[drop.kind].name}</span>

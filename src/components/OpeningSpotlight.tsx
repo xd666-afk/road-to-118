@@ -1,32 +1,50 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowRight, Atom } from 'lucide-react';
-import type { OpeningStep } from '../game/types';
+import { ArrowRight, Atom, Check } from 'lucide-react';
 import './opening-spotlight.css';
 
-const steps: Record<OpeningStep, { number: number; title: string; detail: string; done?: string }> = {
-  start: { number: 1, title: '开始实验', detail: '点击高亮按钮，启动仪器积累碰撞能。', done: '仪器开始运行了。' },
-  charge: { number: 2, title: '手动触发碰撞', detail: '点击高亮的反应容器图片，立刻获得碰撞能。攒到 5 后，就可以补充一份氢样本。', done: '碰撞能已就绪。' },
-  sample: { number: 3, title: '补充氢样本', detail: '点击高亮按钮，花 5 碰撞能购买一份样本。', done: '已补充一份氢样本。' },
-  explore: { number: 4, title: '探索氦', detail: '点击高亮按钮。引导结束后，仪器将合成第一份氦。' },
+export type SpotlightStep = {
+  id: string;
+  number: number;
+  title: string;
+  detail: string;
+  target?: string;
+  done?: string;
+  status?: string;
+  waiting?: boolean;
 };
 
-type GuideStep = 'welcome' | OpeningStep;
-const HOLD_MS = 650;
-const FADE_MS = 250;
+const HOLD_MS = 620;
+const FADE_MS = 230;
 
-export default function OpeningSpotlight({ step, onBegin, onSkip, onManageSaves }: {
-  step?: GuideStep; onBegin: () => void; onSkip: () => void; onManageSaves: () => void;
+export default function OpeningSpotlight({ step, total, reduced, onBegin, onSkip, onManageSaves, onFinish }: {
+  step?: SpotlightStep;
+  total: number;
+  reduced: boolean;
+  onBegin: () => void;
+  onSkip: () => void;
+  onManageSaves: () => void;
+  onFinish: () => void;
 }) {
-  const [bounds, setBounds] = useState<DOMRect>();
   const [shown, setShown] = useState(step);
   const [fading, setFading] = useState(false);
-  const welcomeButton = useRef<HTMLButtonElement>(null);
-  const savesButton = useRef<HTMLButtonElement>(null);
+  const [layout, setLayout] = useState<CSSProperties>();
+  const primary = useRef<HTMLButtonElement>(null);
+  const note = useRef<HTMLElement>(null);
+  const skip = useRef<HTMLButtonElement>(null);
+  const saves = useRef<HTMLButtonElement>(null);
+  const skipAction = useRef(onSkip);
+  const pending = shown?.id !== step?.id;
+  const current = pending ? shown : step;
+  const id = current?.id;
+  const targetSelector = current?.target;
+  const waiting = current?.waiting;
   const transitionLock = useRef(false);
-  const pending = shown !== step;
 
-  useLayoutEffect(() => { transitionLock.current = pending; }, [pending]);
+  useLayoutEffect(() => {
+    transitionLock.current = pending;
+    skipAction.current = onSkip;
+  }, [pending, onSkip]);
 
   useEffect(() => {
     if (!pending) return;
@@ -35,18 +53,16 @@ export default function OpeningSpotlight({ step, onBegin, onSkip, onManageSaves 
     const advance = window.setTimeout(() => {
       setFading(false);
       setShown(step);
-    }, HOLD_MS + FADE_MS);
+    }, HOLD_MS + (reduced ? 0 : FADE_MS));
     return () => { window.clearTimeout(fade); window.clearTimeout(advance); };
-  }, [pending, shown, step]);
+    // Dynamic progress text does not restart the transition.
+  }, [pending, shown?.id, step?.id, reduced]);
 
   useLayoutEffect(() => {
-    if (!shown) return;
-    const welcome = shown === 'welcome';
-    const target = welcome ? welcomeButton.current : document.querySelector<HTMLButtonElement>(`[data-opening-target="${shown}"]`);
+    if (!id) return;
+    const target = targetSelector ? document.querySelector<HTMLElement>(targetSelector) : primary.current;
     const root = document.getElementById('root');
-    if (!target || !root) return;
-    const allowedArea = welcome ? target.closest('.opening-spotlight__welcome') ?? target : target;
-
+    const hint = note.current;
     const blocked = new Set<HTMLElement>();
     const disable = (node: Element) => {
       if (node instanceof HTMLElement && !node.inert) {
@@ -54,42 +70,100 @@ export default function OpeningSpotlight({ step, onBegin, onSkip, onManageSaves 
         blocked.add(node);
       }
     };
-    if (welcome) disable(root);
-    else for (let node: HTMLElement | null = target; node && node !== root; node = node.parentElement) {
-      for (const sibling of node.parentElement?.children ?? []) if (sibling !== node) disable(sibling);
+
+    if (target && root?.contains(target) && !waiting) {
+      for (let node: HTMLElement | null = target; node && node !== root; node = node.parentElement) {
+        for (const sibling of node.parentElement?.children ?? []) if (sibling !== node) disable(sibling);
+      }
+    } else if (root) disable(root);
+
+    function place() {
+      if (!targetSelector || !target?.isConnected || !hint) return;
+      let bounds = target.getBoundingClientRect();
+      const noteWidth = hint.offsetWidth;
+      const noteHeight = hint.offsetHeight;
+      const width = document.documentElement.clientWidth;
+      const height = window.innerHeight;
+      const gutter = 10;
+      const gap = 15;
+      const roomAbove = noteHeight + gap + gutter;
+      const fitsBeside = bounds.right + gap + noteWidth <= width - gutter || bounds.left - gap - noteWidth >= gutter;
+      if (root?.contains(target) && bounds.top < roomAbove && !fitsBeside &&
+        bounds.bottom + roomAbove > height && roomAbove + bounds.height < height - gutter) {
+        const scrollTop = Math.max(0, window.scrollY + bounds.top - roomAbove);
+        if (window.scrollY - scrollTop > 1) {
+          window.scrollTo({ top: scrollTop, behavior: 'instant' });
+          bounds = target.getBoundingClientRect();
+        }
+      }
+      const within = (value: number, limit: number) => Math.max(gutter, Math.min(value, limit - gutter));
+      let x = within(bounds.left + (bounds.width - noteWidth) / 2, width - noteWidth);
+      let y = bounds.top - noteHeight - gap;
+      if (y < gutter) {
+        if (bounds.bottom + gap + noteHeight <= height - gutter) y = bounds.bottom + gap;
+        else if (fitsBeside) {
+          x = bounds.right + gap + noteWidth <= width - gutter ? bounds.right + gap : bounds.left - gap - noteWidth;
+          y = within(bounds.top + (bounds.height - noteHeight) / 2, height - noteHeight);
+        } else y = bounds.top > height - bounds.bottom ? gutter : height - noteHeight - gutter;
+      }
+      const next = {
+        '--guide-x': `${bounds.left}px`, '--guide-y': `${bounds.top}px`,
+        '--guide-width': `${bounds.width}px`, '--guide-height': `${bounds.height}px`,
+        '--hint-x': `${x}px`, '--hint-y': `${y}px`,
+      } as CSSProperties;
+      setLayout(previous => JSON.stringify(previous) === JSON.stringify(next) ? previous : next);
     }
 
-    const place = () => setBounds(target.getBoundingClientRect());
-    const priorDescription = target.getAttribute('aria-describedby');
-    if (!welcome) {
-      target.setAttribute('aria-describedby', 'opening-note');
-      target.scrollIntoView({ block: 'center', behavior: 'instant' });
+    const previousDescription = target?.getAttribute('aria-describedby');
+    if (targetSelector && target && hint) {
+      target.setAttribute('aria-describedby', [previousDescription, 'opening-note-body'].filter(Boolean).join(' '));
+      if (root?.contains(target)) target.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' });
     }
-    target.focus({ preventScroll: true });
+    const focusable = () => [waiting ? null : target, saves.current, skip.current].filter(
+      (node): node is HTMLElement => !!node?.isConnected && !(node instanceof HTMLButtonElement && node.disabled),
+    );
+    focusable()[0]?.focus({ preventScroll: true });
     place();
-    const resize = new ResizeObserver(place);
-    resize.observe(target);
-    resize.observe(root);
+    const observer = new ResizeObserver(place);
+    if (target) observer.observe(target);
+    if (hint) observer.observe(hint);
+    if (root) observer.observe(root);
     window.addEventListener('resize', place);
     window.addEventListener('scroll', place, true);
 
+    // The practice item moves independently of the laboratory layout while falling.
+    let frame = 0;
+    if (id === 'drop' && !reduced) {
+      let started: number | undefined;
+      const track = (now: number) => {
+        started ??= now;
+        place();
+        if (now - started < 1250) frame = requestAnimationFrame(track);
+      };
+      frame = requestAnimationFrame(track);
+    }
+
     const keepTarget = (event: Event) => {
-      if (transitionLock.current || (event.target instanceof Node && !allowedArea.contains(event.target))) {
-        event.preventDefault();
-        event.stopPropagation();
-      }
+      const node = event.target;
+      if (!(node instanceof Node)) return;
+      if (skip.current?.contains(node)) return;
+      if (!transitionLock.current && ((!waiting && target?.contains(node)) || saves.current?.contains(node))) return;
+      event.preventDefault();
+      event.stopPropagation();
     };
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
         event.stopPropagation();
-        onSkip();
+        skipAction.current();
       } else if (event.key === 'Tab') {
+        const options = focusable();
+        const index = options.indexOf(document.activeElement as HTMLElement);
         event.preventDefault();
-        const next = welcome && document.activeElement === target ? savesButton.current ?? target : target;
-        next.focus({ preventScroll: true });
+        const next = index < 0 ? (event.shiftKey ? options.length - 1 : 0) : (index + (event.shiftKey ? -1 : 1) + options.length) % options.length;
+        options[next]?.focus({ preventScroll: true });
       } else if ((transitionLock.current || event.repeat) && (event.key === 'Enter' || event.key === ' ')) {
-        event.preventDefault();
+        if (document.activeElement !== skip.current) event.preventDefault();
       }
     };
     document.addEventListener('pointerdown', keepTarget, true);
@@ -97,47 +171,54 @@ export default function OpeningSpotlight({ step, onBegin, onSkip, onManageSaves 
     document.addEventListener('keydown', onKey, true);
 
     return () => {
-      resize.disconnect();
+      observer.disconnect();
+      cancelAnimationFrame(frame);
       window.removeEventListener('resize', place);
       window.removeEventListener('scroll', place, true);
       document.removeEventListener('pointerdown', keepTarget, true);
       document.removeEventListener('click', keepTarget, true);
       document.removeEventListener('keydown', onKey, true);
-      if (priorDescription === null) target.removeAttribute('aria-describedby');
-      else target.setAttribute('aria-describedby', priorDescription);
+      if (targetSelector && target) {
+        if (previousDescription) target.setAttribute('aria-describedby', previousDescription);
+        else target.removeAttribute('aria-describedby');
+      }
       for (const sibling of blocked) sibling.inert = false;
     };
-  }, [shown, onSkip]);
+  }, [id, targetSelector, waiting, reduced]);
 
-  if (!shown) return null;
-  const welcome = shown === 'welcome';
-  const lesson = welcome ? undefined : steps[shown];
-  const done = pending && step ? lesson?.done : undefined;
-  const style = bounds && {
-    '--opening-x': `${bounds.left}px`, '--opening-y': `${bounds.top}px`,
-    '--opening-width': `${bounds.width}px`, '--opening-height': `${bounds.height}px`,
-    '--opening-center': `${bounds.left + bounds.width / 2}px`,
-  } as CSSProperties;
-
+  if (!current) return null;
+  const welcome = current.id === 'welcome';
+  const card = welcome || current.id === 'done';
+  const done = pending && step ? current.done : undefined;
+  const className = fading ? step ? ' opening-spotlight--switching' : ' opening-spotlight--closing' : '';
   return createPortal(
-    <div className={`opening-spotlight${fading ? step ? ' opening-spotlight--switching' : ' opening-spotlight--closing' : ''}`} style={style}>
-      {welcome ? <div className="opening-spotlight__welcome-shade">
+    <div className={`opening-spotlight${className}`} style={layout} data-step={current.id} data-reduced={reduced}>
+      {card ? <div className="opening-spotlight__welcome-shade">
         <section className="opening-spotlight__welcome" role="dialog" aria-modal="true" aria-labelledby="opening-welcome-title" aria-describedby="opening-welcome-body">
-          <div className="opening-spotlight__welcome-icon"><Atom size={24} aria-hidden="true" /></div>
-          <h2 id="opening-welcome-title">欢迎来到《通往118》</h2>
-          <p id="opening-welcome-body">我是你的实验助手。在这里，你会从氢出发，逐步发现和收录更多元素。先跟我一起合成第一份氦吧。</p>
-          <button ref={welcomeButton} type="button" className="primary-button" onClick={onBegin}>开始引导<ArrowRight size={16} aria-hidden="true" /></button>
-          <button ref={savesButton} type="button" className="text-button welcome-saves" onClick={onManageSaves}>管理存档</button>
+          <div className="opening-spotlight__welcome-icon">{welcome ? <Atom size={24} aria-hidden="true"/> : <Check size={24} aria-hidden="true"/>}</div>
+          <h2 id="opening-welcome-title">{current.title}</h2>
+          <p id="opening-welcome-body">{current.detail}</p>
+          <button ref={primary} type="button" className="primary-button" onClick={welcome ? onBegin : onFinish}>
+            {welcome ? '开始引导' : '完成引导'}<ArrowRight size={16} aria-hidden="true"/>
+          </button>
+          {welcome && <div className="opening-spotlight__links">
+            <button ref={saves} type="button" className="text-button" onClick={onManageSaves}>管理存档</button>
+            <button ref={skip} type="button" className="text-button" onClick={onSkip}>跳过引导</button>
+          </div>}
         </section>
-      </div> : bounds && lesson && <>
-        <div className="opening-spotlight__ring" aria-hidden="true" />
-        <section id="opening-note" className={`opening-spotlight__note${bounds.top < 145 ? ' opening-spotlight__note--below' : ''}`} aria-label="开局操作引导" aria-live="polite">
-          <span>第 {lesson.number} 步 / 共 4 步</span>
-          <h2>{lesson.title}</h2>
-          <p>{done ?? lesson.detail}</p>
+      </div> : <>
+        <div className="opening-spotlight__ring" aria-hidden="true"/>
+        <section ref={note} id="opening-note" className="opening-spotlight__note" aria-label="新手实验引导">
+          <div aria-live="polite">
+            <span>第 {current.number} 步 / 共 {total} 步</span>
+            <h2>{current.title}</h2>
+            <p id="opening-note-body">{done ?? current.detail}</p>
+          </div>
+          {!done && current.status && <p className="opening-spotlight__status">{current.status}</p>}
+          <button ref={skip} type="button" className="text-button" onClick={onSkip}>跳过引导</button>
         </section>
       </>}
-      <div className="opening-spotlight__cover" aria-hidden="true" />
+      <div className="opening-spotlight__cover" aria-hidden="true"/>
     </div>,
     document.body,
   );

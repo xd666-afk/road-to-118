@@ -14,7 +14,7 @@ type IndustryProps = {
 
 const moduleIcons = { feed: Layers3, reaction: Atom, allocation: ArrowDownToLine };
 
-export function IndustryModules({ state, max, act, guideTarget }: IndustryProps & { guideTarget?: string }) {
+export function IndustryModules({ state, max, act }: IndustryProps) {
   const fmt = (value: number) => format(value, state.settings.scientific);
   return <div className="module-grid">
     {MODULE_ORDER.map((key, index) => {
@@ -26,7 +26,7 @@ export function IndustryModules({ state, max, act, guideTarget }: IndustryProps 
       const canResearch = prior && max >= info.unlock;
       const canAfford = !!cost && state.coins.gte(cost.coins) && state.data.gte(cost.data);
       const enabled = state.automation[key];
-      return <section className={`module${guideTarget === `module-${key}` ? ' guide-target' : ''}`} key={key} aria-labelledby={`module-${key}`}>
+      return <section className="module" key={key} aria-labelledby={`module-${key}`}>
         <div className="module-top"><h3 id={`module-${key}`}>{info.name}</h3><Icon size={22} aria-hidden="true"/></div>
         <p>{info.description}</p>
         {built && <div className="module-current">
@@ -41,7 +41,7 @@ export function IndustryModules({ state, max, act, guideTarget }: IndustryProps 
           {built && <small>{moduleEffect(key, level + 1)}</small>}
           <div className="module-cost">{fmt(cost.coins)} 碰撞能 + {fmt(cost.data)} 数据</div>
           {built && state.experimentBoard?.coupon && <small>已应用工业升级券 · 减免 {INDUSTRY_DISCOUNT}%</small>}
-          <button className="secondary-button full" disabled={!canAfford || (!built && !canResearch)}
+          <button className="secondary-button full" data-guide-target={`module-${key}`} disabled={!canAfford || (!built && !canResearch)}
             onClick={() => act(e => { if (built) e.upgradeModule(key); else e.research(key); })}>
             {built ? `升级至 ${level + 1} 级` : !prior ? '先研发上一模块' : max < info.unlock ? `发现 ${element(info.unlock).symbol} 后开放` : '研发模块'}
             <ChevronRight size={15} aria-hidden="true"/>

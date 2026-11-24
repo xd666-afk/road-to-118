@@ -36,9 +36,3 @@ export function labGuideStep(state: GameState) {
 }
 
 export type LabGuideStep = ReturnType<typeof labGuideStep>;
-
-export function labGuideResearchTarget(step: LabGuideStep | undefined) {
-  if (step?.id === 'feed') return 'module-feed';
-  if (step?.id === 'build') return 'research-reactor-2';
-  if (step?.id === 'reaction' || step?.id === 'upgrade') return 'module-reaction';
-}

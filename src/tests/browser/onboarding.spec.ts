@@ -4,7 +4,7 @@ import { D } from '../../game/numbers';
 import { serialize } from '../../game/save';
 const KEY = 'road-to-118.save.v1';
 
-test('new player can buy, skip, reload and replay without losing laboratory progress', async ({ page }) => {
+test('an existing player can skip and start a separate guided save', async ({ page }) => {
   const s = createState(701); s.coins = D(10); s.reactors[0].discoveryHazard = 100000;
   await page.addInitScript(({key,text}) => { if (!localStorage.getItem(key)) localStorage.setItem(key,text); }, {key:KEY,text:serialize(s)});
   await page.goto('/');
@@ -20,10 +20,12 @@ test('new player can buy, skip, reload and replay without losing laboratory prog
   await expect(next).toBeVisible();
   await expect(page.getByText('等级 1',{exact:true})).toBeVisible();
   await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'教程'}).click();
-  await page.getByRole('button',{name:'重看新手引导'}).click();
-  await expect(coach.getByRole('heading')).toHaveText('发现第二种元素');
-  await expect(next).toHaveCount(0);
-  await expect(page.getByText('等级 1',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'新建存档体验引导'}).click();
+  const welcome = page.getByRole('dialog', { name: '欢迎来到《通往118》' });
+  await expect(welcome).toBeVisible();
+  await welcome.getByRole('button', { name: '管理存档' }).click();
+  await expect(page.getByRole('dialog', { name: '存档与实验室设置' })).toBeVisible();
+  expect(await page.evaluate(key => JSON.parse(localStorage.getItem(key)!).reactors[0].upgrades.atoms, KEY)).toBe(1);
 });
 
 test('coach fits narrow screens and shows a real resource shortage', async ({page}) => {

@@ -1,5 +1,5 @@
 import type { Module, Upgrade } from './types';
-export const GAME_VERSION = '0.14.0';
+export const GAME_VERSION = '0.15.0';
 /** Current playable range is H–Xe (1–54). Elements 55–118 stay visible as future research. */
 export const PLAYABLE_ELEMENTS = 54;
 export const FINAL_ELEMENT = 54;
@@ -73,4 +73,3 @@ export const ACHIEVEMENTS = [
   { id: 'upstream', name: '逆流而上', description: '低级容器成功合成超出其推荐上限至少 2 的元素', hidden: true },
 ] as const;
 export const OFFLINE_LIMIT = 4 * 60 * 60;
-
