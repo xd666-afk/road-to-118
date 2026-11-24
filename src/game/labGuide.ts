@@ -14,6 +14,7 @@ const lessons = [
   { id: 'reaction', title: '研发自动反应', detail: `在工业自动化找到「自动反应」，用 ${cost(reaction.coins, reaction.data)} 研发。启用后可批量生产已发现元素，也可逐台给仪器分工。` },
   { id: 'upgrade', title: '把自动反应升到 2 级', detail: `用 ${cost(upgrade.coins, upgrade.data)} 点击「升级至 2 级」。同样的自动生产时间里，I 级仪器倍率从 ×8 到 ×10，II 级及更高级从 ×32 到 ×40。` },
   { id: 'archive', title: '收录第一种元素', detail: `让 I 级容器生产氢。累计提交 ${ARCHIVE_UNITS} 份即可在周期表点亮档案并激活能力。` },
+  { id: 'accelerator', title: '进入加速大厅', detail: '点击实验室右侧的「加速环」，看看四段束管将在哪里建造。' },
 ] as const;
 
 export const LAB_GUIDE_LENGTH = lessons.length;
@@ -28,6 +29,7 @@ export function labGuideStep(state: GameState) {
     state.modules.reaction,
     state.moduleLevels.reaction >= 2,
     archivedCount(state) > 0,
+    state.stats.milestones.acceleratorIntro !== undefined,
   ];
   const step = done.indexOf(false);
   return step < 0

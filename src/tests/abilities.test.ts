@@ -7,9 +7,9 @@ import { deserialize, serialize } from '../game/save';
 
 it('assigns one ability to every playable element and applies it on the hundredth submission', () => {
   const names = new Set<string>();
-  for (let z = 1; z <= 54; z++) names.add(getElementAbility(z)!.name);
-  expect(names.size).toBe(54);
-  expect(getElementAbility(55)).toBeUndefined();
+  for (let z = 1; z <= 55; z++) names.add(getElementAbility(z)!.name);
+  expect(names.size).toBe(55);
+  expect(getElementAbility(56)).toBeUndefined();
 
   const e = new Engine(createState(7));
   const h = e.state.elements[0];
@@ -28,6 +28,7 @@ it('assigns one ability to every playable element and applies it on the hundredt
 it('honors an archived legacy sample and keeps partial submissions toward the new goal', () => {
   const raw = JSON.parse(serialize(createState(7)));
   raw.saveVersion = 3;
+  raw.elements = raw.elements.slice(0, 54);
   raw.activeAbilities = [];
   Object.assign(raw.elements[0], { archived: true, deposited: 50, totalProduced: '50' });
   Object.assign(raw.elements[1], { discovered: true, deposited: 38, inventory: '65', totalProduced: '103' });

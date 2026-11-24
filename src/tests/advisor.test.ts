@@ -154,15 +154,15 @@ describe('progress recommendations', () => {
     expect(e.state.coins.lt(1_000_000_000)).toBe(true);
     expect(e.state.reactors[5].built).toBe(false);
   });
-  it('reports full H–Xe collection without claiming 55–118', () => {
+  it('directs the completed H–Xe collection to the accelerator', () => {
     const e = advanced();
     e.state.reactors.forEach(reactor => { reactor.built = true; });
-    e.state.elements.forEach(row => { row.discovered = true; row.deposited = 100; row.archived = true; row.inventory = D(0); });
+    e.state.elements.slice(0, 54).forEach(row => { row.discovered = true; row.deposited = 100; row.archived = true; row.inventory = D(0); });
     e.state.stats.xeCompletedAt = 1; e.state.stats.completedAt = 2;
     const advice = recommend(e.state);
-    expect(advice.action).toBe('table');
-    expect(advice.detail).toContain('55–118');
-    expect(PLAYABLE_ELEMENTS).toBe(54);
+    expect(advice.action).toBe('accelerator');
+    expect(advice.label).toBe('继续建造加速环');
+    expect(PLAYABLE_ELEMENTS).toBe(55);
   });
   it('refuses an obsolete command and retains dismissed guide and resources through save/load', () => {
     const e = new Engine(createState(9)); e.state.coins = D(10);

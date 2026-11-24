@@ -241,7 +241,7 @@ test('tutorial keeps experiments running and defers discovery popups until retur
 });
 
 test('H–Xe cards show specimen art, neutral electrons and isotope-specific neutrons',async({page})=>{
-  const state=createState(68);state.elements.forEach(e=>e.discovered=true);state.reactors[0].active=false;
+  const state=createState(68);state.elements.slice(0,54).forEach(e=>e.discovered=true);state.reactors[0].active=false;
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(state)});
   await page.setViewportSize({width:1280,height:1000});await page.goto('/');
   await openLabPanel(page, 'archive');
@@ -285,7 +285,7 @@ test('H–Xe cards show specimen art, neutral electrons and isotope-specific neu
   await expect(dialog.locator('.atomic-specimen')).toBeVisible();
   await expect(dialog).toContainText('第五十四号');
   await page.keyboard.press('Escape');
-  await expect(page.locator('[data-z="55"]')).toHaveClass(/version-locked/);
+  await expect(page.locator('[data-z="56"]')).toHaveClass(/version-locked/);
   await page.locator('[data-z="118"]').click();
   await expect(value('质子数')).toHaveText('118');
   await expect(value('电子数（中性）')).toHaveText('118');
@@ -296,7 +296,7 @@ test('H–Xe cards show specimen art, neutral electrons and isotope-specific neu
 test('I–VIII each load an integrated scene with a visible window and support pulses at the edge', async ({ page }) => {
   const state = createState(810);
   state.settings.guideDismissed = true;
-  state.elements.forEach(element => { element.discovered = true; });
+  state.elements.slice(0,54).forEach(element => { element.discovered = true; });
   state.reactors.forEach(reactor => { reactor.built = true; });
   await page.addInitScript(save => localStorage.setItem('road-to-118.save.v1', save), serialize(state));
   await page.goto('/');
@@ -339,7 +339,7 @@ test('I–VIII each load an integrated scene with a visible window and support p
 });
 
 test('320px and 360px knowledge cards keep atomic data readable and distinguish fluorine from fluoride',async({page})=>{
-  const state=createState(69);state.elements.forEach(e=>e.discovered=true);state.reactors[0].active=false;
+  const state=createState(69);state.elements.slice(0,54).forEach(e=>e.discovered=true);state.reactors[0].active=false;
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(state)});
   await page.setViewportSize({width:360,height:800});await page.goto('/');
   await openLabPanel(page, 'archive');

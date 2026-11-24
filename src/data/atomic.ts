@@ -82,4 +82,11 @@ export const ATOMIC_PROFILES: Record<number, AtomicProfile> = {
   },
   ...EXPANDED_ATOMS,
   ...EXPANDED54_ATOMS,
+  55: {
+    isotope: 133, configuration: '1s² 2s² 2p⁶ 3s² 3p⁶ 3d¹⁰ 4s² 4p⁶ 4d¹⁰ 5s² 5p⁶ 6s¹', shells: [2, 8, 18, 18, 8, 1], group: 1,
+    state: '固态', melting: '28.5 °C', boiling: '671 °C',
+    chemistry: '铯是碱金属，最外层有一个 6s 电子，化合物中常见氧化态为 +1。',
+    isotopes: '铯-133 是天然稳定同位素，含 55 个质子和 78 个中子。',
+    occurrence: '自然界中的铯主要以化合物形式存在，可从铯榴石等矿物中提取。',
+  },
 };

@@ -95,11 +95,11 @@ test('element abilities apply as soon as an archive is complete and survive relo
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 });
 
-test('archiving the last unit of Xe completes H–Xe and leaves 55 locked', async ({ page }) => {
+test('archiving the last unit of Xe completes H–Xe and leaves Cs undiscovered', async ({ page }) => {
   const e = new Engine(createState(27));
   e.state.settings.guideDismissed = true;
   e.state.reactors[0].active = false;
-  e.state.elements.forEach(row => { row.discovered = true; row.inventory = D(100); row.totalProduced = D(100); });
+  e.state.elements.slice(0,54).forEach(row => { row.discovered = true; row.inventory = D(100); row.totalProduced = D(100); });
   for (let z = 1; z < 54; z++) e.deposit(z, true);
   e.state.elements[53].deposited = 99;
   e.state.elements[53].inventory = D(1);
@@ -116,5 +116,5 @@ test('archiving the last unit of Xe completes H–Xe and leaves 55 locked', asyn
   await expect(completion).toContainText('54 / 54 已收录');
   await completion.getByRole('button', { name: '继续我的实验室' }).click();
   await openLabPanel(page, 'archive');
-  await expect(page.locator('.periodic-cell[data-z="55"]')).toHaveClass(/version-locked/);
+  await expect(page.locator('.periodic-cell[data-z="55"]')).toHaveClass(/next/);
 });

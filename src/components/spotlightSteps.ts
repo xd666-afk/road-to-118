@@ -19,7 +19,7 @@ export function spotlightStep(state: GameState, lesson: LabGuideStep | undefined
   const opening = state.firstRun;
   if (opening?.step === 'welcome') return {
     id: 'welcome', number: 0, title: '欢迎来到《通往118》',
-    detail: '我是你的实验助手。跟着高亮的位置做一次真实实验，从第一次碰撞开始，亲手合成氦、建造仪器，最后把第一种元素收入周期表。',
+    detail: '我是你的实验助手。跟着高亮的位置，从第一次碰撞开始，合成氦、建造仪器、收录第一个元素，再去看看加速大厅。',
   };
   if (opening?.step === 'helium' && !state.settings.guideDismissed) return {
     id: 'helium', number: 4, title: '正在合成氦', detail: '等容器完成这一次实验，氦的发现卡片就会出现。',
@@ -36,7 +36,16 @@ export function spotlightStep(state: GameState, lesson: LabGuideStep | undefined
   const lab = tab === 'lab';
   const continueInLab = { ...base, id: `${lesson.id}-lab`, target: target('lab'), detail: '点击「实验室」，继续动手实验。' };
   const atChamber = reactor.active ? chamber : target('reactor-status');
-  if (lesson.id === 'done') return { ...base, title: '新手引导完成', detail: '你已完成手动碰撞、仪器建造、自动化升级和首次收录。接下来可以自由探索，或在「教程」里查阅完整手册。' };
+  if (lesson.id === 'done') return { ...base, title: '新手引导完成', detail: '发现氖后，就能回到加速大厅建造东段。点击大厅左上角的返回箭头，继续在反应容器中探索。' };
+
+  if (lesson.id === 'accelerator') {
+    if (tab === 'accelerator') return {
+      ...base, id: 'accelerator-sector', target: target('accelerator-ne'), title: '查看东段的施工条件',
+      detail: '点击「Ne」查看东段需要的材料。发现氖后，攒够氖样本、碰撞能和研究数据就能建造。',
+    };
+    if (!lab) return continueInLab;
+    return { ...base, target: target('accelerator-entry') };
+  }
 
   if (lesson.id === 'pickup' || lesson.id === 'pulse') {
     if (!lab) return continueInLab;

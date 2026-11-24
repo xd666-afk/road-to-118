@@ -2,11 +2,12 @@ import { D, Big, finiteNumber } from './numbers';
 import type { Amount } from './numbers';
 import { abilityBonuses } from './abilityProgress';
 import { discoveryPreparation, discoveryStage, observationProgress, observationRate, stageReadiness } from './discovery';
-import { ACHIEVEMENTS, ARCHIVE_UNITS, CALCIUM_ELEMENT, FINAL_ELEMENT, MODULES, MODULE_ORDER, OFFLINE_LIMIT, PLAYABLE_ELEMENTS, REACTORS, SAVE_VERSION, XENON_ELEMENT, feedDiscount, filingDataPerSample, productionParallel } from './config';
+import { ACHIEVEMENTS, ARCHIVE_UNITS, CAESIUM_ELEMENT, CALCIUM_ELEMENT, MODULES, MODULE_ORDER, OFFLINE_LIMIT, PLAYABLE_ELEMENTS, REACTORS, SAVE_VERSION, XENON_ELEMENT, feedDiscount, filingDataPerSample, productionParallel } from './config';
 import { coinPerEvent, eventRate, firstDiscoveryRate, maxAffordable, price, probability, usefulAtomPurchase } from './economy';
 import { poisson, random, waitingHazard } from './rng';
 import type { GameState, Module, Notice, ReactorJob, ReactorState, Upgrade, WorkMode } from './types';
 import { element } from '../data/elements';
+import { acceleratorSegments, caesiumReadiness, caesiumRun, segmentReadiness } from './accelerator';
 import { PULSE_BOOST_MS, PULSE_BOOSTS, PULSE_DROP_MS, PULSE_DROP_RETRACT_MS, type PulseBoostKind, type PulseDrop } from './pulseBoosts';
 import { canTryTechnique, ECHO_DATA_LIMIT, ECHO_HITS, LITHIUM_CHARGE, LITHIUM_SAMPLES, TRIAL_ECHO_DATA, TRIAL_LITHIUM_SAMPLES, type TechniqueElement } from './pulseTechniques';
 import { advanceSampleContract, assignedToSample, isSampleAnswer, isSampleRoute, sampleAnswer, sampleReady, SAMPLE_GUESS_BONUS, SAMPLE_ROUTES, type SampleAnswer, type SampleRoute } from './sampleContract';
@@ -23,6 +24,7 @@ export function createState(seed = Date.now() >>> 0, now = Date.now()): GameStat
     stats: { events: D(0), produced: D(0), earned: D(0), peak: D(0), builds: 1, purchases: 0, lastEvent: '实验室已准备就绪', neonCompletedAt: null, calciumCompletedAt: null, xeCompletedAt: null, completedAt: null, milestones: {} },
     achievements: [], settings: { scientific: false, reducedMotion: false, collisionSound: false, guideDismissed: false, handsOnGuide: false, mix: [1] },
     notices: [], noticeSeq: 0,
+    accelerator: { built: 0, commissioned: false },
     discoveryWait: 0,
     pulseTech: { echoHits: 0, lithium: 0, tried: [] },
   };
@@ -91,7 +93,7 @@ export class Engine {
 
   private setTarget(id: number, z: number, exploring = false): boolean {
     const s = this.state, r = s.reactors[id - 1];
-    if (!r?.built || !Number.isInteger(z) || z < 1 || z > Math.min(PLAYABLE_ELEMENTS, discoveredMax(s) + 1)) return false;
+    if (!r?.built || !Number.isInteger(z) || z < 1 || z > Math.min(XENON_ELEMENT, discoveredMax(s) + 1)) return false;
     if (id === 1 && z === 2 && s.firstRun) {
       if (s.firstRun.step === 'welcome' || s.firstRun.step === 'start' || s.firstRun.step === 'charge' || s.firstRun.step === 'sample') return false;
       if (s.firstRun.step !== 'helium') {
@@ -125,12 +127,60 @@ export class Engine {
     const s = this.state, r = s.reactors[id - 1], c = REACTORS[id - 1];
     if (!r || r.built || !s.elements[c.unlock - 1].discovered || s.coins.lt(c.buildCoins) || s.data.lt(c.buildData)) return false;
     s.coins = s.coins.minus(c.buildCoins); s.data = s.data.minus(c.buildData); r.built = true;
-    r.target = Math.min(PLAYABLE_ELEMENTS, discoveredMax(s) + 1);
+    r.target = Math.min(XENON_ELEMENT, discoveredMax(s) + 1);
     r.exploring = s.modules.reaction && s.automation.reaction;
     if (s.modules.reaction && s.automation.mode !== 'custom') this.setMode(s.automation.mode);
     s.stats.builds++; s.stats.milestones[`reactor${id}`] = s.elapsed;
     this.award(`reactor${id}`); this.notify('info', `${c.name}已投入运行`); return true;
   }
+  buildAcceleratorSegment(index: number): boolean {
+    const s = this.state;
+    const work = segmentReadiness(s, index);
+    if (!work?.ready) return false;
+    const { segment, specimen } = work;
+    s.coins = s.coins.minus(segment.coins);
+    s.data = s.data.minus(segment.data);
+    specimen.inventory = specimen.inventory.minus(segment.units);
+    s.accelerator = { built: index + 1, commissioned: false };
+    this.notify('info', '加速环完工 · ' + segment.name);
+    return true;
+  }
+
+  commissionAccelerator(): boolean {
+    const s = this.state;
+    if (s.accelerator.built !== acceleratorSegments.length || s.accelerator.commissioned) return false;
+    s.accelerator = { ...s.accelerator, commissioned: true };
+    this.notify('info', '环形加速器已完成全环试束');
+    return true;
+  }
+
+  startCaesiumRun(): boolean {
+    const s = this.state;
+    const { xenon, ready } = caesiumReadiness(s);
+    if (!ready) return false;
+    xenon.inventory = xenon.inventory.minus(caesiumRun.xenon);
+    s.data = s.data.minus(caesiumRun.data);
+    s.accelerator = { ...s.accelerator, runRemaining: caesiumRun.seconds };
+    this.notify('info', '已启动铯信号采集');
+    return true;
+  }
+
+  claimCaesiumRun(): boolean {
+    const s = this.state;
+    const { specimen, remaining } = caesiumReadiness(s);
+    if (!s.accelerator.commissioned || remaining !== 0 || specimen.archived) return false;
+    s.accelerator = { built: s.accelerator.built, commissioned: true };
+    const discovered = specimen.discovered;
+    if (!discovered) {
+      specimen.discovered = true;
+      specimen.firstDiscoveredAt = s.elapsed;
+      s.stats.milestones[`element${CAESIUM_ELEMENT}`] = s.elapsed;
+    }
+    this.storeSamples(CAESIUM_ELEMENT, D(caesiumRun.output));
+    this.notify(discovered ? 'info' : 'discovery', `探测舱已确认 ${caesiumRun.output} 份铯样本`, CAESIUM_ELEMENT);
+    return true;
+  }
+
   research(key: Module): boolean {
     const s = this.state, c = MODULES[key];
     const index = MODULE_ORDER.indexOf(key);
@@ -156,7 +206,7 @@ export class Engine {
     const s = this.state;
     if (!s.modules.reaction || !['explore', 'produce', 'archive'].includes(mode) || !Number.isInteger(z)) return;
     s.automation.mode = mode;
-    s.automation.target = Math.max(1, Math.min(discoveredMax(s), z));
+    s.automation.target = Math.max(1, Math.min(XENON_ELEMENT, discoveredMax(s), z));
     const researcher = highestReactor(s).id;
     for (const r of s.reactors) {
       if (!r.built) continue;
@@ -204,14 +254,14 @@ export class Engine {
   archiveTarget(reactorId = 1, assigned: ReadonlySet<number> = new Set(), specimen?: number): number {
     const s = this.state;
     const incomplete = s.elements.map((e, i) => ({ e, z: i + 1 }))
-      .filter(({ e }) => e.discovered && !e.archived && e.inventory.lt(ARCHIVE_UNITS - e.deposited));
+      .filter(({ e, z }) => z <= XENON_ELEMENT && e.discovered && !e.archived && e.inventory.lt(ARCHIVE_UNITS - e.deposited));
     if (!incomplete.length) return s.automation.target;
     const unassigned = incomplete.filter(({ z }) => !assigned.has(z));
     const available = unassigned.length ? unassigned : incomplete;
     // The current objective is finished by the most advanced device; older
     // devices then sweep the elements inside their own ranges.
     const top = highestReactor(s);
-    if (reactorId === top.id && incomplete.some(({ z }) => z === FINAL_ELEMENT)) return FINAL_ELEMENT;
+    if (reactorId === top.id && incomplete.some(({ z }) => z === XENON_ELEMENT)) return XENON_ELEMENT;
     const config = REACTORS[reactorId - 1];
     if (config) {
       const inRange = available.filter(({ z }) => z >= Math.max(1, config.anchor - 1) && z <= config.softMax);
@@ -251,10 +301,10 @@ export class Engine {
       }
       if (s.elements.slice(0, 10).every(e => e.archived)) this.award('collection');
       if (s.elements.slice(0, CALCIUM_ELEMENT).every(e => e.archived)) this.award('twenty_collection');
-      if (archivedCount(s) === PLAYABLE_ELEMENTS && s.stats.completedAt === null) {
+      if (s.stats.completedAt === null && s.elements.slice(0, XENON_ELEMENT).every(e => e.archived)) {
         s.stats.completedAt = s.elapsed; s.stats.milestones.stage54 = s.elapsed;
         this.award('fifty_four_collection');
-        this.notify('complete', `H–Xe 全部 ${PLAYABLE_ELEMENTS} 格档案已点亮；这是当前版本的完整收集，不代表 55–118 已开放。`, XENON_ELEMENT);
+        this.notify('complete', `H–Xe 全部 ${XENON_ELEMENT} 格档案已点亮。`, XENON_ELEMENT);
       }
     } else if (!silent) this.notify('info', `已提交 ${n} 单位${element(z).name} · ${e.deposited}/${ARCHIVE_UNITS}`);
     return n;
@@ -263,7 +313,7 @@ export class Engine {
     if (amount.lte(0)) return;
     const s = this.state, z = commissionTarget ?? r.target, e = s.elements[z - 1];
     if (!e.discovered) {
-      if (!online || z !== discoveredMax(s) + 1 || z > PLAYABLE_ELEMENTS) return;
+      if (!online || z !== discoveredMax(s) + 1 || z > XENON_ELEMENT) return;
       e.discovered = true; e.firstDiscoveredAt = s.elapsed; e.firstDiscoveredReactor = r.id;
       s.discoveryWait = discoveryPreparation(z + 1);
       s.stats.milestones[`element${z}`] = s.elapsed;
@@ -286,7 +336,7 @@ export class Engine {
       if (r.id === 2 && z >= 8) this.award('old');
       if (z >= REACTORS[r.id - 1].softMax + 2) this.award('upstream');
     }
-    if (commissionTarget === undefined && online && r.exploring && (r.job === 'manual' || s.automation.reaction) && z < PLAYABLE_ELEMENTS) this.setTarget(r.id, Math.min(PLAYABLE_ELEMENTS, discoveredMax(s) + 1), true);
+    if (commissionTarget === undefined && online && r.exploring && (r.job === 'manual' || s.automation.reaction) && z < XENON_ELEMENT) this.setTarget(r.id, Math.min(XENON_ELEMENT, discoveredMax(s) + 1), true);
   }
   private storeSamples(z: number, count: Amount, delivered = 0) {
     const sample = this.state.elements[z - 1];
@@ -504,7 +554,13 @@ export class Engine {
   step(seconds: number, online = true, allowDiscovery = online) {
     if (!Number.isFinite(seconds) || seconds <= 0) return;
     const s = this.state; s.elapsed += seconds;
-    if (online) this.advanceExperiments(seconds);
+    if (online) {
+      this.advanceExperiments(seconds);
+      const { runRemaining } = s.accelerator;
+      if (runRemaining !== undefined && runRemaining > 0) {
+        s.accelerator.runRemaining = Math.max(0, runRemaining - seconds);
+      }
+    }
     this.routeJobs();
     // Keep the target fixed during this tick, even when another device has
     // just discovered it and advances to the next element.

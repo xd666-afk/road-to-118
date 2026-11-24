@@ -3,7 +3,7 @@ import { dirname } from 'node:path';
 import { Engine, createFirstRun, discoveredMax, highestReactor, archivedCount } from '../src/game/engine';
 import { D } from '../src/game/numbers';
 import { income, price } from '../src/game/economy';
-import { ARCHIVE_UNITS, FINAL_ELEMENT, PLAYABLE_ELEMENTS, REACTORS } from '../src/game/config';
+import { ARCHIVE_UNITS, XENON_ELEMENT, REACTORS } from '../src/game/config';
 import type { Upgrade } from '../src/game/types';
 import { applyAdvice, recommend } from '../src/game/advisor';
 import { discoveryStage, stageReadiness } from '../src/game/discovery';
@@ -72,12 +72,12 @@ export function pilot(e: Engine, strategy: Strategy) {
 
   // At Xe, switch once to the real archive pipeline. Its per-reactor range
   // targeting and the allocation module then deposit the remaining 54 rows.
-  if (max >= FINAL_ELEMENT && archivedCount(s) < PLAYABLE_ELEMENTS && s.modules.reaction && s.automation.mode !== 'archive') {
+  if (max >= XENON_ELEMENT && archivedCount(s) < XENON_ELEMENT && s.modules.reaction && s.automation.mode !== 'archive') {
     s.automation.allocation = true;
     e.setMode('archive');
   }
 
-  if (s.automation.mode !== 'archive' && max < PLAYABLE_ELEMENTS) {
+  if (s.automation.mode !== 'archive' && max < XENON_ELEMENT) {
     const nextTarget = max + 1;
     if (top.target !== nextTarget || !top.exploring) e.target(top.id, nextTarget, true);
     if (s.modules.reaction) {

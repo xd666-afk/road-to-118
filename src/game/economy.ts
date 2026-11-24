@@ -1,6 +1,6 @@
 import { D, Big } from './numbers';
 import type { Amount } from './numbers';
-import { PLAYABLE_ELEMENTS, REACTORS, UPGRADES } from './config';
+import { XENON_ELEMENT, REACTORS, UPGRADES } from './config';
 import type { ReactorState, Upgrade } from './types';
 export function activeAtoms(r: ReactorState): Amount { return D(REACTORS[r.id - 1].samples).plus(r.upgrades.atoms); }
 export function capacity(r: ReactorState): Amount { return D(REACTORS[r.id - 1].cap).mul(r.id === 1 ? 1 : D(1.18).pow(r.upgrades.capacity)); }
@@ -41,7 +41,7 @@ export function usefulAtomPurchase(r: ReactorState, coins: Amount): number {
   return lo;
 }
 export function probability(z: number, reactorId: number): number {
-  if (z < 1 || z > PLAYABLE_ELEMENTS || reactorId < 1 || reactorId > REACTORS.length) return 0;
+  if (z < 1 || z > XENON_ELEMENT || reactorId < 1 || reactorId > REACTORS.length) return 0;
   const t = REACTORS[reactorId - 1];
   return Math.min(.3, t.p * t.q ** (z - t.anchor) * t.h ** Math.max(0, z - t.softMax));
 }

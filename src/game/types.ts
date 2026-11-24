@@ -1,3 +1,4 @@
+import type { SAVE_VERSION } from './config';
 import type { Amount } from './numbers';
 import type { PulseBoost } from './pulseBoosts';
 import type { SampleContract } from './sampleContract';
@@ -15,7 +16,7 @@ export interface Notice { id: number; kind: 'discovery' | 'archive' | 'achieveme
 export type OpeningStep = 'start' | 'charge' | 'sample' | 'explore';
 export type FirstRun = { step: 'welcome' | OpeningStep | 'free' } | { step: 'helium'; remaining: number };
 export interface GameState {
-  saveVersion: 5; savedAt: number; elapsed: number; seed: number; rng: number; coins: Amount; data: Amount;
+  saveVersion: typeof SAVE_VERSION; savedAt: number; elapsed: number; seed: number; rng: number; coins: Amount; data: Amount;
   reactors: ReactorState[]; elements: ElementState[];
   modules: Record<Module, boolean>;
   moduleLevels: Record<Module, number>;
@@ -32,6 +33,7 @@ export interface GameState {
   firstRun?: FirstRun;
   pulseBoost?: PulseBoost;
   pulseTech: { echoHits: number; lithium: number; tried: TechniqueElement[] };
+  accelerator: { built: number; commissioned: boolean; runRemaining?: number };
   discoveryWait: number;
   sampleContract?: SampleContract;
   experimentBoard?: ExperimentBoard;

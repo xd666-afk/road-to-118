@@ -1,5 +1,5 @@
 /**
- * 元素能力资料表（H–Xe，1–54）。
+ * 元素能力资料表（H–Cs，1–55）。
  *
  * 纯静态数据，不读取也不修改游戏状态；百分比由宿主按渠道汇总、
  * 设置上限后自行决定如何作用于引擎。文案均为虚构实验增益，
@@ -17,7 +17,7 @@ export interface ElementAbility {
 }
 
 const ABILITIES = new Map<number, ElementAbility>([
-  // 扩充到 Cs–Og（55–118）时，按同一结构继续追加即可；未登记的 z 返回 undefined。
+  // 扩充到 Ba–Og（56–118）时，按同一结构继续追加即可；未登记的 z 返回 undefined。
   [1, { name: '氢样本回收', channel: 'energy', percent: 3, description: '把第一束火花稳稳接住，开局的碰撞能结算更早亮起，节奏也更连贯。' }],
   [2, { name: '氦声稳态', channel: 'energy', percent: 2, description: '让气泡般的噪声退开，读数跳动变轻，能量记录更安静。' }],
   [3, { name: '锂芯蓄能', channel: 'energy', percent: 4, description: '把零散能量收进微型电芯，碰撞能的回收更从容。' }],
@@ -72,6 +72,7 @@ const ABILITIES = new Map<number, ElementAbility>([
   [52, { name: '碲层感光', channel: 'data', percent: 4, description: '感光薄层拓宽采集范围，数据积累更快。' }],
   [53, { name: '碘雾留痕', channel: 'data', percent: 3, description: '碘雾留下阶段标记，实验回溯更清楚。' }],
   [54, { name: '氙闪远光', channel: 'energy', percent: 5, description: '高压氙闪穿透长夜，为整条产线带来最后一束强光。' }],
+  [55, { name: '铯钟校时', channel: 'data', percent: 4, description: '用统一的时间基准同步观测记录，提高研究数据产出。' }],
 ]);
 
 /** 返回对应元素的能力；未定义（如尚未扩充到该元素）时返回 undefined。 */

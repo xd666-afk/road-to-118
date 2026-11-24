@@ -127,10 +127,27 @@ test('new-player practice uses a real drop, collision, reactor construction and 
   const deposit = record.getByRole('button', { name: '提交 100 单位至档案' });
   await expect(deposit).toBeFocused();
   await deposit.click();
+  await advance('accelerator');
+  const accelerator = page.getByRole('button', { name: '加速环工程', exact: true });
+  await expect(accelerator).toContainText('加速环');
+  await expect(accelerator).toBeInViewport();
+  await expect(accelerator).toBeFocused();
+  await accelerator.click();
+  await expect.poll(async () => {
+    await page.clock.runFor(350);
+    return page.locator('[data-guide-target="accelerator-ne"]').count();
+  }).toBe(1);
+  await advance('accelerator-sector');
+  const east = page.getByRole('button', { name: '东段 · 探测区', exact: true });
+  await expect(east).toBeFocused();
+  await east.click();
+  await advance('done');
   const completion = page.getByRole('dialog', { name: '新手引导完成' });
   await completion.getByRole('button', { name: '完成引导' }).click();
   await page.clock.runFor(1000);
   await expect(spotlight).toHaveCount(0);
+  await expect(page.getByRole('complementary', { name: '工区操作' })).toContainText('发现氖后开放');
+  await page.getByRole('button', { name: '返回反应容器' }).click();
   await openLabPanel(page, 'next');
   await expect(page.getByRole('region', { name: '下一步', exact: true })).toBeVisible();
   await openLabPanel(page, 'archive');

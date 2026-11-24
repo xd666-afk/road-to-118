@@ -1,6 +1,6 @@
 import { ArrowDownToLine, Atom, ChevronRight, Layers3 } from 'lucide-react';
 import { ELEMENTS, element } from '../data/elements';
-import { MODULES, MODULE_ORDER, MODULE_UPGRADES, REACTORS, moduleEffect } from '../game/config';
+import { MODULES, MODULE_ORDER, MODULE_UPGRADES, REACTORS, XENON_ELEMENT, moduleEffect } from '../game/config';
 import type { Engine } from '../game/engine';
 import { INDUSTRY_DISCOUNT, industryUpgradePrice } from '../game/experiments';
 import { D, format } from '../game/numbers';
@@ -55,7 +55,7 @@ export function IndustryModules({ state, max, act }: IndustryProps) {
 export default function AutomationControls({ state, max, act }: IndustryProps) {
   if (!state.modules.feed) return null;
   const { automation } = state;
-  const options = ELEMENTS.slice(0, max).map(info => (
+  const options = ELEMENTS.slice(0, Math.min(max, XENON_ELEMENT)).map(info => (
     <option key={info.z} value={info.z}>{info.symbol} · {info.name}</option>
   ));
 

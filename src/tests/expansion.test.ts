@@ -7,7 +7,7 @@ import { deserialize, serialize } from '../game/save';
 import { reactorDisplayPool } from '../game/visuals';
 import { ATOMIC_PROFILES } from '../data/atomic';
 import { KNOWLEDGE, element } from '../data/elements';
-import { CALCIUM_ELEMENT, PLAYABLE_ELEMENTS, REACTORS, XENON_ELEMENT } from '../game/config';
+import { CALCIUM_ELEMENT, REACTORS, XENON_ELEMENT } from '../game/config';
 import { discoverThrough } from './discovery-fixture';
 
 function discover(e: Engine, z: number) {
@@ -66,7 +66,7 @@ describe('H–Xe progression, instrumentation and migration', () => {
     const xe = e.state.elements[XENON_ELEMENT - 1]; xe.inventory = D(100); xe.totalProduced = D(100); e.deposit(XENON_ELEMENT);
     expect(e.state.stats.xeCompletedAt).not.toBeNull(); expect(e.state.stats.completedAt).toBeNull();
     expect(e.state.achievements).toContain('xenon_complete');
-    for (let z = 1; z <= PLAYABLE_ELEMENTS; z++) {
+    for (let z = 1; z <= XENON_ELEMENT; z++) {
       const row = e.state.elements[z - 1]; if (row.archived) continue;
       row.inventory = D(100); row.totalProduced = row.totalProduced.plus(100); e.deposit(z, true);
     }
@@ -76,7 +76,7 @@ describe('H–Xe progression, instrumentation and migration', () => {
   });
   it.each([0, 1])('preserves released v%i balances, RNG, partial archives and the Ne milestone', version => {
     const raw = released10Save(version), s = deserialize(JSON.stringify(raw));
-    expect(s.saveVersion).toBe(5); expect(s.elements).toHaveLength(54); expect(s.reactors).toHaveLength(8);
+    expect(s.saveVersion).toBe(6); expect(s.elements).toHaveLength(55); expect(s.reactors).toHaveLength(8);
     expect(s.coins.toString()).toBe(raw.coins); expect(s.data.toString()).toBe(raw.data); expect(s.rng).toBe(raw.rng);
     expect(s.elements[0].deposited).toBe(38); expect(s.elements[0].inventory.eq(12)).toBe(true);
     expect(s.stats.neonCompletedAt).toBe(raw.stats.completedAt); expect(s.stats.calciumCompletedAt).toBeNull(); expect(s.stats.xeCompletedAt).toBeNull(); expect(s.stats.completedAt).toBeNull();
@@ -149,7 +149,7 @@ describe('H–Xe progression, instrumentation and migration', () => {
   });
   it('migrates a released v2 20/5 save without turning its Ca completion into Xe', () => {
     const raw = released20Save(), s = deserialize(JSON.stringify(raw));
-    expect(s.saveVersion).toBe(5); expect(s.elements).toHaveLength(54); expect(s.reactors).toHaveLength(8);
+    expect(s.saveVersion).toBe(6); expect(s.elements).toHaveLength(55); expect(s.reactors).toHaveLength(8);
     expect(s.elements[CALCIUM_ELEMENT - 1].archived).toBe(true);
     expect(s.stats.neonCompletedAt).not.toBeNull();
     expect(s.stats.calciumCompletedAt).toBe(raw.stats.completedAt);
@@ -169,12 +169,12 @@ describe('H–Xe progression, instrumentation and migration', () => {
     expect(e.state.reactors[6].built).toBe(true);
     const xe = e.state.elements[XENON_ELEMENT - 1]; xe.inventory = D(100); xe.totalProduced = D(100); e.deposit(XENON_ELEMENT);
     expect(e.state.stats.xeCompletedAt).not.toBeNull();
-    for (let z = 1; z <= PLAYABLE_ELEMENTS; z++) {
+    for (let z = 1; z <= XENON_ELEMENT; z++) {
       const row = e.state.elements[z - 1]; if (row.archived) continue;
       row.inventory = D(100); row.totalProduced = row.totalProduced.plus(100); e.deposit(z, true);
     }
     expect(e.state.stats.completedAt).not.toBeNull();
-    expect(archivedCount(e.state)).toBe(PLAYABLE_ELEMENTS);
+    expect(archivedCount(e.state)).toBe(XENON_ELEMENT);
   });
   it('rejects forged shapes, future unlocks and wrong checkpoint flags instead of silently erasing progress', () => {
     const raw = JSON.parse(serialize(createState(745)));
@@ -187,7 +187,7 @@ describe('H–Xe progression, instrumentation and migration', () => {
       (r: any) => r.stats.xeCompletedAt = 1,
       (r: any) => r.stats.neonCompletedAt = 1,
       (r: any) => r.elements.pop(),
-      (r: any) => r.saveVersion = 6,
+      (r: any) => r.saveVersion = 7,
     ]) { const copy = structuredClone(raw); mutate(copy); expect(() => deserialize(JSON.stringify(copy))).toThrow(); }
     const old = released20Save(); old.stats.completedAt = null; expect(() => deserialize(JSON.stringify(old))).toThrow();
   });

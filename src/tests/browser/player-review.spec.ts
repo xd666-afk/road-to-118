@@ -26,7 +26,7 @@ test('welcome waits for the player and mobile guide holds each step before advan
   await page.evaluate(() => document.querySelector<HTMLButtonElement>('[data-guide-target="research"]')?.click());
   await expect(start).toBeVisible();
   await page.clock.runFor(10_000);
-  await expect(page.locator('.progress-resource strong')).toContainText('1/54 发现');
+  await expect(page.locator('.progress-resource strong')).toContainText('1/55 发现');
 
   await start.click();
   await page.clock.runFor(400);
@@ -51,7 +51,7 @@ test('welcome waits for the player and mobile guide holds each step before advan
   const buy = page.getByRole('button', { name: '购买补充氢样本' });
   await expect(buy).toBeInViewport();
   await expect(buy).toBeEnabled();
-  await expect(page.locator('.progress-resource strong')).toContainText('1/54 发现');
+  await expect(page.locator('.progress-resource strong')).toContainText('1/55 发现');
   await buy.click();
 
   await page.clock.runFor(400);
@@ -61,13 +61,13 @@ test('welcome waits for the player and mobile guide holds each step before advan
   await page.reload();
   await expect(guide).toContainText('第 4 步');
   await page.clock.runFor(10_000);
-  await expect(page.locator('.progress-resource strong')).toContainText('1/54 发现');
+  await expect(page.locator('.progress-resource strong')).toContainText('1/55 发现');
   await page.getByRole('button', { name: '探索 He' }).click();
   await page.clock.runFor(1000);
   await expect(guide).toContainText('正在合成氦');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.clock.runFor(3750);
-  await expect(page.locator('.progress-resource strong')).toContainText('1/54 发现');
+  await expect(page.locator('.progress-resource strong')).toContainText('1/55 发现');
   await page.clock.runFor(250);
   await expect(page.locator('.scene-aperture .reactor-impact[data-kind="discovery"]')).toContainText('He');
   await page.clock.runFor(550);

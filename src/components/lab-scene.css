@@ -175,6 +175,7 @@
 .scene-tools .scene-collection { display: block; width: auto; border: 0; padding: 0; }
 .scene-collection button { padding: 5px; flex-direction: column; gap: 3px; color: #bdfff1; min-width: 55px; }
 .scene-tools .scene-collection strong { display: block; color: #e8fffc; font: 600 11px var(--mono); }
+.scene-accelerator .scene-tool-label { font-size: 11px; line-height: 1.2; }
 .hud-ring {
   --ring-color: var(--scene-aqua);
   position: relative;
@@ -359,6 +360,7 @@
 .scene-drawer-content #target { min-height: 46px; }
 .scene-drawer-content .bulk-control { padding-top: 9px; }
 .scene-shell [data-guiding=true] .scene-tools { visibility: hidden; }
+.scene-shell [data-guiding=true] [data-guide-entry=true] { visibility: visible; }
 .scene-shell [data-guiding=true] .lab-playfield { inset-block: max(203px, 22svh) max(138px, 15svh); }
 
 @media (max-width: 660px) {

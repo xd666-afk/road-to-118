@@ -94,7 +94,7 @@ test('a single collection meter and accessible opening checks keep completed He'
   await expect(page.getByRole('progressbar', { name: '元素收集进度' })).toHaveCount(1);
   await expect(page.getByRole('progressbar', { name: '元素收集进度' })).toHaveAttribute('value', '0');
   await expect(page.getByRole('button', { name: /钙档案/ })).toHaveCount(0);
-  await expect(page.locator('.progress-resource strong')).toContainText('2/54 发现');
+  await expect(page.locator('.progress-resource strong')).toContainText('2/55 发现');
   await openLabPanel(page, 'next');
   const checklist = page.getByRole('list', { name: '开局检查清单' });
   await expect(checklist).toBeVisible();
@@ -132,7 +132,7 @@ test('oxygen stays the only discovery while its card is open and fluorine waits 
   await page.clock.runFor(45_000);
   await expect(oxygen).toBeVisible();
   await expect(page.getByTestId('coins')).not.toHaveText(coinsBefore!);
-  await expect(page.locator('.progress-resource strong')).toContainText('8/54 发现');
+  await expect(page.locator('.progress-resource strong')).toContainText('8/55 发现');
 
   await oxygen.getByRole('button', { name: '知道了，继续探索' }).click();
   await expect(page.getByRole('button', { name: '实验目标 氟' })).toContainText('40 秒');
@@ -140,7 +140,7 @@ test('oxygen stays the only discovery while its card is open and fluorine waits 
   const fluorine = page.getByRole('dialog', { name: '新元素发现 · 氟' });
   await page.clock.runFor(39_000);
   await expect(fluorine).toHaveCount(0);
-  await expect(page.locator('.progress-resource strong')).toContainText('8/54 发现');
+  await expect(page.locator('.progress-resource strong')).toContainText('8/55 发现');
   await page.clock.runFor(5_000);
   await expect(fluorine).toBeVisible();
 });

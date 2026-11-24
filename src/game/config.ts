@@ -1,11 +1,11 @@
 import type { Module, Upgrade } from './types';
 export const GAME_VERSION = '0.18.0';
-/** Current playable range is H–Xe (1–54). Elements 55–118 stay visible as future research. */
-export const PLAYABLE_ELEMENTS = 54;
-export const FINAL_ELEMENT = 54;
+/** Conventional reactors cover H–Xe. The separate accelerator covers Cs. */
 export const XENON_ELEMENT = 54;
+export const CAESIUM_ELEMENT = 55;
+export const PLAYABLE_ELEMENTS = CAESIUM_ELEMENT;
 export const CALCIUM_ELEMENT = 20;
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
 export const ARCHIVE_UNITS = 100;
 export const REACTORS = [
   { id: 1, roman: 'I', name: '自由碰撞容器', subtitle: 'FREE COLLISION CHAMBER', range: 'H — Be', softMax: 4, anchor: 2, p: .075, q: .25, h: .2, k: .65, samples: 2, cap: 14, gain: 1, buildCoins: 0, buildData: 0, unlock: 1, description: '从两颗氢原子开始。观察混合粒子，用自由碰撞积累碰撞能。' },
@@ -15,7 +15,7 @@ export const REACTORS = [
   { id: 5, roman: 'V', name: '回旋加速器', subtitle: 'CYCLOTRON', range: 'K — Ca', softMax: 20, anchor: 19, p: .000025, q: .55, h: .15, k: 20, samples: 64, cap: 4000, gain: 1400, buildCoins: 6500000, buildData: 900000, unlock: 18, description: '更高能级的束流，完成钾与钙的里程碑；钙不是本版终点。' },
   { id: 6, roman: 'VI', name: '同步辐射研究环', subtitle: 'SYNCHROTRON RESEARCH RING', range: 'Sc — Kr', softMax: 36, anchor: 21, p: .00055, q: .8, h: .25, k: 5, samples: 96, cap: 10000, gain: 6000, buildCoins: 6000000000, buildData: 4200000, unlock: 20, description: '同步辐射与并行探测器推进到第四周期中段：钪到氪。' },
   { id: 7, roman: 'VII', name: '重离子储存环', subtitle: 'HEAVY-ION STORAGE RING', range: 'Rb — Xe', softMax: 54, anchor: 37, p: .00045, q: .86, h: .3, k: 8, samples: 128, cap: 20000, gain: 25000, buildCoins: 110000000000, buildData: 7800000, unlock: 36, description: '重离子束流覆盖铷到氙，把第五周期收束成完整档案。' },
-  { id: 8, roman: 'VIII', name: '强子对撞环', subtitle: 'HADRON COLLIDER RING', range: 'Cs — Og', softMax: 86, anchor: 55, p: .0003, q: .9, h: .22, k: 12, samples: 160, cap: 40000, gain: 120000, buildCoins: 360000000000, buildData: 12000000, unlock: 54, description: '为未来的 55–118 号元素预留的更高能级；本版中用于持续生产与补档。' },
+  { id: 8, roman: 'VIII', name: '强子对撞环', subtitle: 'HADRON COLLIDER RING', range: 'Cs — Og', softMax: 86, anchor: 55, p: .0003, q: .9, h: .22, k: 12, samples: 160, cap: 40000, gain: 120000, buildCoins: 360000000000, buildData: 12000000, unlock: 54, description: '用于持续生产和补齐 H–Xe 档案。铯研究在加速大厅进行。' },
 ] as const;
 export const productionParallel = (id: number, level = 1) => (id === 1 ? 8 : 32) * (1 + .25 * (level - 1));
 export const UPGRADES: Record<Upgrade, { name: string; base: number; ratio: number; description: string }> = {

@@ -1,12 +1,13 @@
 import { D } from './numbers';
 import { createState, FIRST_HELIUM_SECONDS } from './engine';
-import { ACHIEVEMENTS, ARCHIVE_UNITS, CALCIUM_ELEMENT, MODULE_ORDER, MODULE_UPGRADES, PLAYABLE_ELEMENTS, REACTORS, SAVE_VERSION, XENON_ELEMENT } from './config';
+import { ACHIEVEMENTS, ARCHIVE_UNITS, CAESIUM_ELEMENT, CALCIUM_ELEMENT, MODULE_ORDER, MODULE_UPGRADES, PLAYABLE_ELEMENTS, REACTORS, SAVE_VERSION, XENON_ELEMENT } from './config';
 import type { GameState } from './types';
 import { isPulseBoostKind, PULSE_BOOST_MS } from './pulseBoosts';
 import { ECHO_HITS, isTechniqueElement, LITHIUM_CHARGE, type TechniqueElement } from './pulseTechniques';
 import { discoveryPreparation } from './discovery';
 import { restoreSampleContract } from './sampleContract';
 import { restoreExperimentBoard } from './experiments';
+import { restoreAccelerator } from './accelerator';
 export function serialize(s: GameState, now = Date.now()): string {
   return JSON.stringify({ ...s, savedAt: now, notices: [] });
 }
@@ -17,10 +18,10 @@ export function deserialize(text: string): GameState {
   // v0/v1: released ten elements and three instruments.
   // v2: released twenty elements and five instruments.
   // v4 raises the archive goal and adds per-reactor jobs; v5 adds industry levels.
-  if (![0, 1, 2, 3, 4, SAVE_VERSION].includes(raw.saveVersion)) throw new Error('存档版本不兼容。请保留原文件。');
+  if (![0, 1, 2, 3, 4, 5, SAVE_VERSION].includes(raw.saveVersion)) throw new Error('存档版本不兼容。请保留原文件。');
   const legacy = raw.saveVersion < 4;
   const released10 = raw.saveVersion < 2, released20 = raw.saveVersion === 2;
-  const expectedElements = released10 ? 10 : released20 ? 20 : PLAYABLE_ELEMENTS;
+  const expectedElements = released10 ? 10 : released20 ? 20 : raw.saveVersion < 6 ? XENON_ELEMENT : PLAYABLE_ELEMENTS;
   const expectedReactors = released10 ? 3 : released20 ? 5 : REACTORS.length;
   if (!Array.isArray(raw.elements) || raw.elements.length !== expectedElements || !Array.isArray(raw.reactors) || raw.reactors.length !== expectedReactors) throw new Error('存档缺少元素或设备数据。');
   const s = createState(1, 0), defaults = createState(1, 0), num = (v: unknown, max = Number.MAX_SAFE_INTEGER): number => { if (typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > max) throw new Error('存档包含无效数值。'); return v; };
@@ -43,8 +44,7 @@ export function deserialize(text: string): GameState {
   });
   // Preserve every released discovery and partial archive, then add the new
   // undiscovered future rows. This is an expansion, never a reset.
-  if (released10) s.elements.push(...defaults.elements.slice(10));
-  else if (released20) s.elements.push(...defaults.elements.slice(20));
+  s.elements.push(...defaults.elements.slice(expectedElements));
   if (!s.elements[0].discovered) throw new Error('存档缺少初始氢元素。');
   const max = s.elements.filter(e => e.discovered).length;
   const preparation = discoveryPreparation(max + 1);
@@ -53,7 +53,7 @@ export function deserialize(text: string): GameState {
     if (r.id !== i + 1 || !r.upgrades) throw new Error('设备数据损坏。');
     const upgrades = {} as GameState['reactors'][0]['upgrades'];
     for (const key of ['atoms', 'speed', 'yield', 'capacity'] as const) { const n = num(r.upgrades[key], 1e7); if (!Number.isInteger(n)) throw new Error('升级等级必须为整数。'); upgrades[key] = n; }
-    const target = num(r.target, Math.min(PLAYABLE_ELEMENTS, max + 1)); if (target < 1 || !Number.isInteger(target)) throw new Error('设备目标无效。');
+    const target = num(r.target, Math.min(XENON_ELEMENT, max + 1)); if (target < 1 || !Number.isInteger(target)) throw new Error('设备目标无效。');
     const job = !legacy && (r.job === 'explore' || r.job === 'archive' || (r.job === 'produce' && target <= max)) ? r.job : 'manual';
     return { id: i + 1, built: bool(r.built), active: bool(r.active), target, exploring: bool(r.exploring), job, upgrades, events: amount(r.events), discoveryHazard: num(r.discoveryHazard), productionRemainder: amount(r.productionRemainder), eventRemainder: r.eventRemainder === undefined ? D(0) : amount(r.eventRemainder) };
   });
@@ -73,7 +73,7 @@ export function deserialize(text: string): GameState {
   }
   if ((s.modules.reaction && !s.modules.feed) || (s.modules.allocation && !s.modules.reaction)) throw new Error('工业模块顺序损坏。');
   if (!['explore', 'produce', 'archive', 'custom'].includes(raw.automation.mode)) throw new Error('工作模式损坏。');
-  s.automation.mode = raw.automation.mode; s.automation.reserve = amount(raw.automation.reserve); s.automation.target = num(raw.automation.target, max);
+  s.automation.mode = raw.automation.mode; s.automation.reserve = amount(raw.automation.reserve); s.automation.target = num(raw.automation.target, Math.min(max, XENON_ELEMENT));
   if (!Number.isInteger(s.automation.target) || s.automation.target < 1) throw new Error('生产目标无效。');
   if (legacy) {
     if (s.automation.mode === 'archive' && s.modules.reaction) {
@@ -95,8 +95,8 @@ export function deserialize(text: string): GameState {
   if ((s.stats.neonCompletedAt !== null) !== s.elements[9].archived) throw new Error('氖的完成状态与收录进度不一致。');
   if ((s.stats.calciumCompletedAt !== null) !== s.elements[CALCIUM_ELEMENT - 1].archived) throw new Error('钙的完成状态与收录进度不一致。');
   if ((s.stats.xeCompletedAt !== null) !== s.elements[XENON_ELEMENT - 1].archived) throw new Error('氙的完成状态与收录进度不一致。');
-  if ((s.stats.completedAt !== null) !== (max === PLAYABLE_ELEMENTS && s.elements.every(e => e.archived))) throw new Error('完整收集状态与档案不一致。');
-  const validMilestones = new Set(['complete', 'neonArchive', 'xeArchive', 'stage54', 'firstUpgrade', 'firstArchive', 'pulsePickup', 'boostedPulse', 'module_feed', 'module_reaction', 'module_allocation', ...Array.from({ length: PLAYABLE_ELEMENTS - 1 }, (_, i) => `element${i + 2}`), ...REACTORS.slice(1).map(r => `reactor${r.id}`)]);
+  if ((s.stats.completedAt !== null) !== s.elements.slice(0, XENON_ELEMENT).every(e => e.archived)) throw new Error('完整收集状态与档案不一致。');
+  const validMilestones = new Set(['complete', 'neonArchive', 'xeArchive', 'stage54', 'firstUpgrade', 'firstArchive', 'pulsePickup', 'boostedPulse', 'acceleratorIntro', 'module_feed', 'module_reaction', 'module_allocation', ...Array.from({ length: PLAYABLE_ELEMENTS - 1 }, (_, i) => `element${i + 2}`), ...REACTORS.slice(1).map(r => `reactor${r.id}`)]);
   s.stats.milestones = {}; for (const [k, v] of Object.entries(raw.stats.milestones || {})) { const key = released10 && k === 'complete' ? 'neonArchive' : k; if (validMilestones.has(key)) s.stats.milestones[key] = num(v); }
   if (released10 && oldStage !== null && s.stats.milestones.neonArchive === undefined) s.stats.milestones.neonArchive = oldStage;
   const valid = new Set<string>(ACHIEVEMENTS.map(a => a.id)); if (!Array.isArray(raw.achievements)) throw new Error('成就数据损坏。');
@@ -131,11 +131,13 @@ export function deserialize(text: string): GameState {
       s.firstRun = { step, remaining };
     }
   }
-  if (max >= 10 && max < PLAYABLE_ELEMENTS && raw.observation?.z === max + 1) {
+  if (max >= 10 && max < XENON_ELEMENT && raw.observation?.z === max + 1) {
     const progress = raw.observation.progress;
     if (typeof progress === 'number' && progress >= 0 && progress < 1) s.observation = { z: max + 1, progress };
   }
   s.sampleContract = restoreSampleContract(raw.sampleContract, s);
   s.experimentBoard = restoreExperimentBoard(raw.experimentBoard, s);
+  s.accelerator = restoreAccelerator(s, raw.accelerator);
+  if (s.elements[CAESIUM_ELEMENT - 1].discovered && !s.accelerator.commissioned) throw new Error('铯档案缺少加速环的试束记录。');
   s.saveVersion = SAVE_VERSION; s.notices = []; return s;
 }

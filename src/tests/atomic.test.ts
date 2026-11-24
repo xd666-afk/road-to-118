@@ -6,14 +6,14 @@ const SUP = { '⁰': 0, '¹': 1, '²': 2, '³': 3, '⁴': 4, '⁵': 5, '⁶': 6,
 const superscript = (text: string) => Number([...text].map(char => SUP[char]).join(''));
 
 describe('sourced neutral atom profiles', () => {
-  it('keeps shell populations and orbital occupancies consistent for H through Xe', () => {
-    expect(Object.keys(ATOMIC_PROFILES)).toHaveLength(54);
-    for (let z = 1; z <= 54; z++) {
+  it('keeps shell populations and orbital occupancies consistent for H through Cs', () => {
+    expect(Object.keys(ATOMIC_PROFILES)).toHaveLength(55);
+    for (let z = 1; z <= 55; z++) {
       const atom = ATOMIC_PROFILES[z];
-      const orbitals = Array.from(atom.configuration.matchAll(/([1-5])([spd])([⁰¹²³⁴⁵⁶⁷⁸⁹]+)/g));
+      const orbitals = Array.from(atom.configuration.matchAll(/([1-6])([spd])([⁰¹²³⁴⁵⁶⁷⁸⁹]+)/g));
       expect(orbitals.reduce((sum, match) => sum + superscript(match[3]), 0)).toBe(z);
       expect(atom.shells.reduce((sum, n) => sum + n, 0)).toBe(z);
-      expect(atom.shells).toEqual([1, 2, 3, 4, 5].map(layer => orbitals.filter(match => +match[1] === layer).reduce((sum, match) => sum + superscript(match[3]), 0)).filter(n => n > 0));
+      expect(atom.shells).toEqual([1, 2, 3, 4, 5, 6].map(layer => orbitals.filter(match => +match[1] === layer).reduce((sum, match) => sum + superscript(match[3]), 0)).filter(n => n > 0));
       expect(atom.shells[0]).toBeLessThanOrEqual(2);
       expect(atom.shells[1] ?? 0).toBeLessThanOrEqual(8);
       expect(atom.isotope - z).toBeGreaterThanOrEqual(0);
@@ -22,9 +22,9 @@ describe('sourced neutral atom profiles', () => {
   it('uses explicitly named isotopes, with hydrogen-1 having no neutron', () => {
     const referenceNeutrons = [
       0, 2, 4, 5, 6, 6, 7, 8, 10, 10, 12, 12, 14, 14, 16, 16, 18, 22, 20, 20,
-      24, 26, 28, 28, 30, 30, 32, 30, 34, 34, 38, 42, 42, 46, 44, 48, 48, 50, 50, 50, 52, 56, 56, 58, 58, 60, 60, 66, 66, 70, 70, 78, 74, 78,
+      24, 26, 28, 28, 30, 30, 32, 30, 34, 34, 38, 42, 42, 46, 44, 48, 48, 50, 50, 50, 52, 56, 56, 58, 58, 60, 60, 66, 66, 70, 70, 78, 74, 78, 78,
     ];
-    for (let z = 1; z <= 54; z++) {
+    for (let z = 1; z <= 55; z++) {
       expect(ATOMIC_PROFILES[z].isotope - z).toBe(referenceNeutrons[z - 1]);
       expect(Number.isInteger(ATOMIC_PROFILES[z].isotope)).toBe(true);
       expect(element(z).mass).toBeDefined();
