@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { Activity, ArrowDownToLine, ArrowRight, Atom, BookOpen, Check, CirclePause, CirclePlay, Cpu, Download, FlaskConical, Gauge, Layers3, LockKeyhole, Microscope, Plus, RotateCcw, Settings2, ShieldCheck, Sparkles, Trophy, Upload, Zap } from 'lucide-react';
-import { Engine, archivedCount, discoveredMax, highestReactor } from './game/engine';
+import { lazy, Suspense, useEffect, useRef, useState, type CSSProperties } from 'react';
+import { Archive, ChevronDown, ClipboardList, Compass, Database, Ellipsis, Grid2X2, SlidersHorizontal, Activity, ArrowDownToLine, ArrowRight, Atom, BookOpen, Check, CirclePause, CirclePlay, Cpu, Download, FlaskConical, Gauge, Layers3, LockKeyhole, Microscope, Plus, RotateCcw, Settings2, ShieldCheck, Sparkles, Trophy, Upload, Zap } from 'lucide-react';
+import { Engine, FIRST_HELIUM_SECONDS, archivedCount, discoveredMax, highestReactor } from './game/engine';
 import { D, format } from './game/numbers';
 import { reactorDisplayPool } from './game/visuals';
 import { activeAtoms, capacity, coinPerEvent, eventRate, firstDiscoveryRate, income, maxAffordable, price, probability } from './game/economy';
@@ -12,9 +12,9 @@ import { ELEMENTS, KNOWLEDGE, SCIENCE_NOTE, baikeUrl, element } from './data/ele
 import Particles from './components/Particles';
 import ManualPulse from './components/ManualPulse';
 import Modal from './components/Modal';
-import Tutorial from './components/Tutorial';
 import Onboarding from './components/Onboarding';
 import OpeningSpotlight from './components/OpeningSpotlight';
+import { HudRing, LabDrawer } from './components/LabHud';
 import { SPOTLIGHT_LENGTH, spotlightStep } from './components/spotlightSteps';
 import SavedGames from './components/SavedGames';
 import PulseDrops from './components/PulseDrops';
@@ -26,16 +26,20 @@ import { assignedToSample } from './game/sampleContract';
 import { recommend, applyAdvice, openingStep } from './game/advisor';
 import './components/journey.css';
 import { AtomicFacts, FurtherScience } from './components/AtomicProfile';
-import { advancedReactorArtwork, artworkUrl, specimenImageStyle } from './data/artwork';
+import { artworkUrl, reactorImageStyle, specimenImageStyle } from './data/artwork';
 import ElementAbility from './components/ElementAbility';
 import { abilityBonuses } from './game/abilityProgress';
 import AutomationControls, { IndustryModules } from './components/AutomationControls';
-import { discoveryStage, observationProgress, observationRate, stageReadiness } from './game/discovery';
+import { discoveryPreparation, discoveryStage, observationProgress, observationRate, stageReadiness } from './game/discovery';
 import { ATOMIC_PROFILES } from './data/atomic';
 import { labGuideStep } from './game/labGuide';
 
+const Tutorial = lazy(() => import('./components/Tutorial'));
+
 const tabs = [ { id: 'lab', name: '实验室', en: 'LABORATORY', icon: FlaskConical }, { id: 'research', name: '科研', en: 'RESEARCH', icon: Cpu }, { id: 'achievements', name: '成就', en: 'ACHIEVEMENTS', icon: Trophy }, { id: 'stats', name: '统计', en: 'OBSERVATORY', icon: Activity }, { id: 'guide', name: '教程', en: 'HANDBOOK', icon: BookOpen } ];
 const TABLE_HASH = '#periodic-table';
+const drawerTitles = { upgrades: '实验控制', tasks: '试验委托', archive: '元素周期表', instrument: '仪器控制', next: '下一步', more: '更多' };
+type Drawer = keyof typeof drawerTitles;
 const clock = (seconds: number) => { const s = Math.max(0, Math.floor(seconds)); return `${Math.floor(s / 3600).toString().padStart(2, '0')}:${Math.floor(s / 60 % 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`; };
 const intervalLabel = (seconds: number) => !Number.isFinite(seconds) || seconds > 86400 * 365 ? '超过 1 年 / 次' : seconds < 60 ? `约 ${Math.max(1, Math.round(seconds))} 秒 / 次` : seconds < 3600 ? `约 ${(seconds / 60).toFixed(1)} 分钟 / 次` : `约 ${(seconds / 3600).toFixed(1)} 小时 / 次`;
 type Dialog = { kind: 'element'; z: number; discovery?: boolean } | { kind: 'settings' | 'complete' } | null;
@@ -59,6 +63,7 @@ export default function App() {
   const [rawSave, setRawSave] = useState(boot.raw);
   const [slotError, setSlotError] = useState('');
   const [destination, setDestination] = useState(() => location.hash.startsWith('#guide') ? 'guide' : location.hash === TABLE_HASH ? 'table' : 'lab');
+  const [drawer, setDrawer] = useState<Drawer>();
   const tab = destination === 'table' ? 'lab' : destination;
   const [focus, setFocus] = useState(() => initialReactor(boot.engine.state)), [bulk, setBulk] = useState<number | 'max'>(1);
   const [dialog, setDialog] = useState<Dialog>(null), [queue, setQueue] = useState<number[]>([]), [endPending, setEndPending] = useState(false);
@@ -66,7 +71,7 @@ export default function App() {
   const [toasts, setToasts] = useState<Toast[]>([]), [saveStatus, setSaveStatus] = useState(boot.error ? '存档需处理' : '本地存档'), [saveBlocked, setSaveBlocked] = useState(!!boot.error);
   const [message, setMessage] = useState(boot.error || ''), [flash, setFlash] = useState(0), [debug, setDebug] = useState(false);
   const [offline, setOffline] = useState(boot.offline && boot.offline.seconds > 30 ? boot.offline : null);
-  const archiveSection = useRef<HTMLElement>(null), tableScroll = useRef<HTMLDivElement>(null), importInput = useRef<HTMLInputElement>(null);
+  const tableScroll = useRef<HTMLDivElement>(null), importInput = useRef<HTMLInputElement>(null);
   const engine = engineRef.current, s = engine.state, r = s.reactors[focus - 1], c = REACTORS[focus - 1];
   const opening = s.firstRun?.step;
   const visualPool = reactorDisplayPool(s, r);
@@ -128,16 +133,33 @@ export default function App() {
   const practiceDrop = !!engine.pulseDrop?.practice;
   const spotlight = tab === 'guide' ? undefined : spotlightStep(s, handsOn, tab, focus, practiceDrop, boost?.kind === 'inspiration', shortfall);
 
+  const guidedDrawer = spotlight?.id === 'sample' ? 'upgrades' : spotlight?.id === 'archive' ? 'archive' : undefined;
+  const activeDrawer = guidedDrawer ?? (destination === 'table' ? 'archive' : drawer);
+
   function goToTab(next: string) {
     setDestination(next);
+    setDrawer(undefined);
     const hash = next === 'guide' ? '#guide' : next === 'table' ? TABLE_HASH : '';
     history.replaceState(null, '', location.pathname + location.search + hash);
-    if (next !== 'table') window.scrollTo({ top: 0 });
-    else if (destination === 'table') archiveSection.current?.scrollIntoView({ block: 'start' });
+    window.scrollTo({ top: 0 });
+  }
+
+  function toggleDrawer(next: Drawer) {
+    if (next === 'archive') goToTab(activeDrawer === 'archive' ? 'lab' : 'table');
+    else {
+      if (destination === 'table') goToTab('lab');
+      setDrawer(activeDrawer === next ? undefined : next);
+    }
+  }
+
+  function closeDrawer() {
+    if (destination === 'table') goToTab('lab');
+    else setDrawer(undefined);
   }
 
   useEffect(() => {
     const followHash = () => {
+      setDrawer(undefined);
       if (location.hash.startsWith('#guide')) setDestination('guide');
       else if (location.hash === TABLE_HASH) setDestination('table');
       else if (!location.hash) setDestination('lab');
@@ -146,10 +168,19 @@ export default function App() {
     return () => window.removeEventListener('hashchange', followHash);
   }, []);
 
-  const openingInProgress = !!spotlight;
   useEffect(() => {
-    if (destination === 'table' && !openingInProgress) archiveSection.current?.scrollIntoView({ block: 'start' });
-  }, [destination, openingInProgress]);
+    if (!activeDrawer || tab !== 'lab' || spotlight || dialog) return;
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      if (destination === 'table') {
+        history.replaceState(null, '', location.pathname + location.search);
+        setDestination('lab');
+      }
+      setDrawer(undefined);
+    };
+    window.addEventListener('keydown', escape);
+    return () => window.removeEventListener('keydown', escape);
+  }, [activeDrawer, destination, tab, spotlight?.id, dialog]);
 
   function collect() {
     const notices = engineRef.current.state.notices.splice(0);
@@ -358,52 +389,40 @@ export default function App() {
       </button>
     </div>;
   }
-  const advancedArt = advancedReactorArtwork[focus];
-  const devicePhoto = advancedArt ? {
-    backgroundImage: `url("${artworkUrl(advancedArt.file)}")`,
-    '--port-y': `${advancedArt.portY}%`,
-    '--port-width': `${advancedArt.portWidth}%`,
-  } as CSSProperties : { backgroundPosition: `${focus <= 3 ? (focus - 1) * 50 : (focus - 4) * 100}% center` };
   const viewport = (
     <div className="viewport">
       <Particles count={Math.min(60, activeAtoms(r).toNumber())} mix={visualPool} speed={r.upgrades.speed} reduced={s.settings.reducedMotion} active={r.active} flash={flash}/>
     </div>
   );
   const collisionControl = <ManualPulse key={focus} enabled={engine.canManualPulse(focus)} reducedMotion={s.settings.reducedMotion}
-        tutorialTarget label={r.active ? '点击图片触发碰撞' : '仪器已暂停'}
+        tutorialTarget label={r.active ? '点击触发碰撞' : '仪器已暂停'}
         onPulse={() => {
           const reward = act(e => e.manualPulse(focus));
           return reward ? { energy: fmt(reward.energy), data: fmt(reward.data) } : null;
         }}/>;
-  const lab = () => <>
-    <div className="lab-banner"><h1>实验室</h1><time>已运行 {clock(s.elapsed)}</time></div>
-    {!spotlight && <div className="lab-guidance">
-      {showCoach ? coach() : <section className="mission-card" aria-label="下一步">
-        <div>
-          <div className="eyebrow"><span className="tiny-orbit" aria-hidden="true"/>下一步</div>
-          {openingMilestones.some(item => !item.done) && <div className="opening-milestones" role="list" aria-label="开局检查清单">
-            {openingMilestones.map(item => <span key={item.name} role="listitem" aria-label={`${item.name}：${item.done ? '已完成' : '待完成'}`} className={item.done ? 'done' : ''}>{item.done ? <Check size={11}/> : <i/>}{item.name}</span>)}
-          </div>}
-          <p className="goal-detail">{goal.detail}</p>
-        </div>
-        <button className="secondary-button goal-action" disabled={!goal.enabled} onClick={() => act(goal.run)}>{goal.label}<ArrowRight size={15}/></button>
-      </section>}
-    </div>}
-    {handsOn && (handsOn.id === 'pickup' || handsOn.id === 'pulse') && <div className="guided-lab-actions">
-      <button type="button" className="primary-button" data-guide-target="release-drop"
-        disabled={practiceDrop || !!boost} onClick={() => act(e => e.showPracticeDrop())}>放出练习灵感点</button>
-    </div>}
-    <div className="lab-grid">
-      <section className="panel reactor-panel"><div className="panel-heading"><div><h2>{c.name}<span className="tiny-label">{c.roman} 级</span></h2></div><button className={`status-pill ${r.active ? '' : 'paused'}`} data-opening-target={focus === 1 ? "start" : undefined} data-guide-target="reactor-status" onClick={() => act(e => e.toggleReactor(focus))}>{r.active ? <><i/>运行中 <CirclePause size={13}/></> : <><CirclePlay size={13}/>{opening === "start" ? "开始实验" : "已暂停"}</>}</button></div>
-        <div className={`device device-${focus} ${advancedArt ? 'device-illustrated' : ''}`}><div className="device-photo" style={devicePhoto}>{advancedArt && viewport}</div><div className="device-readout readout-left"><strong>{fmt(activeAtoms(r))}</strong><small>样本</small></div><div className="device-readout readout-right"><strong data-testid="current-rate">{fmt(eventRate(r))}<small> 次/秒</small></strong><small>实验速度</small></div>{!advancedArt && viewport}{collisionControl}<span className="visual-note">粒子示意</span></div>
+  const targetInfo = element(r.target);
+  const nextInfo = max < PLAYABLE_ELEMENTS ? element(max + 1) : undefined;
+  const tracking = r.active && r.exploring && r.target === nextInfo?.z;
+  const heliumTimer = r.target === 2 && s.firstRun?.step === 'helium' ? s.firstRun.remaining : 0;
+  const preparation = r.target === nextInfo?.z ? s.discoveryWait : 0;
+  const remainingPreparation = heliumTimer || preparation;
+  const preparationLength = heliumTimer ? FIRST_HELIUM_SECONDS : discoveryPreparation(r.target);
+  const observing = !targetKnown && targetStage && canExplore;
+  const targetProgress = targetKnown ? 1 : remainingPreparation && preparationLength
+    ? 1 - remainingPreparation / preparationLength : observed;
+  const targetLabel = observing ? '首次观测进度' : remainingPreparation ? '样本准备进度' : undefined;
+  const targetStatus = targetKnown ? '生产' : observing ? `${Math.floor(observed * 100)}%`
+    : remainingPreparation ? `${Math.ceil(remainingPreparation)} 秒` : '探索';
+  const researchAvailable = (max >= MODULES.feed.unlock && !s.modules.feed) ||
+    REACTORS.some(t => max >= t.unlock && !s.reactors[t.id - 1].built);
+  const drawerButton = (id: Drawer, label: string, Icon: typeof Atom) =>
+    <button type="button" aria-expanded={activeDrawer === id} aria-controls="experiment-drawer" onClick={() => toggleDrawer(id)}>
+      <Icon size={20} aria-hidden="true"/><span>{label}</span>
+    </button>;
+
+  const instrumentPanel = () => <>
         <div className="reactor-switch"><label htmlFor="reactor-selector">仪器</label><select id="reactor-selector" aria-label="切换反应容器" value={focus} onChange={e => setFocus(+e.target.value)}>{REACTORS.filter(t => s.reactors[t.id - 1].built).map(t => <option key={t.id} value={t.id}>{t.roman} 级 · {t.name}{!s.reactors[t.id - 1].active && ' · 已暂停'}</option>)}</select><button className="text-button" onClick={() => goToTab('research')}>研发仪器<ArrowRight size={13}/></button></div>
-        <div className="target-control"><div className="target-element" style={{ '--element': element(r.target).color } as CSSProperties}><small>{r.target}</small><strong>{element(r.target).symbol}</strong></div><div className="target-copy"><span className="eyebrow">{targetKnown ? '重复生产' : '正在探索'}</span><h3>{element(r.target).name}<span>{element(r.target).english}</span></h3>{targetNote && <p>{targetNote}</p>}{targetStage && canExplore && <progress className="observation-progress" aria-label="首次观测进度" max={1} value={observed}/>}</div><div className="target-actions"><label className="sr-only" htmlFor="target">选择实验目标</label><select id="target" value={r.target} onChange={e => act(engine => { engine.target(focus, +e.target.value); })}>{ELEMENTS.slice(0, Math.min(PLAYABLE_ELEMENTS, max + 1)).map(e => <option key={e.z} value={e.z} disabled={e.z > max && !canExplore}>{e.symbol} · {e.name}{e.z > max ? ' · 下一发现' : ''}</option>)}</select>{max < PLAYABLE_ELEMENTS && <button className="text-button accent" disabled={!canExplore} aria-describedby={requirements.length ? 'exploration-requirements' : undefined} data-guide-target="explore" onClick={() => act(e => { e.target(focus, max + 1, true); })}>探索 {element(max + 1).symbol}<ArrowRight size={14}/></button>}</div></div>
-        {handsOn?.id === 'archive' && <div className="guided-lab-actions">
-          <button type="button" className="primary-button" data-guide-target="produce-h" onClick={() => act(e => {
-            if (e.target(1, 1)) e.state.reactors[0].active = true;
-            setFocus(1);
-          })}>让 I 级生产氢</button>
-        </div>}
+        <div className="target-control"><div className="target-element" style={{ '--element': element(r.target).color } as CSSProperties}><small>{r.target}</small><strong>{element(r.target).symbol}</strong></div><div className="target-copy"><span className="eyebrow">{targetKnown ? '重复生产' : '正在探索'}</span><h3>{element(r.target).name}<span>{element(r.target).english}</span></h3>{targetNote && <p>{targetNote}</p>}</div><div className="target-actions"><label className="sr-only" htmlFor="target">选择实验目标</label><select id="target" value={r.target} onChange={e => act(engine => { engine.target(focus, +e.target.value); })}>{ELEMENTS.slice(0, Math.min(PLAYABLE_ELEMENTS, max + 1)).map(e => <option key={e.z} value={e.z} disabled={e.z > max && !canExplore}>{e.symbol} · {e.name}{e.z > max ? ' · 下一发现' : ''}</option>)}</select></div></div>
         {!!requirements.length && <p id="exploration-requirements" className="exploration-requirements">
           <strong>探索{element(max + 1).name}前还需</strong>
           <span>{requirements.join(' · ')}</span>
@@ -420,20 +439,103 @@ export default function App() {
               })}>{symbol}</button>
           )) : visualPool.map(z => <span className="element-sample-chip" key={z}>{element(z).symbol}</span>)}
         </div>
-      </section>
-      <aside className="control-column"><section className="panel upgrades-panel"><div className="panel-heading"><div><h2>实验控制</h2></div><Settings2 size={18} className="muted"/></div><div className="bulk-control"><span title="仅影响升级购买数量，不影响探索次数、实验样本或成功率">升级数量</span><div role="group" aria-label="升级数量（仅影响升级，不影响探索次数与实验样本）">{([1, 10, 100, 'max'] as const).map(n => <button className={bulk === n ? 'selected' : ''} onClick={() => setBulk(n)} key={n}>{n === 'max' ? 'MAX' : `×${n}`}</button>)}</div></div>{(['atoms', 'speed', 'yield'] as Upgrade[]).map(upgradeCard)}{focus > 1 && upgradeCard('capacity')}<div className="reactor-output" aria-label="本机产出">
+  </>;
+  const upgradesPanel = () => <section className="panel upgrades-panel"><div className="bulk-control"><span title="仅影响升级购买数量，不影响探索次数、实验样本或成功率">升级数量</span><div role="group" aria-label="升级数量（仅影响升级，不影响探索次数与实验样本）">{([1, 10, 100, 'max'] as const).map(n => <button className={bulk === n ? 'selected' : ''} onClick={() => setBulk(n)} key={n}>{n === 'max' ? 'MAX' : `×${n}`}</button>)}</div></div>{(['atoms', 'speed', 'yield'] as Upgrade[]).map(upgradeCard)}{focus > 1 && upgradeCard('capacity')}<div className="reactor-output" aria-label="本机产出">
         <div><span>本机碰撞能</span><strong data-testid="reactor-energy-rate">{fmt(income(r).mul(energyMultiplier))}<small> /秒</small></strong></div>
         <div><span>本机研究数据</span><strong data-testid="reactor-data-rate">{fmt(eventRate(r).mul(dataMultiplier))}<small> 点/秒</small></strong></div>
-      </div></section>
-        <div className="lab-operations">
+      </div></section>;
+  const tasksPanel = () => <div className="lab-operations">
     <ReactorAssignments state={s}/>
     <ExperimentBoard key={`experiments-${slotId}`} state={s} act={act} openElement={openElement}/>
     {max >= 8 && <SampleContract key={slotId} state={s} act={act}/>}
+  </div>;
+  const nextPanel = () => (
+    <div className="lab-guidance">
+      {showCoach ? coach() : <section className="mission-card" aria-label="下一步">
+        <div>
+          <div className="eyebrow"><span className="tiny-orbit" aria-hidden="true"/>下一步</div>
+          {openingMilestones.some(item => !item.done) && <div className="opening-milestones" role="list" aria-label="开局检查清单">
+            {openingMilestones.map(item => <span key={item.name} role="listitem" aria-label={`${item.name}：${item.done ? '已完成' : '待完成'}`} className={item.done ? 'done' : ''}>{item.done ? <Check size={11}/> : <i/>}{item.name}</span>)}
+          </div>}
+          <p className="goal-detail">{goal.detail}</p>
         </div>
-      </aside>
+        <button className="secondary-button goal-action" disabled={!goal.enabled} onClick={() => act(goal.run)}>{goal.label}<ArrowRight size={15}/></button>
+      </section>}
     </div>
-    {periodic()}
-  </>;
+  );
+  const drawerContent = () => {
+    switch (activeDrawer) {
+      case 'upgrades': return upgradesPanel();
+      case 'tasks': return tasksPanel();
+      case 'archive': return periodic();
+      case 'instrument': return instrumentPanel();
+      case 'next': return nextPanel();
+      case 'more': return <div className="scene-more">{tabs.slice(2).map(t => <button type="button" key={t.id} onClick={() => goToTab(t.id)}><t.icon size={19}/>{t.name}<ArrowRight size={15}/></button>)}</div>;
+    }
+  };
+
+  const lab = () => <section className="lab-scene" aria-label="实验室" data-guiding={!!spotlight}
+    style={{ '--hall-art': `url("${artworkUrl('accelerator-hall.webp')}")` } as CSSProperties}>
+    <div className="device lab-playfield device-illustrated" inert={!!activeDrawer}>
+      <div className="device-photo" style={reactorImageStyle(focus)}>{viewport}</div>
+      {collisionControl}
+    </div>
+    <div className="scene-hud">
+      {brand()}
+      <section className="scene-resources" aria-label="实验室资源">
+        <div className="scene-stat scene-energy" title={`碰撞能，+ ${fmt(totalIncome)} /秒`}><Zap size={19} aria-hidden="true"/><span className="sr-only">碰撞能</span><strong data-testid="coins">{fmt(s.coins)}</strong></div>
+        <div className="scene-stat scene-data" title="研究数据"><Database size={16} aria-hidden="true"/><span className="sr-only">研究数据</span><strong>{fmt(s.data)}</strong></div>
+        <div className="scene-stat scene-speed" title="总实验速度"><Activity size={17} aria-hidden="true"/><span className="sr-only">总实验速度</span><strong>{fmt(totalRate)}</strong><small>/秒</small></div>
+      </section>
+      <button type="button" className="scene-icon-button" aria-label="存档与设置" title={saveStatus} onClick={openSaves}><Settings2 size={20}/></button>
+    </div>
+    <div className="scene-notices" inert={!!activeDrawer}>{notices()}</div>
+    <div className="scene-instrument" inert={!!activeDrawer}>
+      <button type="button" className="scene-device-select" aria-label="仪器设置" aria-expanded={activeDrawer === 'instrument'} aria-controls="experiment-drawer" onClick={() => toggleDrawer('instrument')}>
+        <span className="scene-tier">{c.roman}</span><span>{c.name}</span><ChevronDown size={14}/>
+      </button>
+      <button type="button" className={`status-pill ${r.active ? '' : 'paused'}`} data-opening-target={focus === 1 ? 'start' : undefined} data-guide-target="reactor-status"
+        aria-label={r.active ? '运行中' : opening === 'start' ? '开始实验' : '已暂停'} title={r.active ? '暂停仪器' : '启动仪器'} onClick={() => act(e => e.toggleReactor(focus))}>
+        {r.active ? <CirclePause size={20}/> : <CirclePlay size={20}/>}
+        {opening === 'start' ? <span>开始实验</span> : <span className="sr-only">{r.active ? '运行中' : '已暂停'}</span>}
+      </button>
+      <div className="scene-local" title="本机实验速度"><Gauge size={15}/><span data-testid="current-rate">{fmt(eventRate(r))}<small> 次/秒</small></span></div>
+    </div>
+    <aside className="scene-tools" inert={!!activeDrawer}>
+      <div className="progress-resource scene-collection">
+        <button type="button" aria-label="打开元素收集" title={`已收录 ${archived} / ${PLAYABLE_ELEMENTS}`} aria-expanded={activeDrawer === 'archive'} aria-controls="experiment-drawer" onClick={() => toggleDrawer('archive')}>
+          <HudRing label="元素收集进度" value={archived} max={PLAYABLE_ELEMENTS}><Archive size={20}/></HudRing>
+          <strong>{archived}/{PLAYABLE_ELEMENTS}<span className="sr-only"> 收录 · {max}/{PLAYABLE_ELEMENTS} 发现</span></strong>
+        </button>
+      </div>
+      <button type="button" className="scene-icon-button" aria-label="下一步" title="下一步" aria-expanded={activeDrawer === 'next'} aria-controls="experiment-drawer" onClick={() => toggleDrawer('next')}><Compass size={22}/></button>
+    </aside>
+    <div className="scene-actions" inert={!!activeDrawer}>
+      {handsOn && (handsOn.id === 'pickup' || handsOn.id === 'pulse') && <button type="button" className="scene-action" data-guide-target="release-drop"
+        disabled={practiceDrop || !!boost} onClick={() => act(e => e.showPracticeDrop())}>放出练习灵感点</button>}
+      {handsOn?.id === 'archive' && <button type="button" className="scene-action" data-guide-target="produce-h" onClick={() => act(e => {
+        if (e.target(1, 1)) e.state.reactors[0].active = true;
+        setFocus(1);
+      })}>让 I 级生产氢</button>}
+      <button type="button" className="scene-target" aria-label={`实验目标 ${targetInfo.name}`} aria-expanded={activeDrawer === 'instrument'} aria-controls="experiment-drawer" onClick={() => toggleDrawer('instrument')} title={targetNote ?? requirements.join(' · ')}>
+        <HudRing label={targetLabel} value={targetProgress} max={1}><strong>{targetInfo.symbol}</strong></HudRing>
+        <span><strong>{targetInfo.name}</strong><small>{targetStatus}</small></span>
+      </button>
+      {nextInfo && !tracking && <button type="button" className="scene-action scene-explore" disabled={!canExplore} data-guide-target="explore" onClick={() => act(e => { e.target(focus, nextInfo.z, true); })}
+        title={!canExplore ? requirements.join(' · ') : undefined}>
+        {canExplore ? <ArrowRight size={16}/> : <LockKeyhole size={15}/>}探索 {nextInfo.symbol}
+      </button>}
+    </div>
+    {activeDrawer && <div className="scene-shade" aria-hidden="true" onClick={closeDrawer}/>}
+    <nav className="scene-dock" aria-label="主导航">
+      {drawerButton('upgrades', '升级', SlidersHorizontal)}
+      <button type="button" data-guide-target="research" onClick={() => goToTab('research')}><Cpu size={20}/><span>科研</span>{researchAvailable && <i aria-hidden="true"/>}</button>
+      {drawerButton('tasks', '委托', ClipboardList)}
+      {drawerButton('archive', '周期表', Grid2X2)}
+      {drawerButton('more', '更多', Ellipsis)}
+    </nav>
+    {activeDrawer && <LabDrawer key={activeDrawer} title={drawerTitles[activeDrawer]} onClose={closeDrawer}>{drawerContent()}</LabDrawer>}
+  </section>;
 
   const abilitySummary = () => {
     if (archived === 0) return null;
@@ -443,7 +545,7 @@ export default function App() {
     </section>;
   };
   const periodic = () => (
-    <section className="lab-archive" id="periodic-table" ref={archiveSection} aria-labelledby="periodic-table-title">
+    <section className="lab-archive" id="periodic-table" aria-labelledby="periodic-table-title">
       <header className="archive-heading">
         <h2 id="periodic-table-title">元素周期表</h2>
       </header>
@@ -492,7 +594,7 @@ export default function App() {
     </section>
   );
 
-  const research = () => <><div className="section-heading"><div><div className="eyebrow">RESEARCH & INDUSTRY</div><h1>把偶然的发现，<span>变成持续的能力。</span></h1></div><div className="research-budget"><span>可用研究数据</span><strong>{fmt(s.data)}<small> 点</small></strong></div></div><div className="research-grid">{REACTORS.map(t => { const state = s.reactors[t.id - 1], unlocked = max >= t.unlock, afford = s.coins.gte(t.buildCoins) && s.data.gte(t.buildData), art = advancedReactorArtwork[t.id]; return <section id={`research-reactor-${t.id}`} className={`panel research-device ${!unlocked ? 'is-locked' : ''}`} key={t.id}><div className={`research-device-art ${t.id > 3 && t.id <= 5 ? 'expansion-art' : ''} ${art ? 'advanced-art' : ''}`} style={art ? { backgroundImage: `url("${artworkUrl(art.file)}")` } : { backgroundPosition: `${t.id <= 3 ? (t.id - 1) * 50 : (t.id - 4) * 100}% center` }}/><div className="research-device-copy"><div className="eyebrow">{t.roman} 级 / {t.range}</div><h2>{t.name}</h2><div className="spec-line"><span>速度上限</span><strong>{t.cap} 次/秒</strong></div><div className="spec-line"><span>开放条件</span><strong>{t.id === 1 ? '开局可用' : `首次发现 ${element(t.unlock).name}`}</strong></div>{state.built ? <button className="secondary-button full" onClick={() => { setFocus(t.id); goToTab('lab'); }}><Check size={15}/>已建成 · 进入控制台<ArrowRight size={15}/></button> : <><div className="construction-cost"><span className={s.coins.gte(t.buildCoins) ? '' : 'insufficient'}>{fmt(t.buildCoins)} 碰撞能</span><span className={s.data.gte(t.buildData) ? '' : 'insufficient'}>{fmt(t.buildData)} 数据</span></div><button className="primary-button full" data-guide-target={t.id === 2 ? "build" : undefined} disabled={!unlocked || !afford} onClick={() => act(e => { if (e.build(t.id)) { setFocus(t.id); goToTab('lab'); } })}>{!unlocked ? <><LockKeyhole size={15}/>发现 {element(t.unlock).symbol} 后开放</> : <>研发并建造<ArrowRight size={15}/></>}</button>{unlocked && !afford && <p className="cost-shortfall">还差 {shortfall(t.buildCoins, t.buildData)}</p>}</>}</div></section>; })}</div><section id="industry-panel" className="panel industry-panel"><div className="panel-heading"><div><span className="eyebrow">INDUSTRIAL PIPELINE</span><h2>工业自动化</h2></div><span className="tiny-label">{Object.values(s.modules).filter(Boolean).length} / 3 模块</span></div><IndustryModules state={s} max={max} act={act}/><AutomationControls state={s} max={max} act={act}/></section></>;
+  const research = () => <><div className="section-heading"><div><h1>科研</h1></div><div className="research-budget"><span>可用研究数据</span><strong>{fmt(s.data)}<small> 点</small></strong></div></div><div className="research-grid">{REACTORS.map(t => { const state = s.reactors[t.id - 1], unlocked = max >= t.unlock, afford = s.coins.gte(t.buildCoins) && s.data.gte(t.buildData); return <section id={`research-reactor-${t.id}`} className={`panel research-device ${!unlocked ? 'is-locked' : ''}`} key={t.id}><div className="research-device-art research-series"><div style={reactorImageStyle(t.id)} /></div><div className="research-device-copy"><div className="eyebrow">{t.roman} 级 / {t.range}</div><h2>{t.name}</h2><div className="spec-line"><span>速度上限</span><strong>{t.cap} 次/秒</strong></div><div className="spec-line"><span>开放条件</span><strong>{t.id === 1 ? '开局可用' : `首次发现 ${element(t.unlock).name}`}</strong></div>{state.built ? <button className="secondary-button full" onClick={() => { setFocus(t.id); goToTab('lab'); }}><Check size={15}/>已建成 · 进入控制台<ArrowRight size={15}/></button> : <><div className="construction-cost"><span className={s.coins.gte(t.buildCoins) ? '' : 'insufficient'}>{fmt(t.buildCoins)} 碰撞能</span><span className={s.data.gte(t.buildData) ? '' : 'insufficient'}>{fmt(t.buildData)} 数据</span></div><button className="primary-button full" data-guide-target={t.id === 2 ? "build" : undefined} disabled={!unlocked || !afford} onClick={() => act(e => { if (e.build(t.id)) { setFocus(t.id); goToTab('lab'); } })}>{!unlocked ? <><LockKeyhole size={15}/>发现 {element(t.unlock).symbol} 后开放</> : <>研发并建造<ArrowRight size={15}/></>}</button>{unlocked && !afford && <p className="cost-shortfall">还差 {shortfall(t.buildCoins, t.buildData)}</p>}</>}</div></section>; })}</div><section id="industry-panel" className="panel industry-panel"><div className="panel-heading"><div><span className="eyebrow">INDUSTRIAL PIPELINE</span><h2>工业自动化</h2></div><span className="tiny-label">{Object.values(s.modules).filter(Boolean).length} / 3 模块</span></div><IndustryModules state={s} max={max} act={act}/><AutomationControls state={s} max={max} act={act}/></section></>;
 
   const achievements = () => <><div className="section-heading"><div><div className="eyebrow">MILESTONES & IMPOSSIBILITIES</div><h1>记录突破，<span>也记录那些意外。</span></h1></div><span className="count-badge">{s.achievements.length}<small> / {ACHIEVEMENTS.length}</small></span></div><div className="achievement-grid">{ACHIEVEMENTS.map(a => { const earned = s.achievements.includes(a.id), hidden = a.hidden && !earned; return <section className={`panel achievement ${earned ? 'earned' : ''} ${hidden ? 'secret' : ''}`} key={a.id}><div className="achievement-medal">{hidden ? <LockKeyhole size={23}/> : a.hidden ? <Sparkles size={25}/> : <Trophy size={25}/>}</div><div><span className="eyebrow">{a.hidden ? 'HIDDEN DISCOVERY' : 'LAB MILESTONE'}{earned ? ' / 已达成' : ''}</span><h3>{hidden ? '？？？' : a.name}</h3><p>{hidden ? '在实验室的边界之外，还有意想不到的可能。' : a.description}</p></div>{earned && <Check className="earned-check" size={18}/>}</section>; })}</div><p className="page-note">隐藏成就只记录在线的成功合成；已发现元素的重复生产也可达成。徽章不会改变生产倍率。</p></>;
 
@@ -531,7 +633,12 @@ export default function App() {
     return <Modal title={discovery ? `新元素发现 · ${info.name}` : `${info.name} · ${info.english}`} onClose={() => setDialog(null)}><div className="element-card-hero"><div className={`large-element ${state?.archived ? 'archived' : ''}`} style={{ '--element': info.color } as CSSProperties}><span>{z}</span><strong>{info.symbol}</strong><small>{info.english}</small><i>{info.mass || '—'}</i></div>{specimen ? <div className="specimen" role="img" style={specimen} aria-label={info.specimenDescription}/> : <div className="locked-specimen"><LockKeyhole size={32}/><p>{z > PLAYABLE_ELEMENTS ? '未来研究目标' : '等待首次发现'}</p></div>}</div><div className="knowledge-status"><span className={state?.archived ? 'accent' : ''}>{state?.archived ? '✓ 已正式收录' : known ? '已发现 · 尚未收录' : z > PLAYABLE_ELEMENTS ? `v${GAME_VERSION} 版本锁定` : '未发现'}</span><span>第 {z} 号元素</span></div>{discovery && pendingDiscoveries === 0 && <div className="discovery-queue"><span>查看档案期间，已知元素和资源继续产出。</span><button className="secondary-button" onClick={() => setDialog(null)}>知道了，继续探索</button></div>}{inventory}{pendingDiscoveries > 0 && <div className="discovery-queue" role="status"><span>还有 {pendingDiscoveries} 项新发现待查看</span><button className="secondary-button" onClick={() => setDialog(null)}>查看下一个发现</button></div>}{known && <ElementAbility z={z} archived={state.archived}/>}<AtomicFacts info={info} known={known}/>{known && knowledge ? <><div className="knowledge-body"><h3>{knowledge.title}</h3><p>{knowledge.fact}</p><h4>电子与性质</h4><p>{ATOMIC_PROFILES[z]?.chemistry}</p><h4>主要用途</h4><p>{knowledge.application}</p><FurtherScience info={info}/><h4>实验进展</h4><p>{knowledge.unlock}</p></div><dl className="element-history"><div><dt>首次发现</dt><dd>{clock(state.firstDiscoveredAt || 0)} · {state.firstDiscoveredReactor ? `${REACTORS[state.firstDiscoveredReactor - 1].roman} 级` : '初始样本'}</dd></div><div><dt>累计获得</dt><dd>{fmt(state.totalProduced)} 单位</dd></div></dl><p className="specimen-caption">{info.specimenDescription}{z === 10 && '（图为放电发光示意，常温常压下氖气无色。）'}{z >= 21 && z <= PLAYABLE_ELEMENTS && '（图为样本外观示意。）'}</p><p className="science-note">{SCIENCE_NOTE} <a href={baikeUrl(info.name)} target="_blank" rel="noreferrer">百度百科 ↗</a></p></> : <div className="locked-copy"><p>{z > PLAYABLE_ELEMENTS ? z === 118 ? '鿫是《通往118》的长期终点。未来版本中，“100 个 Og”将代表 100 次成功合成且确认的事件记录，并非长期储存的普通气体。' : `它属于未来的旅程。v${GAME_VERSION} 已开放 1—54 号元素（H–Xe）；55–118 号只作为未来研究目标显示，尚未开放或测试。` : `依次发现元素后，你将有机会与${info.name}相遇。当前下一个新元素是 ${element(Math.min(PLAYABLE_ELEMENTS, max + 1)).symbol}。`}</p><button className="secondary-button full" onClick={() => setDialog(null)}>返回实验室</button></div>}</Modal>;
   }
 
-  return <div className="app-shell"><header className="site-header"><a className="brand" href="#" onClick={e => { e.preventDefault(); goToTab('lab'); }}><span className="brand-mark"><Atom size={30} strokeWidth={1.2}/></span><span><strong>通往<span>118</span></strong><small>ROAD TO 118</small></span><i>v{GAME_VERSION}</i></a><nav className="main-nav" aria-label="主导航">{tabs.map(t => <button key={t.id} data-guide-target={t.id} className={tab === t.id ? 'active' : ''} onClick={() => goToTab(t.id)}><t.icon size={17}/><span>{t.name}</span><small>{t.en}</small>{t.id === 'research' && ((max >= MODULES.feed.unlock && !s.modules.feed) || REACTORS.some(t => max >= t.unlock && !s.reactors[t.id - 1].built)) && <i className="nav-dot"/>}</button>)}</nav><div className="header-right"><span className="save-label"><ShieldCheck size={14}/>{saveStatus}</span><button className="icon-button" aria-label="存档与设置" onClick={openSaves}><Settings2 size={19}/></button></div></header><main>{tab !== 'guide' && <section className="resource-bar" aria-label="实验室资源"><div className="main-resource"><span className="resource-label"><Zap size={14}/>碰撞能</span><div className="coin-value" data-testid="coins">{fmt(s.coins)}</div><p className="resource-income">收入 <strong>+{fmt(totalIncome)}</strong><small> /秒</small></p></div><div className="resource-item"><span>总实验速度</span><strong>{fmt(totalRate)}<small>次/秒</small></strong></div><div className="resource-item"><span>研究数据</span><strong>{fmt(s.data)}<small>点</small></strong></div><div className="resource-item progress-resource"><span>收集进度</span><strong>{archived}<small>/{PLAYABLE_ELEMENTS} 收录</small><em>{max}/{PLAYABLE_ELEMENTS} 发现</em></strong><progress className="collection-progress" aria-label="元素收集进度" max={PLAYABLE_ELEMENTS} value={archived}/></div></section>}{saveBlocked && <div className="message-banner recovery-warning" role="alert"><span>当前进度尚未保存。请先处理旧存档，刷新会丢失本次进度。</span><button className="secondary-button" onClick={openSaves}>处理存档</button></div>}{message && <div className="message-banner" role="status"><span>{message}</span><button className="text-button" onClick={() => setMessage('')}>关闭</button></div>}{offline && tab !== 'guide' && <div className="offline-banner"><span><RotateCcw size={18}/><strong>欢迎回来。</strong>已结算 {clock(offline.seconds)} 离线实验：+{fmt(offline.coins)} 碰撞能，+{fmt(offline.produced)} 单位已发现元素。最多结算 4 小时。</span><button className="text-button" onClick={() => setOffline(null)}>继续实验<ArrowRight size={14}/></button></div>}<div className="tab-content" key={tab}>{tab === 'lab' ? lab() : tab === 'research' ? research() : tab === 'achievements' ? achievements() : tab === 'guide' ? <><div className="guide-replay"><button className="secondary-button" onClick={replayTutorial}><RotateCcw size={15}/>{canResumeGuide ? '继续新手引导' : '新建存档体验引导'}</button></div><Tutorial onPlay={() => goToTab('lab')}/></> : stats()}</div><footer><span><Atom size={15}/>ROAD TO 118<span className="footer-divider"/>从两颗氢原子开始的旅程</span><button className="text-button" onClick={() => goToTab('guide')}>教程<ArrowRight size={13}/></button></footer></main><div className="toast-stack" aria-live="polite">{toasts.filter(t => tab !== 'guide' && Date.now() - t.time < 6500).slice(-3).map(t => <div className={`toast ${t.kind}`} key={t.id}>{t.kind === 'achievement' ? <Trophy size={17}/> : t.kind === 'archive' ? <BookOpen size={17}/> : <Sparkles size={17}/>}<span>{t.text}</span></div>)}</div><input ref={importInput} type="file" accept=".json,application/json" className="sr-only" aria-label="导入游戏存档" onChange={e => { void importSave(e.target.files?.[0]); }}/>
+  const brand = () => <a className="brand" href="#" onClick={e => { e.preventDefault(); goToTab('lab'); }}><span className="brand-mark"><Atom size={30} strokeWidth={1.2}/></span><span><strong>通往<span>118</span></strong><small>ROAD TO 118</small></span><i>v{GAME_VERSION}</i></a>;
+  const notices = () => <>{saveBlocked && <div className="message-banner recovery-warning" role="alert"><span>当前进度尚未保存。请先处理旧存档，刷新会丢失本次进度。</span><button className="secondary-button" onClick={openSaves}>处理存档</button></div>}{message && <div className="message-banner" role="status"><span>{message}</span><button className="text-button" onClick={() => setMessage('')}>关闭</button></div>}{offline && tab !== 'guide' && <div className="offline-banner"><span><RotateCcw size={18}/><strong>欢迎回来。</strong>已结算 {clock(offline.seconds)} 离线实验：+{fmt(offline.coins)} 碰撞能，+{fmt(offline.produced)} 单位已发现元素。最多结算 4 小时。</span><button className="text-button" onClick={() => setOffline(null)}>继续实验<ArrowRight size={14}/></button></div>}</>;
+
+  return <div className={`app-shell${tab === 'lab' ? ' scene-shell' : ''}`}>
+    {tab === 'lab' ? <main className="scene-main">{lab()}</main> : <><header className="site-header">{brand()}<nav className="main-nav" aria-label="主导航">{tabs.map(t => <button key={t.id} data-guide-target={t.id} className={tab === t.id ? 'active' : ''} onClick={() => goToTab(t.id)}><t.icon size={17}/><span>{t.name}</span><small>{t.en}</small>{t.id === 'research' && ((max >= MODULES.feed.unlock && !s.modules.feed) || REACTORS.some(t => max >= t.unlock && !s.reactors[t.id - 1].built)) && <i className="nav-dot"/>}</button>)}</nav><div className="header-right"><span className="save-label"><ShieldCheck size={14}/>{saveStatus}</span><button className="icon-button" aria-label="存档与设置" onClick={openSaves}><Settings2 size={19}/></button></div></header><main>{tab !== 'guide' && <section className="resource-bar" aria-label="实验室资源"><div className="main-resource"><span className="resource-label"><Zap size={14}/>碰撞能</span><div className="coin-value" data-testid="coins">{fmt(s.coins)}</div><p className="resource-income">收入 <strong>+{fmt(totalIncome)}</strong><small> /秒</small></p></div><div className="resource-item"><span>总实验速度</span><strong>{fmt(totalRate)}<small>次/秒</small></strong></div><div className="resource-item"><span>研究数据</span><strong>{fmt(s.data)}<small>点</small></strong></div><div className="resource-item progress-resource"><span>收集进度</span><strong>{archived}<small>/{PLAYABLE_ELEMENTS} 收录</small><em>{max}/{PLAYABLE_ELEMENTS} 发现</em></strong><progress className="collection-progress" aria-label="元素收集进度" max={PLAYABLE_ELEMENTS} value={archived}/></div></section>}{notices()}<div className="tab-content" key={tab}>{tab === 'research' ? research() : tab === 'achievements' ? achievements() : tab === 'guide' ? <><div className="guide-replay"><button className="secondary-button" onClick={replayTutorial}><RotateCcw size={15}/>{canResumeGuide ? '继续新手引导' : '新建存档体验引导'}</button></div><Suspense fallback={<p role="status">正在打开教程…</p>}><Tutorial onPlay={() => goToTab('lab')}/></Suspense></> : stats()}</div><footer><span><Atom size={15}/>ROAD TO 118<span className="footer-divider"/>从两颗氢原子开始的旅程</span><button className="text-button" onClick={() => goToTab('guide')}>教程<ArrowRight size={13}/></button></footer></main></>}
+    <div className="toast-stack" aria-live="polite">{toasts.filter(t => tab !== 'guide' && Date.now() - t.time < 6500).slice(-3).map(t => <div className={`toast ${t.kind}`} key={t.id}>{t.kind === 'achievement' ? <Trophy size={17}/> : t.kind === 'archive' ? <BookOpen size={17}/> : <Sparkles size={17}/>}<span>{t.text}</span></div>)}</div><input ref={importInput} type="file" accept=".json,application/json" className="sr-only" aria-label="导入游戏存档" onChange={e => { void importSave(e.target.files?.[0]); }}/>
     {!dialog && queue.length === 0 && <OpeningSpotlight key={slotId} step={spotlight} total={SPOTLIGHT_LENGTH}
       reduced={s.settings.reducedMotion} onBegin={() => act(e => e.beginOpening())}
       onSkip={skipSpotlight} onManageSaves={openSaves} onFinish={dismissGuide}/>}

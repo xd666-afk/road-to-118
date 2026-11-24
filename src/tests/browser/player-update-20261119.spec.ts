@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { closeLabPanel, openLabPanel } from './lab-controls';
 import { createState } from '../../game/engine';
 import { price } from '../../game/economy';
 import { D } from '../../game/numbers';
@@ -21,7 +22,7 @@ test('He archive submit is above the fold at 360x800 and 1440x1000 and deposits 
   await page.addInitScript(({ key, text }) => localStorage.setItem(key, text), { key: KEY, text: serialize(s) });
   await page.setViewportSize({ width: 360, height: 800 });
   await page.goto('/');
-  await page.locator('#periodic-table').scrollIntoViewIfNeeded();
+  await openLabPanel(page, 'archive');
   await page.locator('[data-z="2"]').click();
 
   const region = page.getByRole('region', { name: '元素收录操作' });
@@ -44,6 +45,7 @@ test('fixed batches stay disabled when unaffordable while MAX spends only what i
   await page.addInitScript(({ key, text }) => localStorage.setItem(key, text), { key: KEY, text: serialize(s) });
   await page.goto('/');
 
+  await openLabPanel(page, 'upgrades');
   const yieldCard = page.locator('.upgrade').filter({ hasText: '单次收益' });
   const buy = yieldCard.getByRole('button', { name: '购买单次收益' });
   for (const batch of ['×10', '×100']) {
@@ -68,6 +70,7 @@ test('x100 buys exactly 100 even when MAX can buy 102', async ({ page }) => {
   await page.addInitScript(({ key, text }) => localStorage.setItem(key, text), { key: KEY, text: serialize(s) });
   await page.goto('/');
 
+  await openLabPanel(page, 'upgrades');
   const atomsCard = page.locator('.upgrade').filter({ hasText: '补充氢样本' });
   const buy = atomsCard.getByRole('button', { name: '购买补充氢样本' });
   await page.getByRole('button', { name: 'MAX', exact: true }).click();
@@ -92,6 +95,7 @@ test('a single collection meter and accessible opening checks keep completed He'
   await expect(page.getByRole('progressbar', { name: '元素收集进度' })).toHaveAttribute('value', '0');
   await expect(page.getByRole('button', { name: /钙档案/ })).toHaveCount(0);
   await expect(page.locator('.progress-resource strong')).toContainText('2/54 发现');
+  await openLabPanel(page, 'next');
   const checklist = page.getByRole('list', { name: '开局检查清单' });
   await expect(checklist).toBeVisible();
   await expect(checklist.getByRole('listitem', { name: '发现 He：已完成' })).toBeVisible();
@@ -117,7 +121,9 @@ test('oxygen stays the only discovery while its card is open and fluorine waits 
   await page.clock.pauseAt(new Date(clock + 1000));
   await page.addInitScript(({ key, text }) => localStorage.setItem(key, text), { key: KEY, text: serialize(s, clock + 1000) });
   await page.goto('/');
+  await openLabPanel(page, 'instrument');
   await page.getByLabel('切换反应容器').selectOption('3');
+  await closeLabPanel(page);
 
   const oxygen = page.getByRole('dialog', { name: '新元素发现 · 氧' });
   await page.clock.runFor(500);
@@ -129,7 +135,8 @@ test('oxygen stays the only discovery while its card is open and fluorine waits 
   await expect(page.locator('.progress-resource strong')).toContainText('8/54 发现');
 
   await oxygen.getByRole('button', { name: '知道了，继续探索' }).click();
-  await expect(page.locator('.target-copy')).toContainText('还需 40 秒');
+  await expect(page.getByRole('button', { name: '实验目标 氟' })).toContainText('40 秒');
+  await expect(page.getByRole('progressbar', { name: '样本准备进度' })).toHaveAttribute('value', '0');
   const fluorine = page.getByRole('dialog', { name: '新元素发现 · 氟' });
   await page.clock.runFor(39_000);
   await expect(fluorine).toHaveCount(0);

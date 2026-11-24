@@ -2,6 +2,18 @@
   "generator": "Built-in image generation",
   "assets": [
     {
+      "file": "accelerator-hall.webp",
+      "layout": "Full-bleed accelerator hall in a 16:9 composition",
+      "generator": "Built-in image generation",
+      "prompt": "Asset for an original browser game about discovering chemical elements, a 16:9 full-bleed backdrop only. Photorealistic cinematic industrial accelerator laboratory hall, symmetrical straight-on viewpoint, a vaulted hexagonal dark blue graphite chamber and layered clean white strip lighting, deep perspective from side corridors and glossy technical floor, warm copper service pipes on one side, turquoise instrumentation lights on the other side, moody saturated midnight teal and petrol palette with luminous icy aqua lines. Main center of image is clear empty floor and empty rear wall, designed as the backdrop for a large separately composited central reactor prop. Key spatial details along far edges, center is quieter but has dark illuminated steps and atmosphere. Clean premium original science game environment, scientific research location, believable real metal and concrete, no people, no device in center, no text, no signage, no UI, no watermark. Preserve interest if center-cropped to narrow portrait. Wide panoramic composition."
+    },
+    {
+      "file": "reactor-series.webp",
+      "layout": "Transparent 4 × 2 atlas. Top row I–IV, bottom row V–VIII.",
+      "generator": "Built-in image generation",
+      "prompt": "One game asset sprite atlas containing exactly 8 separately readable original modern industrial particle reactors, evenly spaced in a strict grid of FOUR COLUMNS and TWO ROWS occupying the complete image, equal grid cell sizes, wide 2:1 landscape canvas. Transparent background, no scenery, no floor plane. Within each cell a complete mechanical prop centered horizontally and vertically, margins on ALL sides between different props (at least 10% cell width). Consistent straight-on front view, no tilted perspective, same absolute relative scale across cells, studio product render with premium stylized realistic game texture, blue-black steel and silver plus rich jewel-tone accent lighting. Critical consistent feature: each machine has a round dark glass aperture exactly in the horizontal and vertical center of its cell, about one third of cell width, unobstructed near-black dark glass on which animated atoms will later be laid. Top row left to right: 1 slender brushed silver circular vacuum chamber with amber lights and twin side conduits; 2 copper-wound magnetic chamber with sage-turquoise tubing; 3 bulky octagonal indigo fusion core; 4 horizontal white and amber ion beam emitter. Bottom row left to right: 5 large teal segmented cyclotron with brass; 6 pale-steel turquoise synchrotron with paired cooling consoles; 7 deep blue heavy ion ring with violet accent; 8 advanced graphite collider with bright pink and violet highlights. Visual hierarchy and distinct silhouettes, crisp details, expensive mechanical toy-like precision, front-facing experimental apparatus family. No lettering, no numbering, no people, no interface, no grid marks, strictly exactly eight sprites in a regular four-by-two formation, centered dark porthole on each machine."
+    },
+    {
       "file": "lab-console.webp",
       "layout": "Panoramic laboratory banner with quiet negative space on the left",
       "generator": "Built-in image generation",

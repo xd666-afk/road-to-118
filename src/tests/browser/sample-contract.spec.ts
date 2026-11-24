@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openLabPanel } from './lab-controls';
 import { createState } from '../../game/engine';
 import { serialize } from '../../game/save';
 
@@ -22,6 +23,7 @@ test('players can choose a supply plan, see both jobs, and reveal an unknown sam
     if (!localStorage.getItem(key)) localStorage.setItem(key, text);
   }, serialize(state, now + 1000));
   await page.goto('/');
+  await openLabPanel(page, 'tasks');
   const panel = page.locator('.sample-contract');
   await expect(panel).toBeVisible();
   await expect(panel.getByRole('button', { name: /氢供料.*1,800 碰撞能/ })).toBeVisible();
@@ -31,6 +33,7 @@ test('players can choose a supply plan, see both jobs, and reveal an unknown sam
   await page.clock.runFor(7000);
   await expect(panel.getByRole('progressbar', { name: '供料进度' })).not.toHaveAttribute('value', '0');
   await page.reload();
+  await openLabPanel(page, 'tasks');
   await expect(panel.getByRole('progressbar', { name: '供料进度' })).not.toHaveAttribute('value', '0');
   await page.clock.runFor(27000);
   await expect(panel).toContainText('最外层电子比氖少 1 个');
@@ -38,6 +41,7 @@ test('players can choose a supply plan, see both jobs, and reveal an unknown sam
   await panel.getByRole('button', { name: '确认样本' }).click();
   await expect(panel.getByRole('status')).toContainText('额外获得 100 研究数据');
   await page.reload();
+  await openLabPanel(page, 'tasks');
   await expect(panel.getByRole('status')).toContainText('样本确认是 氟（F）');
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 });

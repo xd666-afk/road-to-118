@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openLabPanel } from './lab-controls';
 import { createState, Engine } from '../../game/engine';
 import { D } from '../../game/numbers';
 import { serialize } from '../../game/save';
@@ -73,7 +74,7 @@ test('element abilities apply as soon as an archive is complete and survive relo
   await page.setViewportSize({ width: 360, height: 800 });
   await page.goto('/');
 
-  const openTable = () => page.locator('#periodic-table').scrollIntoViewIfNeeded();
+  const openTable = () => openLabPanel(page, 'archive');
   await openTable();
   await page.locator('.periodic-cell[data-z="1"]').click();
   const card = page.getByRole('dialog');
@@ -105,6 +106,7 @@ test('archiving the last unit of Xe completes H–Xe and leaves 55 locked', asyn
   await page.addInitScript(text => localStorage.setItem('road-to-118.save.v1', text), serialize(e.state));
   await page.setViewportSize({ width: 360, height: 800 });
   await page.goto('/');
+  await openLabPanel(page, 'archive');
   await page.locator('.periodic-cell[data-z="54"]').click();
   await page.getByRole('dialog').getByRole('button', { name: '提交 1 单位至档案' }).click();
   await expect(page.getByRole('dialog')).toContainText('已生效');
@@ -113,6 +115,6 @@ test('archiving the last unit of Xe completes H–Xe and leaves 55 locked', asyn
   const completion = page.getByRole('dialog', { name: 'H–Xe 全收集完成。' });
   await expect(completion).toContainText('54 / 54 已收录');
   await completion.getByRole('button', { name: '继续我的实验室' }).click();
-  await page.locator('#periodic-table').scrollIntoViewIfNeeded();
+  await openLabPanel(page, 'archive');
   await expect(page.locator('.periodic-cell[data-z="55"]')).toHaveClass(/version-locked/);
 });

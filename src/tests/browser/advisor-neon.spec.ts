@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { closeLabPanel, openLabPanel } from './lab-controls';
 import { createState } from '../../game/engine';
 import { D } from '../../game/numbers';
 import { serialize } from '../../game/save';
@@ -25,14 +26,19 @@ test('Ne advice archives with a real deposit, then returns the top instrument to
   await page.goto('/');
 
   await expect(page.getByRole('region', { name: '新手实验引导' })).toHaveCount(0);
-  await expect(page.locator('.mission-card')).toContainText('88/100');
   const collection = page.getByRole('progressbar', { name: '元素收集进度' });
   await expect(collection).toHaveAttribute('value', '2');
+  await openLabPanel(page, 'next');
+  await expect(page.locator('.mission-card')).toContainText('88/100');
   await page.locator('.mission-card').getByRole('button', { name: '提交氖的记录' }).click();
+  await openLabPanel(page, 'archive');
   await expect(page.locator('.periodic-cell[data-z="10"]')).toHaveClass(/archived/);
+  await closeLabPanel(page);
   await expect(collection).toHaveAttribute('value', '3');
+  await openLabPanel(page, 'next');
 
   await page.locator('.mission-card').getByRole('button', { name: '开始研究 · Ca' }).click();
+  await openLabPanel(page, 'instrument');
   await expect(page.locator('#reactor-selector')).toHaveValue('5');
   await expect(page.locator('#target')).toHaveValue('20');
 });
@@ -43,15 +49,23 @@ test('mobile lab controls meet the 44px touch target without overflowing 320px',
   await page.setViewportSize({ width: 320, height: 800 });
   await page.goto('/');
 
-  for (const selector of ['.status-pill', '.reactor-switch > button', '.target-actions .text-button', '.bulk-control button', '#reactor-selector', '#target']) {
-    const controls = page.locator(selector);
-    expect(await controls.count(), selector).toBeGreaterThan(0);
-    for (let i = 0; i < await controls.count(); i++) {
-      const box = await controls.nth(i).boundingBox();
-      expect(box?.height ?? 0, selector).toBeGreaterThanOrEqual(44);
+  const checkTouchTargets = async (selectors: string[]) => {
+    for (const selector of selectors) {
+      const controls = page.locator(selector);
+      expect(await controls.count(), selector).toBeGreaterThan(0);
+      for (let i = 0; i < await controls.count(); i++) {
+        const box = await controls.nth(i).boundingBox();
+        expect(box?.height ?? 0, selector).toBeGreaterThanOrEqual(44);
+      }
     }
-  }
+  };
+  await checkTouchTargets(['.status-pill', '.scene-explore', '.scene-dock button']);
   await expect(page.getByRole('progressbar', { name: '元素收集进度' })).toBeVisible();
+  await openLabPanel(page, 'instrument');
+  await checkTouchTargets(['.reactor-switch > button', '#reactor-selector', '#target']);
+  await openLabPanel(page, 'upgrades');
+  await checkTouchTargets(['.bulk-control button']);
+  await closeLabPanel(page);
 
   await page.getByRole('button', { name: '存档与设置' }).click();
   const close = page.getByRole('dialog').getByRole('button', { name: '关闭弹窗' });

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { enterLabPage, openLabPanel } from './lab-controls';
 import { writeFileSync } from 'node:fs';
 
 test('welcome waits for the player and mobile guide holds each step before advancing', async ({ page }) => {
@@ -20,9 +21,9 @@ test('welcome waits for the player and mobile guide holds each step before advan
   await expect(guide).toContainText('第 1 步');
   await expect(page.locator('.lab-guidance')).toHaveCount(0);
   await expect(start).toBeInViewport();
-  const nav = page.locator('.main-nav');
+  const nav = page.locator('.scene-dock');
   expect(await nav.evaluate(node => !!node.closest('[inert]'))).toBe(true);
-  await page.evaluate(() => document.querySelector<HTMLButtonElement>('.main-nav button:nth-child(2)')?.click());
+  await page.evaluate(() => document.querySelector<HTMLButtonElement>('[data-guide-target="research"]')?.click());
   await expect(start).toBeVisible();
   await page.clock.runFor(10_000);
   await expect(page.locator('.progress-resource strong')).toContainText('1/54 发现');
@@ -31,14 +32,14 @@ test('welcome waits for the player and mobile guide holds each step before advan
   await page.clock.runFor(400);
   await expect(guide).toContainText('第 1 步');
   await expect(guide).toContainText('仪器开始运行了');
-  await expect(page.locator('.control-column')).toHaveAttribute('inert', '');
+  await expect(page.locator('.scene-actions')).toHaveAttribute('inert', '');
   await page.evaluate(() => document.querySelector<HTMLButtonElement>('[data-opening-target="start"]')?.click());
   await expect(page.locator('[data-opening-target="start"]')).toContainText('运行中');
   await page.clock.runFor(600);
   await expect(guide).toContainText('第 2 步');
   const pulse = page.getByRole('button', { name: '手动碰撞' });
   await expect(pulse).toBeInViewport();
-  await expect(page.locator('.control-column')).toHaveAttribute('inert', '');
+  await expect(page.locator('.scene-instrument')).toHaveAttribute('inert', '');
   await pulse.click();
   await expect(page.locator('.mp-fx-group').last()).toContainText('+2 碰撞能');
   await pulse.click();
@@ -72,7 +73,7 @@ test('welcome waits for the player and mobile guide holds each step before advan
   await expect(card).toBeVisible();
   await expect(card.getByRole('button', { name: '继续引导' })).toBeFocused();
   await card.getByRole('button', { name: '继续引导' }).click();
-  await expect(page.locator('#target')).toHaveValue('2');
+  await expect(page.locator('.scene-target')).toHaveAttribute('aria-label', '实验目标 氦');
   await expect(page.getByRole('region', { name: '下一步', exact: true })).toHaveCount(0);
   await expect(page.getByRole('region', { name: '新手实验引导' })).toContainText('认识灵感点');
 });
@@ -82,6 +83,7 @@ test('skipping the spotlight switches to the single next-step panel', async ({ p
   await expect(page.getByRole('dialog', { name: '欢迎来到《通往118》' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
+  await openLabPanel(page, 'next');
   const next = page.getByRole('region', { name: '下一步', exact: true });
   await expect(next.getByRole('button', { name: '补充第一份氢样本' })).toBeVisible();
   await expect(page.getByRole('region', { name: '新手实验引导' })).toHaveCount(0);
@@ -101,12 +103,12 @@ test('player review: all six sections fit phone widths; pause survives reload', 
   for(const width of [320,360,768,1440]) {
     await page.setViewportSize({width,height:900});
     for(const name of ['实验室','科研','成就','统计','教程']) {
-      await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name,exact:true}).click();
+      await enterLabPage(page, name);
       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`${width}px ${name}`).toBe(true);
       measurements.push({width,tab:name,tinyTargets:await page.locator('button:visible').evaluateAll(buttons=>buttons.map(b=>({text:b.textContent?.trim(),w:b.getBoundingClientRect().width,h:b.getBoundingClientRect().height})).filter(b=>b.w<32||b.h<32))});
     }
   }
-  await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'实验室',exact:true}).click();
+  await enterLabPage(page, '实验室');
   await page.reload();
   await expect(page.getByRole('button',{name:'已暂停',exact:true})).toBeVisible();
   await expect(page.getByTestId('current-rate')).toHaveText('0 次/秒');

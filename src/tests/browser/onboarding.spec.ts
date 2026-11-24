@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { enterLabPage, openLabPanel } from './lab-controls';
 import { createState } from '../../game/engine';
 import { D } from '../../game/numbers';
 import { serialize } from '../../game/save';
@@ -8,6 +9,7 @@ test('an existing player can skip and start a separate guided save', async ({ pa
   const s = createState(701); s.coins = D(10); s.reactors[0].discoveryHazard = 100000;
   await page.addInitScript(({key,text}) => { if (!localStorage.getItem(key)) localStorage.setItem(key,text); }, {key:KEY,text:serialize(s)});
   await page.goto('/');
+  await openLabPanel(page, 'next');
   const coach = page.getByRole('region', {name:'新手实验引导'});
   await expect(coach).toBeVisible();
   await coach.getByRole('button', {name:'引导操作：补充第一份氢样本'}).click();
@@ -16,10 +18,13 @@ test('an existing player can skip and start a separate guided save', async ({ pa
   await expect(coach).toHaveCount(0);
   const next = page.getByRole('region', { name: '下一步', exact: true });
   await expect(next).toBeVisible();
-  await page.reload(); await expect(coach).toHaveCount(0);
+  await page.reload();
+  await openLabPanel(page, 'next');
+  await expect(coach).toHaveCount(0);
   await expect(next).toBeVisible();
+  await openLabPanel(page, 'upgrades');
   await expect(page.getByText('等级 1',{exact:true})).toBeVisible();
-  await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'教程'}).click();
+  await enterLabPage(page, '教程');
   await page.getByRole('button',{name:'新建存档体验引导'}).click();
   const welcome = page.getByRole('dialog', { name: '欢迎来到《通往118》' });
   await expect(welcome).toBeVisible();
@@ -32,6 +37,7 @@ test('coach fits narrow screens and shows a real resource shortage', async ({pag
   const s = createState(702);s.reactors[0].active=false;
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(s)});
   await page.goto('/');
+  await openLabPanel(page, 'next');
   const coach=page.getByRole('region',{name:'新手实验引导'});
   await coach.getByRole('button',{name:'引导操作：恢复实验'}).click();
   await expect(coach.getByRole('button',{name:'引导操作：补充第一份氢样本'})).toBeDisabled();
@@ -54,6 +60,7 @@ test('the last onboarding step is the sole guidance on desktop and phone, then h
   s.modules.feed = s.modules.reaction = true;
   await page.addInitScript(({ key, text }) => localStorage.setItem(key, text), { key: KEY, text: serialize(s) });
   await page.goto('/');
+  await openLabPanel(page, 'next');
 
   const guidance = page.locator('.lab-guidance');
   const coach = guidance.getByRole('region', { name: '新手实验引导' });
@@ -69,6 +76,7 @@ test('the last onboarding step is the sole guidance on desktop and phone, then h
   await archive.click();
   await expect(coach).toHaveCount(0);
   await expect(guidance.getByRole('region', { name: '下一步', exact: true })).toBeVisible();
+  await openLabPanel(page, 'archive');
   await expect(page.locator('[data-z="1"]')).toContainText('已收录');
 });
 
@@ -80,10 +88,13 @@ test('calcium recommendation preserves the 20th milestone without ending the H�
   s.elements[19].deposited=99;s.elements[19].inventory=D(0);s.elements[19].totalProduced=D(99);
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(s)});
   await page.goto('/');
+  await openLabPanel(page, 'next');
   await expect(page.getByRole('region',{name:'新手实验引导'})).toHaveCount(0);
   await page.locator('.mission-card').getByRole('button',{name:'生产钙 · 保留第二十号里程碑'}).click();
+  await openLabPanel(page, 'instrument');
   await expect(page.locator('#reactor-selector')).toHaveValue('5');
   await expect(page.locator('#target')).toHaveValue('20');
+  await openLabPanel(page, 'next');
   await page.locator('.mission-card').getByRole('button',{name:'提交钙的记录'}).click({timeout:20000});
   await expect(page.locator('.toast-stack')).toContainText('第二十号里程碑');
   await expect(page.getByRole('dialog')).toHaveCount(0);

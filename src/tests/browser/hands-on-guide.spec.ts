@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openLabPanel } from './lab-controls';
 import { createState } from '../../game/engine';
 import { D } from '../../game/numbers';
 import { serialize } from '../../game/save';
@@ -108,7 +109,7 @@ test('new-player practice uses a real drop, collision, reactor construction and 
   await expect(vessel).toBeInViewport();
   await vessel.click();
   await advance('reaction-research');
-  await expect(page.locator('#reactor-selector')).toHaveValue('2');
+  await expect(page.locator('.scene-tier')).toHaveText('II');
   await page.getByRole('button', { name: '科研', exact: true }).click();
   await advance('reaction');
   const reaction = page.locator('[data-guide-target="module-reaction"]');
@@ -130,7 +131,9 @@ test('new-player practice uses a real drop, collision, reactor construction and 
   await completion.getByRole('button', { name: '完成引导' }).click();
   await page.clock.runFor(1000);
   await expect(spotlight).toHaveCount(0);
+  await openLabPanel(page, 'next');
   await expect(page.getByRole('region', { name: '下一步', exact: true })).toBeVisible();
+  await openLabPanel(page, 'archive');
   await expect(page.locator('[data-z="1"]')).toContainText('已收录');
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
   await page.reload();

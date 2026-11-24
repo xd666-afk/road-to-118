@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openLabPanel } from './lab-controls';
 import { createState } from '../../game/engine';
 import { nextExperimentRound, NEXT_EXPERIMENT_SECONDS } from '../../game/experiments';
 import { D } from '../../game/numbers';
@@ -27,6 +28,7 @@ test('players can compare production plans and see which instrument delivered', 
   }, serialize(state, now + 1000));
   await page.setViewportSize({ width: 360, height: 800 });
   await page.goto('/');
+  await openLabPanel(page, 'tasks');
 
   const board = page.locator('.experiment-board');
   const assignments = page.getByRole('region', { name: '仪器分工' });
@@ -44,6 +46,7 @@ test('players can compare production plans and see which instrument delivered', 
   await board.getByRole('button', { name: '领取奖励' }).click();
   await expect(board).toContainText(`I 级仪器交付了 ${offer.goal} 份氢`);
   await page.reload();
+  await openLabPanel(page, 'tasks');
   await board.locator('summary').click();
   await expect(board).toContainText(`I 级仪器交付了 ${offer.goal} 份氢`);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
@@ -75,6 +78,7 @@ test('an archive commission awards a coupon and the next industry upgrade uses i
   }, serialize(state, now + 1000));
   await page.setViewportSize({ width: 360, height: 800 });
   await page.goto('/');
+  await openLabPanel(page, 'tasks');
   const board = page.locator('.experiment-board');
   await board.locator('summary').click();
   await expect(board.getByRole('button', { name: /手动碰撞/ })).toBeVisible();

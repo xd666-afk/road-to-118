@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { closeLabPanel, openLabPanel } from './lab-controls';
 import { readFileSync } from 'node:fs';
 import { createState } from '../../game/engine';
 import { D } from '../../game/numbers';
@@ -99,11 +100,13 @@ test('instrument selector reveals a paused non-selected instrument', async ({pag
   s.reactors[0].discoveryHazard=100000;
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(s)});
   await page.goto('/');
+  await openLabPanel(page, 'instrument');
   const selector = page.locator('#reactor-selector');
   await expect(selector).toHaveValue('1');
   await expect(selector.locator('option[value="2"]')).toContainText('已暂停');
   await expect(selector.locator('option[value="1"]')).not.toContainText('已暂停');
   await selector.selectOption('2');
+  await closeLabPanel(page);
   await expect(page.getByRole('button',{name:'已暂停',exact:true})).toBeVisible();
 });
 

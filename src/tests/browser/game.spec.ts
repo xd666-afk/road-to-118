@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { closeLabPanel, enterLabPage, openLabPanel } from './lab-controls';
 import { Engine, createState } from '../../game/engine';
 import { D } from '../../game/numbers';
 import { serialize } from '../../game/save';
@@ -8,17 +9,19 @@ test('desktop: renders live economy, buys upgrades, opens all 118 elements, and 
   const state=createState(51); state.coins=D(200); state.reactors[0].discoveryHazard=100;
   await page.addInitScript(({ key, text })=>localStorage.setItem(key,text), {key:KEY,text:serialize(state)});
   await page.goto('/');
-  await expect(page.getByRole('heading',{name:/自由碰撞容器/})).toBeVisible();
+  await expect(page.locator('.scene-device-select')).toContainText('自由碰撞容器');
   await expect(page.getByTestId('coins')).toBeVisible();
+  await openLabPanel(page, 'upgrades');
   await page.getByRole('button',{name:'购买补充氢样本',exact:true}).click();
   await expect(page.getByText('等级 1',{exact:true})).toBeVisible();
-  const archive = page.getByRole('region', { name: '元素周期表', exact: true });
+  await openLabPanel(page, 'archive');
+  const archive = page.getByRole('region', { name: '元素周期表面板', exact: true });
   const archiveHeading = archive.getByRole('heading', { name: '元素周期表' });
   await expect(archive.locator('.periodic-cell')).toHaveCount(118);
   await expect(archive.locator('[data-z="2"]')).toContainText('下一发现');
   await archiveHeading.scrollIntoViewIfNeeded();
   await expect(archiveHeading).toBeInViewport();
-  await expect(page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '周期表' })).toHaveCount(0);
+  await expect(page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '周期表' })).toHaveAttribute('aria-expanded', 'true');
   await expect(page.getByTestId('current-rate')).toHaveCount(1);
   await page.locator('[data-z="118"]').click();
   await expect(page.getByRole('dialog')).toContainText('鿫');
@@ -33,10 +36,14 @@ test('mobile 360px: usable navigation, scrollable table, knowledge cards, no pag
   const state=createState(52);state.reactors[0].discoveryHazard=100;
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(state)});
   await page.setViewportSize({width:360,height:800}); await page.goto('/');
+  await expect(page.locator('.lab-scene')).toHaveCSS('height', '800px');
+  await expect(page.locator('#experiment-drawer')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '手动碰撞' })).toBeInViewport();
+  await openLabPanel(page, 'upgrades');
   await expect(page.getByRole('button',{name:'购买补充氢样本',exact:true})).toBeVisible();
   await page.screenshot({path:'artifacts/mobile-laboratory.png',fullPage:true});
   expect(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.locator('#periodic-table').scrollIntoViewIfNeeded();
+  await openLabPanel(page, 'archive');
   expect(await page.locator('.table-scroll').evaluate(el=>el.scrollWidth>el.clientWidth)).toBe(true);
   await page.locator('[data-z="1"]').click(); await expect(page.getByRole('dialog')).toContainText('氢');
   await expect(page.getByRole('button',{name:'关闭弹窗'})).toBeVisible();
@@ -59,12 +66,16 @@ test('99 Ca remains incomplete; one more submission preserves the 20th milestone
   e.state.reactors.forEach(r=>r.active=false);e.target(5,20);
   const ca=e.state.elements[19];ca.inventory=D(99);ca.totalProduced=D(99);e.state.notices=[];
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(e.state)});
-  await page.goto('/');await page.locator('#periodic-table').scrollIntoViewIfNeeded();
+  await page.goto('/');await openLabPanel(page, 'archive');
   await page.locator('[data-z="20"]').click();await page.getByRole('button',{name:'提交 99 单位至档案'}).click();
   await expect(page.getByRole('dialog').locator('.inventory-block')).toContainText('99 / 100');
   await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).toHaveCount(0);
-  await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'实验室',exact:true}).click();
-  await page.getByLabel('切换反应容器').selectOption('5');await page.getByRole('button',{name:'已暂停'}).click();
+  await closeLabPanel(page);
+  await openLabPanel(page, 'instrument');
+  await page.getByLabel('切换反应容器').selectOption('5');
+  await closeLabPanel(page);
+  await page.getByRole('button',{name:'已暂停'}).click();
+  await openLabPanel(page, 'archive');
   await page.locator('[data-z="20"]').click();
   await page.getByRole('button',{name:'提交 1 单位至档案'}).click({timeout:15000});
   await expect(page.getByRole('dialog')).toContainText('周期表已永久点亮');
@@ -87,6 +98,7 @@ test('online first discovery opens exactly one knowledge card and can be reread'
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(s)});
   await page.goto('/'); await expect(page.getByRole('dialog')).toContainText('新元素发现 · 氦');
   await page.keyboard.press('Escape'); await page.waitForTimeout(500); await expect(page.getByRole('dialog')).not.toBeVisible();
+  await openLabPanel(page, 'archive');
   await page.locator('[data-z="2"]').click(); await expect(page.getByRole('dialog')).toContainText('氦');
 });
 
@@ -99,13 +111,16 @@ test('opening hints lead from Be to a new reactor, parallel production and a rea
   for(const r of e.state.reactors)r.discoveryHazard=100;
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(e.state)});
   await page.goto('/');
+  await openLabPanel(page, 'upgrades');
   await expect(page.getByRole('button',{name:'购买粒子加速',exact:true})).toBeDisabled();
+  await openLabPanel(page, 'next');
   await page.locator('.mission-card').getByRole('button',{name:'研发原料补充'}).click();
   await page.locator('.mission-card').getByRole('button',{name:'建造 II 级仪器'}).click();
-  await expect(page.getByRole('heading',{name:/受控反应容器/})).toBeVisible();
+  await expect(page.locator('.scene-device-select')).toContainText('受控反应容器');
   await page.locator('.mission-card').getByRole('button',{name:'研发自动反应'}).click();
   await page.locator('.mission-card').getByRole('button',{name:'让 I 型生产氢样本'}).click();
   await page.locator('.mission-card').getByRole('button',{name:'提交并点亮 H'}).click({timeout:10000});
+  await openLabPanel(page, 'archive');
   await expect(page.locator('[data-z="1"]')).toContainText('已收录');
 });
 
@@ -113,10 +128,12 @@ test('mobile first upgrade is reachable without scrolling',async({page})=>{
   const state=createState(62);state.coins=D(10);state.reactors[0].discoveryHazard=100;
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(state)});
   await page.setViewportSize({width:360,height:800});await page.goto('/');
+  await openLabPanel(page, 'next');
   const coach = page.getByRole('region', { name: '新手实验引导' });
   const action = coach.getByRole('button', { name: '引导操作：补充第一份氢样本' });
   await expect(page.getByRole('region', { name: '下一步', exact: true })).toHaveCount(0);
   await expect(action).toBeInViewport();await action.click();
+  await openLabPanel(page, 'upgrades');
   await expect(page.getByText('等级 1',{exact:true})).toBeVisible();
 });
 
@@ -126,7 +143,9 @@ test('III displays newly discovered heavier elements while I retains its chosen 
   e.build(2);e.build(3);e.target(3,9);e.state.settings.mix=[1,2,3,4,5];e.state.notices=[];
   for(const r of e.state.reactors)r.discoveryHazard=100;
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(e.state)});
-  await page.goto('/');await page.getByLabel('切换反应容器').selectOption('3');
+  await page.goto('/');
+  await openLabPanel(page, 'instrument');
+  await page.getByLabel('切换反应容器').selectOption('3');
   await expect(page.locator('.mix-control .element-sample-chip')).toHaveText(['N','O','F']);
   await expect(page.locator('canvas')).toHaveAttribute('aria-label',/展示元素：N、O、F。/);
   await page.getByLabel('切换反应容器').selectOption('1');
@@ -138,15 +157,16 @@ test('income and speed use distinct units; full explanation is in the separate t
   Object.assign(state.reactors[0].upgrades,{atoms:23,speed:7,yield:1});state.reactors[0].discoveryHazard=1000000;
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(state)});
   await page.setViewportSize({width:1440,height:1000});await page.goto('/');
-  await expect(page.locator('.resource-income')).toHaveText('收入 +18.9 /秒');
+  await expect(page.locator('.scene-energy')).toHaveAttribute('title', '碰撞能，+ 18.9 /秒');
   await expect(page.getByTestId('current-rate')).toHaveText('14 次/秒');
+  await openLabPanel(page, 'upgrades');
   await expect(page.getByTestId('reactor-energy-rate')).toHaveText('18.9 /秒');
   await expect(page.getByTestId('reactor-data-rate')).toHaveText('14 点/秒');
   await expect(page.getByRole('progressbar', { name: '当前速度占上限' })).toHaveCount(0);
   await expect(page.locator('.metric-help, .income-breakdown, .upgrade-hint, .waiting-note')).toHaveCount(0);
   await expect(page.getByRole('button',{name:/解释：/})).toHaveCount(0);
   await page.screenshot({path:'artifacts/simple-laboratory-desktop.png',fullPage:true,animations:'disabled'});
-  await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'教程'}).click();
+  await enterLabPage(page, '教程');
   await expect(page.getByRole('article')).toContainText('14 次/秒 × 1.35 碰撞能/次');
   await expect(page.getByRole('article')).toContainText('= 18.9 碰撞能/秒');
   await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -155,6 +175,7 @@ test('income and speed use distinct units; full explanation is in the separate t
   await page.getByRole('button',{name:'返回实验',exact:true}).click();
   await page.getByRole('button',{name:'运行中'}).click();
   await expect(page.getByTestId('current-rate')).toHaveText('0 次/秒');
+  await openLabPanel(page, 'upgrades');
   await expect(page.getByTestId('reactor-energy-rate')).toHaveText('0 /秒');
   await expect(page.getByTestId('reactor-data-rate')).toHaveText('0 点/秒');
 });
@@ -168,13 +189,15 @@ test('total speed sums devices; switching the device only changes its own speed 
   for(const r of state.reactors)r.discoveryHazard=1000000;
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(state)});
   await page.goto('/');
-  await expect(page.locator('.resource-bar .resource-item').first()).toContainText('56次/秒');
-  await expect(page.locator('.resource-income')).toContainText('+270');
+  await expect(page.locator('.scene-speed')).toContainText('56/秒');
+  await expect(page.locator('.scene-energy')).toHaveAttribute('title', /270/);
+  await openLabPanel(page, 'instrument');
   await page.getByLabel('切换反应容器').selectOption('2');
   await expect(page.getByTestId('current-rate')).toHaveText('42 次/秒');
-  await expect(page.locator('.upgrade').filter({hasText:'单次收益'})).toContainText('每次 6 → 8.1 碰撞能');
   await expect(page.locator('.chamber-footer')).toContainText('批量生产 ×32');
   await expect(page.locator('.target-copy')).toContainText('平均等待约');
+  await openLabPanel(page, 'upgrades');
+  await expect(page.locator('.upgrade').filter({hasText:'单次收益'})).toContainText('每次 6 → 8.1 碰撞能');
   await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'科研',exact:true}).click();
   await expect(page.locator('#production-target')).toHaveCount(0);
   await page.locator('#work-mode').selectOption('produce');
@@ -187,7 +210,7 @@ test('mobile has five usable tabs and one readable tutorial document, including 
   await page.setViewportSize({width:360,height:800});await page.goto('/');
   await expect(page.getByRole('navigation',{name:'主导航'}).getByRole('button')).toHaveCount(5);
   await page.screenshot({path:'artifacts/simple-laboratory-mobile.png',fullPage:true,animations:'disabled'});
-  await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'教程'}).click();
+  await enterLabPage(page, '教程');
   await expect(page.getByRole('article').getByRole('heading',{level:2})).toHaveText(['开始实验','资源与速度','选择升级','发现与收录','自动化','存档与其他']);
   await page.getByRole('navigation',{name:'教程目录'}).getByRole('link',{name:/发现与收录/}).click();
   await expect(page.locator('#guide-archive')).toBeInViewport();
@@ -200,8 +223,8 @@ test('mobile has five usable tabs and one readable tutorial document, including 
   await page.setViewportSize({width:360,height:800});
   await page.screenshot({path:'artifacts/simple-tutorial-mobile.png',fullPage:true,animations:'disabled'});
   await page.getByRole('button',{name:'返回实验',exact:true}).click();
-  await expect(page.getByRole('heading',{name:/自由碰撞容器/})).toBeVisible();
-  await expect(page.locator('.resource-bar')).toBeVisible();
+  await expect(page.locator('.scene-device-select')).toContainText('自由碰撞容器');
+  await expect(page.locator('.scene-resources')).toBeVisible();
   await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'科研',exact:true}).click();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
@@ -221,7 +244,7 @@ test('H–Xe cards show specimen art, neutral electrons and isotope-specific neu
   const state=createState(68);state.elements.forEach(e=>e.discovered=true);state.reactors[0].active=false;
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(state)});
   await page.setViewportSize({width:1280,height:1000});await page.goto('/');
-  await page.locator('#periodic-table').scrollIntoViewIfNeeded();
+  await openLabPanel(page, 'archive');
   const dialog=page.getByRole('dialog');
   const value=(label:string)=>dialog.locator('.atomic-facts>div').filter({has:page.getByText(label,{exact:true})}).locator('dd');
   for(let z=1;z<=20;z++){
@@ -270,7 +293,7 @@ test('H–Xe cards show specimen art, neutral electrons and isotope-specific neu
   await expect(dialog.locator('.electron-configuration')).toHaveCount(0);
 });
 
-test('VI–VIII each load distinct art and support a manual pulse at the edge of the picture', async ({ page }) => {
+test('I–VIII each load distinct art and support a manual pulse at the edge of the picture', async ({ page }) => {
   const state = createState(810);
   state.settings.guideDismissed = true;
   state.elements.forEach(element => { element.discovered = true; });
@@ -279,13 +302,15 @@ test('VI–VIII each load distinct art and support a manual pulse at the edge of
   await page.goto('/');
   const selector = page.getByRole('combobox', { name: '切换反应容器' });
   const device = page.locator('.device-illustrated');
-  for (const [index, roman] of ['vi', 'vii', 'viii'].entries()) {
+  const positions = new Set<string>();
+  for (let index = 0; index < 8; index++) {
     await page.setViewportSize({ width: index === 1 ? 360 : 1440, height: 800 });
-    await selector.selectOption(String(index + 6));
+    await openLabPanel(page, 'instrument');
+    await selector.selectOption(String(index + 1));
+    await closeLabPanel(page);
     const photo = device.locator('.device-photo');
-    await expect(photo).toHaveCSS('background-image', new RegExp(`reactor-${roman}\\.webp`));
-    const image = await page.request.get(`/assets/reactor-${roman}.webp`);
-    expect(image.headers()['content-type']).toContain('image/webp');
+    await expect(photo).toHaveCSS('background-image', /reactor-series\.webp/);
+    positions.add(await photo.evaluate(photo => getComputedStyle(photo).backgroundPosition));
     const pulse = device.getByRole('button', { name: '手动碰撞' });
     await pulse.scrollIntoViewIfNeeded();
     const artBox = (await photo.boundingBox())!;
@@ -296,14 +321,15 @@ test('VI–VIII each load distinct art and support a manual pulse at the edge of
     await expect(device.locator('.mp-fx-group.is-latest')).toContainText('碰撞能');
   }
   await page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '科研' }).click();
-  await expect(page.locator('.research-device-art.advanced-art')).toHaveCount(3);
+  expect(positions.size).toBe(8);
+  await expect(page.locator('.research-device-art.research-series')).toHaveCount(8);
 });
 
 test('320px and 360px knowledge cards keep atomic data readable and distinguish fluorine from fluoride',async({page})=>{
   const state=createState(69);state.elements.forEach(e=>e.discovered=true);state.reactors[0].active=false;
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(state)});
   await page.setViewportSize({width:360,height:800});await page.goto('/');
-  await page.locator('#periodic-table').scrollIntoViewIfNeeded();
+  await openLabPanel(page, 'archive');
   await page.locator('[data-z="9"]').click();
   const dialog=page.getByRole('dialog');
   await expect(dialog.locator('.atomic-facts>div').filter({has:page.getByText('电子数（中性）',{exact:true})}).locator('dd')).toHaveText('9');
@@ -336,6 +362,7 @@ test('shows each missing VI requirement beside Sc exploration and clears it when
   await page.setViewportSize({ width: 360, height: 800 });
   await page.goto('/');
 
+  await openLabPanel(page, 'instrument');
   const requirements = page.locator('#exploration-requirements');
   await expect(requirements).toContainText('探索钪前还需');
   await expect(requirements).toContainText('建造 VI 级同步辐射研究环');
@@ -344,19 +371,28 @@ test('shows each missing VI requirement beside Sc exploration and clears it when
   await page.getByRole('button', { name: '研发仪器' }).click();
   await page.locator('.research-device').filter({ has: page.getByRole('heading', { name: '同步辐射研究环' }) })
     .getByRole('button', { name: '研发并建造' }).click();
+  await openLabPanel(page, 'instrument');
   await expect(requirements).not.toContainText('建造 VI 级');
   await expect(requirements).toContainText('设备扩容 0/1 级');
+  await openLabPanel(page, 'upgrades');
   await page.getByRole('button', { name: '购买设备扩容' }).click();
+  await openLabPanel(page, 'instrument');
   await expect(requirements).not.toContainText('设备扩容 0/1 级');
   await expect(requirements).toContainText('扩容＋单次收益合计 1/4 级');
+  await openLabPanel(page, 'upgrades');
   for (let level = 0; level < 3; level++) await page.getByRole('button', { name: '购买单次收益' }).click();
+  await openLabPanel(page, 'instrument');
   await expect(requirements).not.toContainText('扩容＋单次收益');
+  await closeLabPanel(page);
   const explore = page.getByRole('button', { name: '探索 Sc' });
   await expect(explore).toBeDisabled();
+  await openLabPanel(page, 'archive');
   await page.locator('.periodic-cell[data-z="20"]').click();
   await page.getByRole('button', { name: '提交 77 单位至档案' }).click();
   await page.keyboard.press('Escape');
+  await openLabPanel(page, 'instrument');
   await expect(requirements).toHaveCount(0);
+  await closeLabPanel(page);
   await expect(explore).toBeEnabled();
 });
 
@@ -376,10 +412,13 @@ test('released Ne save upgrades in place and shows a real Na survey after IV tun
   await page.clock.pauseAt(start + 1000);
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:JSON.stringify(old)});
   await page.setViewportSize({width:1440,height:1000});await page.goto('/');
+  await openLabPanel(page, 'archive');
   await expect(page.locator('[data-z="10"]')).toHaveClass(/archived/);
   await expect(page.getByRole('dialog')).toHaveCount(0);
+  await openLabPanel(page, 'next');
   await page.locator('.mission-card').getByRole('button',{name:'建造 IV 级仪器'}).click();
-  await expect(page.getByRole('heading',{name:/离子束反应器/})).toBeVisible();
+  await expect(page.locator('.scene-device-select')).toContainText('离子束反应器');
+  await openLabPanel(page, 'instrument');
   const requirements = page.locator('#exploration-requirements');
   await expect(requirements).toContainText('探索钠前还需');
   await expect(requirements).toContainText('设备扩容 0/1 级');
@@ -387,17 +426,23 @@ test('released Ne save upgrades in place and shows a real Na survey after IV tun
   await expect(requirements).not.toContainText('收录氖');
   await page.clock.runFor(6000);
   await expect(page.getByRole('dialog')).toHaveCount(0);
+  await openLabPanel(page, 'next');
   const tuning = page.locator('.mission-card').getByRole('button', { name: /培养 IV 级/ });
   for (let level = 0; level < 3; level++) await tuning.click();
   await page.locator('.mission-card').getByRole('button', { name: '开始研究 · Na' }).click();
+  await openLabPanel(page, 'instrument');
   await expect(requirements).toHaveCount(0);
+  await closeLabPanel(page);
   const progress = page.getByRole('progressbar', { name: '首次观测进度' });
   await expect(progress).toHaveAttribute('value', '0');
   await page.clock.runFor(6000);
   expect(Number(await progress.getAttribute('value'))).toBeGreaterThan(.1);
+  await openLabPanel(page, 'instrument');
   await expect(page.locator('.target-copy')).toContainText('观测');
+  await openLabPanel(page, 'archive');
   await expect(page.locator('[data-z="10"]')).toHaveClass(/archived/);
-  await expect(page.locator('.device-photo')).toHaveCSS('background-image',/reactor-expansion-atlas/);
+  await closeLabPanel(page);
+  await expect(page.locator('.device-photo')).toHaveCSS('background-image',/reactor-series/);
   await page.screenshot({path:'artifacts/v02-reactor-iv-desktop.png',fullPage:true,animations:'disabled'});
 });
 
@@ -412,13 +457,16 @@ test('V opens after Ar and reaches Ca; its graphic and representative samples us
   e.state.reactors.forEach(r=>r.active=false);e.state.reactors[4].active=true;e.state.reactors[4].discoveryHazard=0;e.state.notices=[];
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(e.state)});
   await page.setViewportSize({width:1440,height:1000});await page.goto('/');
+  await openLabPanel(page, 'next');
   await page.locator('.lab-guidance').getByRole('button',{name:/建造 V 级仪器/}).click();
   const tune = page.locator('.mission-card').getByRole('button', { name: /培养 V 级/ });
   for (let level = 0; level < 3; level++) await tune.click();
   await page.locator('.mission-card').getByRole('button', { name: '开始研究 · Ca' }).click();
-  await expect(page.getByRole('heading',{name:/回旋加速器/})).toBeVisible();
+  await expect(page.locator('.scene-device-select')).toContainText('回旋加速器');
   await expect(page.locator('canvas')).toHaveAttribute('aria-label',/展示元素：K。/);
+  await openLabPanel(page, 'instrument');
   await expect(page.getByLabel('切换反应容器').locator('option')).toHaveCount(5);
+  await closeLabPanel(page);
   await page.screenshot({path:'artifacts/v02-reactor-v-desktop.png',fullPage:true,animations:'disabled'});
 });
 
@@ -428,9 +476,12 @@ test('new period fits 320px and 360px screens and reads Ca and P knowledge witho
   for(let id=2;id<=5;id++)e.build(id);e.state.reactors.forEach(r=>r.active=false);e.state.notices=[];
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(e.state)});
   await page.setViewportSize({width:360,height:800});await page.goto('/');
+  await openLabPanel(page, 'instrument');
   await page.getByLabel('切换反应容器').selectOption('5');
+  await closeLabPanel(page);
   for(const width of [320,360]){await page.setViewportSize({width,height:800});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}
   await page.screenshot({path:'artifacts/v02-mobile-laboratory.png',fullPage:true,animations:'disabled'});
+  await openLabPanel(page, 'archive');
   await page.locator('[data-z="20"]').click();
   await expect(page.getByRole('dialog').locator('.electron-shells')).toHaveAttribute('aria-label','电子层由内到外：2、8、8、2');
   expect(await page.getByRole('dialog').evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);

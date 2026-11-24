@@ -24,15 +24,11 @@ export function specimenImageStyle(z: number) {
   };
 }
 
-interface ReactorArtwork {
-  file: string;
-  portY: number;
-  portWidth: number;
+export function reactorImageStyle(id: number) {
+  const cell = id - 1;
+  return {
+    backgroundImage: `url("${artworkUrl('reactor-series.webp')}")`,
+    backgroundSize: '400% 200%',
+    backgroundPosition: `${(cell % 4) * 100 / 3}% ${Math.floor(cell / 4) * 100}%`,
+  };
 }
-
-// The viewport shares the image's square box. These values were measured on each finished illustration.
-export const advancedReactorArtwork: Partial<Record<number, ReactorArtwork>> = {
-  6: { file: 'reactor-vi.webp', portY: 42.4, portWidth: 27.5 },
-  7: { file: 'reactor-vii.webp', portY: 39.8, portWidth: 26.7 },
-  8: { file: 'reactor-viii.webp', portY: 40.8, portWidth: 28.5 },
-};
