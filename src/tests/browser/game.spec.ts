@@ -293,7 +293,7 @@ test('H–Xe cards show specimen art, neutral electrons and isotope-specific neu
   await expect(dialog.locator('.electron-configuration')).toHaveCount(0);
 });
 
-test('I–VIII each load distinct art and support a manual pulse at the edge of the picture', async ({ page }) => {
+test('I–VIII each load an integrated scene with a visible window and support pulses at the edge', async ({ page }) => {
   const state = createState(810);
   state.settings.guideDismissed = true;
   state.elements.forEach(element => { element.discovered = true; });
@@ -301,28 +301,38 @@ test('I–VIII each load distinct art and support a manual pulse at the edge of 
   await page.addInitScript(save => localStorage.setItem('road-to-118.save.v1', save), serialize(state));
   await page.goto('/');
   const selector = page.getByRole('combobox', { name: '切换反应容器' });
-  const device = page.locator('.device-illustrated');
-  const positions = new Set<string>();
+  const device = page.locator('.lab-playfield');
+  const sources = new Set<string>();
   for (let index = 0; index < 8; index++) {
-    await page.setViewportSize({ width: index === 1 ? 360 : 1440, height: 800 });
+    const width = index % 2 ? 360 : 1440;
+    await page.setViewportSize({ width, height: 800 });
     await openLabPanel(page, 'instrument');
     await selector.selectOption(String(index + 1));
     await closeLabPanel(page);
-    const photo = device.locator('.device-photo');
-    await expect(photo).toHaveCSS('background-image', /reactor-series\.webp/);
-    positions.add(await photo.evaluate(photo => getComputedStyle(photo).backgroundPosition));
+    const photo = page.locator('.scene-image');
+    await expect(photo).toHaveAttribute('src', /reactor-room-[iv]+\.webp/);
+    sources.add(await photo.getAttribute('src') ?? '');
+    const aperture = page.locator('.scene-aperture canvas');
+    await expect(aperture).toBeInViewport({ ratio: 1 });
+    const window = (await aperture.boundingBox())!;
+    expect(window.width).toBeGreaterThan(70);
+    expect(window.x).toBeGreaterThan(0);
+    expect(window.x + window.width).toBeLessThan(width);
     const pulse = device.getByRole('button', { name: '手动碰撞' });
     await pulse.scrollIntoViewIfNeeded();
     const artBox = (await photo.boundingBox())!;
     const area = (await pulse.boundingBox())!;
     expect(artBox.width).toBeCloseTo(artBox.height, 0);
     expect(area).toEqual(await device.boundingBox());
-    await pulse.click({ position: { x: artBox.x - area.x + 10, y: 10 } });
+    await pulse.click({ position: { x: 10, y: area.height / 2 } });
     await expect(device.locator('.mp-fx-group.is-latest')).toContainText('碰撞能');
   }
   await page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '科研' }).click();
-  expect(positions.size).toBe(8);
-  await expect(page.locator('.research-device-art.research-series')).toHaveCount(8);
+  expect(sources.size).toBe(8);
+  const gallery = page.locator('.research-device-art.research-series img');
+  await expect(gallery).toHaveCount(8);
+  expect(await gallery.evaluateAll(images => images.map(image => image.getAttribute('src')).sort()))
+    .toEqual([...sources].sort());
 });
 
 test('320px and 360px knowledge cards keep atomic data readable and distinguish fluorine from fluoride',async({page})=>{
@@ -442,7 +452,7 @@ test('released Ne save upgrades in place and shows a real Na survey after IV tun
   await openLabPanel(page, 'archive');
   await expect(page.locator('[data-z="10"]')).toHaveClass(/archived/);
   await closeLabPanel(page);
-  await expect(page.locator('.device-photo')).toHaveCSS('background-image',/reactor-series/);
+  await expect(page.locator('.scene-image')).toHaveAttribute('src', /reactor-room-iv\.webp/);
   await page.screenshot({path:'artifacts/v02-reactor-iv-desktop.png',fullPage:true,animations:'disabled'});
 });
 

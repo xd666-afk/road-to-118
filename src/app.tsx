@@ -11,6 +11,7 @@ import type { GameState, Module, Upgrade } from './game/types';
 import { ELEMENTS, KNOWLEDGE, SCIENCE_NOTE, baikeUrl, element } from './data/elements';
 import Particles from './components/Particles';
 import ManualPulse from './components/ManualPulse';
+import ReactorScene from './components/ReactorScene';
 import Modal from './components/Modal';
 import Onboarding from './components/Onboarding';
 import OpeningSpotlight from './components/OpeningSpotlight';
@@ -26,7 +27,7 @@ import { assignedToSample } from './game/sampleContract';
 import { recommend, applyAdvice, openingStep } from './game/advisor';
 import './components/journey.css';
 import { AtomicFacts, FurtherScience } from './components/AtomicProfile';
-import { artworkUrl, reactorImageStyle, specimenImageStyle } from './data/artwork';
+import { artworkUrl, reactorScene, specimenImageStyle } from './data/artwork';
 import ElementAbility from './components/ElementAbility';
 import { abilityBonuses } from './game/abilityProgress';
 import AutomationControls, { IndustryModules } from './components/AutomationControls';
@@ -389,11 +390,6 @@ export default function App() {
       </button>
     </div>;
   }
-  const viewport = (
-    <div className="viewport">
-      <Particles count={Math.min(60, activeAtoms(r).toNumber())} mix={visualPool} speed={r.upgrades.speed} reduced={s.settings.reducedMotion} active={r.active} flash={flash}/>
-    </div>
-  );
   const collisionControl = <ManualPulse key={focus} enabled={engine.canManualPulse(focus)} reducedMotion={s.settings.reducedMotion}
         tutorialTarget label={r.active ? '点击触发碰撞' : '仪器已暂停'}
         onPulse={() => {
@@ -474,12 +470,12 @@ export default function App() {
     }
   };
 
-  const lab = () => <section className="lab-scene" aria-label="实验室" data-guiding={!!spotlight}
-    style={{ '--hall-art': `url("${artworkUrl('accelerator-hall.webp')}")` } as CSSProperties}>
-    <div className="device lab-playfield device-illustrated" inert={!!activeDrawer}>
-      <div className="device-photo" style={reactorImageStyle(focus)}>{viewport}</div>
-      {collisionControl}
-    </div>
+  const lab = () => <section className="lab-scene" aria-label="实验室" data-guiding={!!spotlight}>
+    <ReactorScene key={focus} id={focus}>
+      <Particles count={Math.min(60, activeAtoms(r).toNumber())} mix={visualPool}
+        speed={r.upgrades.speed} reduced={s.settings.reducedMotion} active={r.active} flash={flash}/>
+    </ReactorScene>
+    <div className="device lab-playfield" inert={!!activeDrawer}>{collisionControl}</div>
     <div className="scene-hud">
       {brand()}
       <section className="scene-resources" aria-label="实验室资源">
@@ -594,7 +590,7 @@ export default function App() {
     </section>
   );
 
-  const research = () => <><div className="section-heading"><div><h1>科研</h1></div><div className="research-budget"><span>可用研究数据</span><strong>{fmt(s.data)}<small> 点</small></strong></div></div><div className="research-grid">{REACTORS.map(t => { const state = s.reactors[t.id - 1], unlocked = max >= t.unlock, afford = s.coins.gte(t.buildCoins) && s.data.gte(t.buildData); return <section id={`research-reactor-${t.id}`} className={`panel research-device ${!unlocked ? 'is-locked' : ''}`} key={t.id}><div className="research-device-art research-series"><div style={reactorImageStyle(t.id)} /></div><div className="research-device-copy"><div className="eyebrow">{t.roman} 级 / {t.range}</div><h2>{t.name}</h2><div className="spec-line"><span>速度上限</span><strong>{t.cap} 次/秒</strong></div><div className="spec-line"><span>开放条件</span><strong>{t.id === 1 ? '开局可用' : `首次发现 ${element(t.unlock).name}`}</strong></div>{state.built ? <button className="secondary-button full" onClick={() => { setFocus(t.id); goToTab('lab'); }}><Check size={15}/>已建成 · 进入控制台<ArrowRight size={15}/></button> : <><div className="construction-cost"><span className={s.coins.gte(t.buildCoins) ? '' : 'insufficient'}>{fmt(t.buildCoins)} 碰撞能</span><span className={s.data.gte(t.buildData) ? '' : 'insufficient'}>{fmt(t.buildData)} 数据</span></div><button className="primary-button full" data-guide-target={t.id === 2 ? "build" : undefined} disabled={!unlocked || !afford} onClick={() => act(e => { if (e.build(t.id)) { setFocus(t.id); goToTab('lab'); } })}>{!unlocked ? <><LockKeyhole size={15}/>发现 {element(t.unlock).symbol} 后开放</> : <>研发并建造<ArrowRight size={15}/></>}</button>{unlocked && !afford && <p className="cost-shortfall">还差 {shortfall(t.buildCoins, t.buildData)}</p>}</>}</div></section>; })}</div><section id="industry-panel" className="panel industry-panel"><div className="panel-heading"><div><span className="eyebrow">INDUSTRIAL PIPELINE</span><h2>工业自动化</h2></div><span className="tiny-label">{Object.values(s.modules).filter(Boolean).length} / 3 模块</span></div><IndustryModules state={s} max={max} act={act}/><AutomationControls state={s} max={max} act={act}/></section></>;
+  const research = () => <><div className="section-heading"><div><h1>科研</h1></div><div className="research-budget"><span>可用研究数据</span><strong>{fmt(s.data)}<small> 点</small></strong></div></div><div className="research-grid">{REACTORS.map(t => { const state = s.reactors[t.id - 1], unlocked = max >= t.unlock, afford = s.coins.gte(t.buildCoins) && s.data.gte(t.buildData); return <section id={`research-reactor-${t.id}`} className={`panel research-device ${!unlocked ? 'is-locked' : ''}`} key={t.id}><div className="research-device-art research-series"><img src={artworkUrl(reactorScene(t.id).file)} alt="" loading="lazy" decoding="async"/></div><div className="research-device-copy"><div className="eyebrow">{t.roman} 级 / {t.range}</div><h2>{t.name}</h2><div className="spec-line"><span>速度上限</span><strong>{t.cap} 次/秒</strong></div><div className="spec-line"><span>开放条件</span><strong>{t.id === 1 ? '开局可用' : `首次发现 ${element(t.unlock).name}`}</strong></div>{state.built ? <button className="secondary-button full" onClick={() => { setFocus(t.id); goToTab('lab'); }}><Check size={15}/>已建成 · 进入控制台<ArrowRight size={15}/></button> : <><div className="construction-cost"><span className={s.coins.gte(t.buildCoins) ? '' : 'insufficient'}>{fmt(t.buildCoins)} 碰撞能</span><span className={s.data.gte(t.buildData) ? '' : 'insufficient'}>{fmt(t.buildData)} 数据</span></div><button className="primary-button full" data-guide-target={t.id === 2 ? "build" : undefined} disabled={!unlocked || !afford} onClick={() => act(e => { if (e.build(t.id)) { setFocus(t.id); goToTab('lab'); } })}>{!unlocked ? <><LockKeyhole size={15}/>发现 {element(t.unlock).symbol} 后开放</> : <>研发并建造<ArrowRight size={15}/></>}</button>{unlocked && !afford && <p className="cost-shortfall">还差 {shortfall(t.buildCoins, t.buildData)}</p>}</>}</div></section>; })}</div><section id="industry-panel" className="panel industry-panel"><div className="panel-heading"><div><span className="eyebrow">INDUSTRIAL PIPELINE</span><h2>工业自动化</h2></div><span className="tiny-label">{Object.values(s.modules).filter(Boolean).length} / 3 模块</span></div><IndustryModules state={s} max={max} act={act}/><AutomationControls state={s} max={max} act={act}/></section></>;
 
   const achievements = () => <><div className="section-heading"><div><div className="eyebrow">MILESTONES & IMPOSSIBILITIES</div><h1>记录突破，<span>也记录那些意外。</span></h1></div><span className="count-badge">{s.achievements.length}<small> / {ACHIEVEMENTS.length}</small></span></div><div className="achievement-grid">{ACHIEVEMENTS.map(a => { const earned = s.achievements.includes(a.id), hidden = a.hidden && !earned; return <section className={`panel achievement ${earned ? 'earned' : ''} ${hidden ? 'secret' : ''}`} key={a.id}><div className="achievement-medal">{hidden ? <LockKeyhole size={23}/> : a.hidden ? <Sparkles size={25}/> : <Trophy size={25}/>}</div><div><span className="eyebrow">{a.hidden ? 'HIDDEN DISCOVERY' : 'LAB MILESTONE'}{earned ? ' / 已达成' : ''}</span><h3>{hidden ? '？？？' : a.name}</h3><p>{hidden ? '在实验室的边界之外，还有意想不到的可能。' : a.description}</p></div>{earned && <Check className="earned-check" size={18}/>}</section>; })}</div><p className="page-note">隐藏成就只记录在线的成功合成；已发现元素的重复生产也可达成。徽章不会改变生产倍率。</p></>;
 

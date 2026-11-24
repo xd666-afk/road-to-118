@@ -24,11 +24,18 @@ export function specimenImageStyle(z: number) {
   };
 }
 
-export function reactorImageStyle(id: number) {
-  const cell = id - 1;
-  return {
-    backgroundImage: `url("${artworkUrl('reactor-series.webp')}")`,
-    backgroundSize: '400% 200%',
-    backgroundPosition: `${(cell % 4) * 100 / 3}% ${Math.floor(cell / 4) * 100}%`,
-  };
+// Center x, center y and usable glass diameter as percentages of the source square.
+const reactorScenes = [
+  { file: 'reactor-room-i.webp', aperture: [50, 49.6, 14.4] },
+  { file: 'reactor-room-ii.webp', aperture: [50, 50.4, 14.3] },
+  { file: 'reactor-room-iii.webp', aperture: [50, 51.3, 13.8] },
+  { file: 'reactor-room-iv.webp', aperture: [50, 52, 14] },
+  { file: 'reactor-room-v.webp', aperture: [50, 48.4, 13.2] },
+  { file: 'reactor-room-vi.webp', aperture: [50, 52.8, 15.7] },
+  { file: 'reactor-room-vii.webp', aperture: [50, 50, 14.3] },
+  { file: 'reactor-room-viii.webp', aperture: [50, 52.5, 14.3] },
+] as const;
+
+export function reactorScene(id: number) {
+  return reactorScenes[id - 1];
 }
