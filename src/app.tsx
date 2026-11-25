@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState, type CSSProperties } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { CircleDashed } from 'lucide-react';
 import { Archive, ChevronDown, ClipboardList, Compass, Database, Ellipsis, Grid2X2, SlidersHorizontal, Activity, ArrowDownToLine, ArrowRight, Atom, BookOpen, Check, CirclePause, CirclePlay, Cpu, Download, FlaskConical, Gauge, Layers3, LockKeyhole, Microscope, Plus, RotateCcw, Settings2, ShieldCheck, Sparkles, Trophy, Upload, Zap } from 'lucide-react';
 import { Engine, FIRST_HELIUM_SECONDS, archivedCount, discoveredMax, highestReactor } from './game/engine';
@@ -18,6 +18,7 @@ import { useCollisionSound, type ImpactKind, type ReactorImpact } from './compon
 import Modal from './components/Modal';
 import Onboarding from './components/Onboarding';
 import OpeningSpotlight from './components/OpeningSpotlight';
+import LaunchIntro, { markIntroSeen, shouldPlayIntro } from './components/LaunchIntro';
 import { HudRing, LabDrawer } from './components/LabHud';
 import { SPOTLIGHT_LENGTH, spotlightStep } from './components/spotlightSteps';
 import SavedGames from './components/SavedGames';
@@ -80,6 +81,11 @@ export default function App() {
     const offline = loaded.error ? null : engine.offline();
     return { ...loaded, engine, offline };
   });
+  const [intro, setIntro] = useState(shouldPlayIntro);
+  const finishIntro = useCallback(() => {
+    markIntroSeen();
+    setIntro(false);
+  }, []);
   const engineRef = useRef(boot.engine), [, rerender] = useState(0);
   const activeSlot = useRef(boot.slot);
   const slotId = activeSlot.current.id;
@@ -109,7 +115,7 @@ export default function App() {
   const handsOn = s.settings.handsOnGuide && !s.settings.guideDismissed && !s.firstRun && max >= 2 ? labGuideStep(s) : undefined;
   const dropsVisible = tab !== 'guide' && tab !== 'accelerator' && tab !== 'projects' && !dialog && !s.firstRun && max >= 2;
   const canSpawnRandomDrops = useRef(false);
-  canSpawnRandomDrops.current = dropsVisible && !handsOn && !trial;
+  canSpawnRandomDrops.current = !intro && dropsVisible && !handsOn && !trial;
   const boost = engine.activePulseBoost();
   const fmt = (v: Parameters<typeof format>[0]) => format(v, scientific);
   const bonuses = laboratoryBonuses(s);
@@ -289,7 +295,7 @@ export default function App() {
     return () => { clearInterval(timer); document.removeEventListener('visibilitychange', visibility); window.removeEventListener('pagehide', leaving); };
   }, [slotId]);
   useEffect(() => {
-    if (dialog || trial || tab === 'guide') return;
+    if (intro || dialog || trial || tab === 'guide') return;
     if (queue.length) {
       const reveal = () => {
         setDialog({ kind: 'element', z: queue[0], discovery: true });
@@ -301,7 +307,7 @@ export default function App() {
       }
       reveal();
     } else if (endPending) { setDialog({ kind: 'complete' }); setEndPending(false); }
-  }, [dialog, queue, endPending, tab, trial]);
+  }, [intro, dialog, queue, endPending, tab, trial]);
 
   function exportSave() {
     const blob = new Blob([serialize(engineRef.current.state)], { type: 'application/json' }), url = URL.createObjectURL(blob), a = document.createElement('a');
@@ -791,7 +797,8 @@ export default function App() {
   const notices = () => <>{saveBlocked && <div className="message-banner recovery-warning" role="alert"><span>当前进度尚未保存。请先处理旧存档，刷新会丢失本次进度。</span><button className="secondary-button" onClick={openSaves}>处理存档</button></div>}{message && <div className="message-banner" role="status"><span>{message}</span><button className="text-button" onClick={() => setMessage('')}>关闭</button></div>}{offline && tab !== 'guide' && <div className="offline-banner"><span><RotateCcw size={18}/><strong>欢迎回来。</strong>已结算 {clock(offline.seconds)} 离线实验：+{fmt(offline.coins)} 碰撞能，+{fmt(offline.produced)} 单位已发现元素。最多结算 4 小时。</span><button className="text-button" onClick={() => setOffline(null)}>继续实验<ArrowRight size={14}/></button></div>}</>;
 
   const inLab = tab === 'lab' || tab === 'accelerator' || tab === 'projects';
-  return <div className={`app-shell${inLab ? ' scene-shell' : ''}`}>
+  return <>
+  <div className={`app-shell${inLab ? ' scene-shell' : ''}`} inert={intro || undefined}>
     {inLab ? <main className="scene-main">
       {tab === 'accelerator' ? <Suspense fallback={<div className="lab-scene">{sceneHud()}</div>}>
         <Accelerator key={slotId} state={s} hud={sceneHud()} notices={notices()} onExit={() => goToTab('lab')}
@@ -812,7 +819,7 @@ export default function App() {
       </Suspense> : lab()}
     </main> : <><header className="site-header">{brand()}<nav className="main-nav" aria-label="主导航">{tabs.map(t => <button key={t.id} data-guide-target={t.id} className={tab === t.id ? 'active' : ''} onClick={() => goToTab(t.id)}><t.icon size={17}/><span>{t.name}</span><small>{t.en}</small>{t.id === 'research' && ((max >= MODULES.feed.unlock && !s.modules.feed) || REACTORS.some(t => max >= t.unlock && !s.reactors[t.id - 1].built)) && <i className="nav-dot"/>}</button>)}</nav><div className="header-right"><span className="save-label"><ShieldCheck size={14}/>{saveStatus}</span><button className="icon-button" aria-label="存档与设置" onClick={openSaves}><Settings2 size={19}/></button></div></header><main>{tab !== 'guide' && <section className="resource-bar" aria-label="实验室资源"><div className="main-resource"><span className="resource-label"><Zap size={14}/>碰撞能</span><div className="coin-value" data-testid="coins">{fmt(s.coins)}</div><p className="resource-income">收入 <strong>+{fmt(totalIncome)}</strong><small> /秒</small></p></div><div className="resource-item"><span>总实验速度</span><strong>{fmt(totalRate)}<small>次/秒</small></strong></div><div className="resource-item"><span>研究数据</span><strong>{fmt(s.data)}<small>点</small></strong></div><div className="resource-item progress-resource"><span>收集进度</span><strong>{archived}<small>/{PLAYABLE_ELEMENTS} 收录</small><em>{max}/{PLAYABLE_ELEMENTS} 发现</em></strong><progress className="collection-progress" aria-label="元素收集进度" max={PLAYABLE_ELEMENTS} value={archived}/></div></section>}{notices()}<div className="tab-content" key={tab}>{tab === 'research' ? research() : tab === 'achievements' ? achievements() : tab === 'guide' ? <><div className="guide-replay"><button className="secondary-button" onClick={replayTutorial}><RotateCcw size={15}/>{canResumeGuide ? '继续新手引导' : '新建存档体验引导'}</button></div><Suspense fallback={<p role="status">正在打开教程…</p>}><Tutorial onPlay={() => goToTab('lab')}/></Suspense></> : stats()}</div><footer><span><Atom size={15}/>ROAD TO 118<span className="footer-divider"/>从两颗氢原子开始的旅程</span><button className="text-button" onClick={() => goToTab('guide')}>教程<ArrowRight size={13}/></button></footer></main></>}
     <div className="toast-stack" aria-live="polite">{toasts.filter(t => tab !== 'guide' && Date.now() - t.time < 6500).slice(-3).map(t => <div className={`toast ${t.kind}`} key={t.id}>{t.kind === 'achievement' ? <Trophy size={17}/> : t.kind === 'archive' ? <BookOpen size={17}/> : <Sparkles size={17}/>}<span>{t.text}</span></div>)}</div><input ref={importInput} type="file" accept=".json,application/json" className="sr-only" aria-label="导入游戏存档" onChange={e => { void importSave(e.target.files?.[0]); }}/>
-    {!dialog && queue.length === 0 && <OpeningSpotlight key={slotId} step={spotlight} total={SPOTLIGHT_LENGTH}
+    {!intro && !dialog && queue.length === 0 && <OpeningSpotlight key={slotId} step={spotlight} total={SPOTLIGHT_LENGTH}
       reduced={s.settings.reducedMotion} onBegin={() => {
         if (destination === 'table') goToTab('lab');
         act(e => e.beginOpening());
@@ -825,5 +832,7 @@ export default function App() {
       <SavedGames slots={slots} activeId={slotId} error={slotError} onCreate={() => changeSave('create')} onSwitch={id => changeSave('switch', id)} onDelete={id => changeSave('delete', id)}/>
       <div className="settings-list"><label><span><strong>碰撞音效</strong><small>播放碰撞、回波与释放电芯的声音</small></span><input type="checkbox" checked={s.settings.collisionSound} onChange={e => act(() => { s.settings.collisionSound = e.target.checked; })}/></label><label><span><strong>科学记数法</strong><small>关闭时显示中文大数单位，超过载后自动使用科学记数法</small></span><input type="checkbox" checked={s.settings.scientific} onChange={e => act(() => { s.settings.scientific = e.target.checked; })}/></label><label><span><strong>减少动态效果</strong><small>降低粒子运动，保留全部游戏功能</small></span><input type="checkbox" checked={s.settings.reducedMotion} onChange={e => act(() => { s.settings.reducedMotion = e.target.checked; })}/></label></div>{saveBlocked && rawSave !== undefined && <button className="secondary-button full" onClick={exportRawSave}><Download size={17}/>导出原始旧档</button>}<div className="save-actions"><button className="secondary-button" onClick={exportSave}><Download size={17}/>导出存档</button><button className="secondary-button" onClick={() => importInput.current?.click()}><Upload size={17}/>导入存档</button></div><button className="primary-button full" onClick={saveCurrent}>{saveBlocked ? '备份旧档并保存当前进度' : '立即保存'}</button><p className="science-note">进度保存在当前浏览器，每 12 秒自动保存。导入会替换正在使用的档位。</p></Modal>}
     {dialog?.kind === 'complete' && <Modal title="H–Xe 全收集完成。" onClose={() => setDialog(null)}><div className="completion-emblem"><span>54</span><strong>Xe</strong><small>XENON / 氙</small><i><Check size={17}/>{XENON_ELEMENT} / {XENON_ELEMENT} 已收录</i></div><p className="completion-text">从两颗氢原子，到 H–Xe 五十四格完整档案。<br/>下一站是加速大厅的铯研究。</p><div className="end-stats"><div><span>全收集时间</span><strong>{clock(s.stats.completedAt || 0)}</strong></div><div><span>氙收录时间</span><strong>{s.stats.xeCompletedAt === null ? '—' : clock(s.stats.xeCompletedAt)}</strong></div><div><span>已点亮元素</span><strong>{XENON_ELEMENT} / {XENON_ELEMENT}</strong></div></div><p className="science-note">全环试束完成后即可研究第 55 号元素铯。</p><button className="primary-button full" onClick={() => setDialog(null)}>继续我的实验室<ArrowRight size={16}/></button></Modal>}
-  </div>;
+  </div>
+  {intro && <LaunchIntro reduced={s.settings.reducedMotion} onFinish={finishIntro}/>}
+  </>;
 }
