@@ -153,7 +153,7 @@ export const EXPANDED_KNOWLEDGE: Record<number, KnowledgeCard> = {
     title: '从灰白金属到生命骨架',
     fact: '钙是原子序数为 20 的银白色金属，属于碱土金属。金属钙能与水反应；骨骼、牙齿、石灰石和石膏中的钙则结合在不同的化合物中。',
     application: '钙的化合物广泛用于水泥、建筑材料和水处理，金属钙还可用于冶金。骨骼的重要无机组分是含钙磷酸盐材料，并不是金属钙的堆积。',
-    unlock: '游戏中：累计提交 100 单位钙完成里程碑，并激活钙的元素能力。',
+    unlock: '游戏中：累计提交 100 份钙完成探索校准。正式收录共需 150 份，完成后激活钙的元素能力。',
     source: 'https://periodic-table.rsc.org/element/20/calcium',
   },
 };

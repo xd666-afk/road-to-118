@@ -1,17 +1,18 @@
 import { D, Big, finiteNumber } from './numbers';
 import type { Amount } from './numbers';
-import { abilityBonuses } from './abilityProgress';
-import { discoveryPreparation, discoveryStage, observationProgress, observationRate, stageReadiness } from './discovery';
-import { ACHIEVEMENTS, ARCHIVE_UNITS, CAESIUM_ELEMENT, CALCIUM_ELEMENT, MODULES, MODULE_ORDER, OFFLINE_LIMIT, PLAYABLE_ELEMENTS, REACTORS, SAVE_VERSION, XENON_ELEMENT, feedDiscount, filingDataPerSample, productionParallel } from './config';
+import { laboratoryBonuses } from './abilityProgress';
+import { discoveryPreparation, discoveryStage, hasCalibration, isCalibrationSpecimen, observationProgress, observationRate, stageReadiness } from './discovery';
+import { ACHIEVEMENTS, ARCHIVE_UNITS, BARIUM_ELEMENT, CAESIUM_ELEMENT, CALCIUM_ELEMENT, MODULES, MODULE_ORDER, OFFLINE_LIMIT, PLAYABLE_ELEMENTS, REACTORS, SAVE_VERSION, XENON_ELEMENT, archiveUnits, feedDiscount, filingDataPerSample, productionParallel } from './config';
 import { coinPerEvent, eventRate, firstDiscoveryRate, maxAffordable, price, probability, usefulAtomPurchase } from './economy';
 import { poisson, random, waitingHazard } from './rng';
 import type { GameState, Module, Notice, ReactorJob, ReactorState, Upgrade, WorkMode } from './types';
 import { element } from '../data/elements';
-import { acceleratorSegments, caesiumReadiness, caesiumRun, segmentReadiness } from './accelerator';
+import { acceleratorBatch, acceleratorReadiness, acceleratorSegments, acceleratorSweep, activeAcceleratorTarget, bariumBeamOffset, segmentReadiness, type AcceleratorTarget } from './accelerator';
 import { PULSE_BOOST_MS, PULSE_BOOSTS, PULSE_DROP_MS, PULSE_DROP_RETRACT_MS, type PulseBoostKind, type PulseDrop } from './pulseBoosts';
 import { canTryTechnique, ECHO_DATA_LIMIT, ECHO_HITS, LITHIUM_CHARGE, LITHIUM_SAMPLES, TRIAL_ECHO_DATA, TRIAL_LITHIUM_SAMPLES, type TechniqueElement } from './pulseTechniques';
 import { advanceSampleContract, assignedToSample, isSampleAnswer, isSampleRoute, sampleAnswer, sampleReady, SAMPLE_GUESS_BONUS, SAMPLE_ROUTES, type SampleAnswer, type SampleRoute } from './sampleContract';
 import { availableIndustryUpgrade, EXPERIMENT_SECONDS, experimentProduction, industryUpgradePrice, isOfferAvailable, nextExperimentRound, NEXT_EXPERIMENT_SECONDS, productionPlans, type ExperimentBoard, type ExperimentOffer } from './experiments';
+import { knownReactorSample, projectBonus, projects, pulseStationLimits, researchCampusUnlocked, researchContribution, separationBonus, separationCost, SPECTRAL_SAMPLES, SPECTRAL_SECONDS, spectrumReward, STATION_SURGE, type ProjectId } from './projects';
 
 export function createState(seed = Date.now() >>> 0, now = Date.now()): GameState {
   const s: GameState = {
@@ -25,6 +26,8 @@ export function createState(seed = Date.now() >>> 0, now = Date.now()): GameStat
     achievements: [], settings: { scientific: false, reducedMotion: false, collisionSound: false, guideDismissed: false, handsOnGuide: false, mix: [1] },
     notices: [], noticeSeq: 0,
     accelerator: { built: 0, commissioned: false },
+    projects: { spectroscopy: { built: 0, funded: 0 }, separation: { built: 0, funded: 0 }, pulse: { built: 0, funded: 0 } },
+    projectOperations: { pulseCharge: 0, pulseHits: 0 },
     discoveryWait: 0,
     pulseTech: { echoHits: 0, lithium: 0, tried: [] },
   };
@@ -133,16 +136,72 @@ export class Engine {
     s.stats.builds++; s.stats.milestones[`reactor${id}`] = s.elapsed;
     this.award(`reactor${id}`); this.notify('info', `${c.name}已投入运行`); return true;
   }
-  buildAcceleratorSegment(index: number): boolean {
+  fundAcceleratorSegment(index: number, limit?: number): number {
     const s = this.state;
     const work = segmentReadiness(s, index);
-    if (!work?.ready) return false;
-    const { segment, specimen } = work;
-    s.coins = s.coins.minus(segment.coins);
-    s.data = s.data.minus(segment.data);
-    specimen.inventory = specimen.inventory.minus(segment.units);
-    s.accelerator = { built: index + 1, commissioned: false };
-    this.notify('info', '加速环完工 · ' + segment.name);
+    if (!work?.available) return 0;
+    const { segment, funded } = work;
+    const invested = researchContribution(s.data, segment.data - funded, limit);
+    if (!invested) return 0;
+    s.data = s.data.minus(invested);
+    if (funded + invested === segment.data) {
+      s.accelerator = { built: index + 1, commissioned: false };
+      this.notify('info', '加速环完工 · ' + segment.name);
+    } else s.accelerator = { ...s.accelerator, funded: funded + invested };
+    return invested;
+  }
+
+  fundProject(id: ProjectId, index: number, limit?: number): number {
+    const s = this.state;
+    const project = projects[id];
+    const { built, funded } = s.projects[id];
+    const stage = project.stages[index];
+    if (index !== built || !stage || !s.elements[stage.z - 1].discovered) return 0;
+    const invested = researchContribution(s.data, stage.data - funded, limit);
+    if (!invested) return 0;
+    s.data = s.data.minus(invested);
+    const finished = funded + invested === stage.data;
+    s.projects = { ...s.projects, [id]: finished ? { built: built + 1, funded: 0 } : { built, funded: funded + invested } };
+    if (finished && id === 'pulse') s.projectOperations.pulseCharge = Math.min(s.projectOperations.pulseCharge, pulseStationLimits(s).charge);
+    return invested;
+  }
+
+  startSpectrumScan(target: number): boolean {
+    const s = this.state;
+    const level = s.projects.spectroscopy.built;
+    if (!researchCampusUnlocked(s) || !level || s.projectOperations.scan || !knownReactorSample(s, target)) return false;
+    const sample = s.elements[target - 1];
+    if (sample.inventory.lt(SPECTRAL_SAMPLES)) return false;
+    sample.inventory = sample.inventory.minus(SPECTRAL_SAMPLES);
+    s.projectOperations = { ...s.projectOperations, scan: { target, level, remaining: SPECTRAL_SECONDS } };
+    return true;
+  }
+
+  claimSpectrumScan(): boolean {
+    const s = this.state;
+    const scan = s.projectOperations.scan;
+    if (!researchCampusUnlocked(s) || !scan || scan.remaining > 0) return false;
+    const reward = spectrumReward(scan.target, scan.level);
+    s.data = s.data.plus(reward);
+    s.projectOperations = { ...s.projectOperations, scan: undefined };
+    return true;
+  }
+
+  setSeparationTarget(target: number): boolean {
+    const s = this.state;
+    if (!s.projects.separation.built || s.projectOperations.separationTarget === target || !knownReactorSample(s, target)) return false;
+    const cost = separationCost(target);
+    if (s.data.lt(cost)) return false;
+    s.data = s.data.minus(cost);
+    s.projectOperations = { ...s.projectOperations, separationTarget: target };
+    return true;
+  }
+
+  releaseStationPulse(): boolean {
+    const s = this.state;
+    const limit = pulseStationLimits(s);
+    if (!limit.charge || s.projectOperations.pulseHits > 0 || s.projectOperations.pulseCharge < limit.charge) return false;
+    s.projectOperations = { ...s.projectOperations, pulseCharge: 0, pulseHits: limit.hits };
     return true;
   }
 
@@ -154,30 +213,59 @@ export class Engine {
     return true;
   }
 
-  startCaesiumRun(): boolean {
+  startAcceleratorRun(target: AcceleratorTarget): boolean {
     const s = this.state;
-    const { xenon, ready } = caesiumReadiness(s);
+    const { recipe, supply, ready } = acceleratorReadiness(s, target);
     if (!ready) return false;
-    xenon.inventory = xenon.inventory.minus(caesiumRun.xenon);
-    s.data = s.data.minus(caesiumRun.data);
-    s.accelerator = { ...s.accelerator, runRemaining: caesiumRun.seconds };
-    this.notify('info', '已启动铯信号采集');
+    supply.inventory = supply.inventory.minus(recipe.units);
+    s.data = s.data.minus(recipe.data);
+    s.accelerator = { ...s.accelerator, runTarget: target, runRemaining: acceleratorBatch.seconds };
+    this.notify('info', `已启动${element(target).name}实验`);
     return true;
   }
 
-  claimCaesiumRun(): boolean {
+  lockCaesiumSignal(): boolean {
+    const run = this.state.accelerator;
+    if (!run.commissioned || activeAcceleratorTarget(run) !== CAESIUM_ELEMENT || run.runRemaining === undefined) return false;
+    const signal = acceleratorSweep(run.runRemaining);
+    if (!signal.ready) return false;
+    this.captureAcceleratorSweep(signal.next);
+    return true;
+  }
+
+  adjustBariumBeam(direction: -1 | 1): 'adjusted' | 'focused' | false {
+    const run = this.state.accelerator;
+    if (!run.commissioned || activeAcceleratorTarget(run) !== BARIUM_ELEMENT || !run.runRemaining ||
+        (direction !== -1 && direction !== 1)) return false;
+    const offset = bariumBeamOffset(this.state);
+    const next = offset + direction;
+    if (Math.abs(next) > 2) return false;
+    if (next !== 0) {
+      this.state.accelerator = { ...run, runOffset: next };
+      return 'adjusted';
+    }
+    this.captureAcceleratorSweep(acceleratorSweep(run.runRemaining).next);
+    return 'focused';
+  }
+
+  private captureAcceleratorSweep(next: number) {
+    const run = this.state.accelerator;
+    this.state.accelerator = { ...run, runRemaining: next, runLocks: (run.runLocks ?? 0) + 1, runOffset: undefined };
+  }
+
+  claimAcceleratorRun(target: AcceleratorTarget): boolean {
     const s = this.state;
-    const { specimen, remaining } = caesiumReadiness(s);
+    const { specimen, remaining, output } = acceleratorReadiness(s, target);
     if (!s.accelerator.commissioned || remaining !== 0 || specimen.archived) return false;
     s.accelerator = { built: s.accelerator.built, commissioned: true };
     const discovered = specimen.discovered;
     if (!discovered) {
       specimen.discovered = true;
       specimen.firstDiscoveredAt = s.elapsed;
-      s.stats.milestones[`element${CAESIUM_ELEMENT}`] = s.elapsed;
+      s.stats.milestones[`element${target}`] = s.elapsed;
     }
-    this.storeSamples(CAESIUM_ELEMENT, D(caesiumRun.output));
-    this.notify(discovered ? 'info' : 'discovery', `探测舱已确认 ${caesiumRun.output} 份铯样本`, CAESIUM_ELEMENT);
+    this.storeSamples(target, D(output));
+    this.notify(discovered ? 'info' : 'discovery', `探测舱已确认 ${output} 份${element(target).name}样本`, target);
     return true;
   }
 
@@ -253,8 +341,10 @@ export class Engine {
 
   archiveTarget(reactorId = 1, assigned: ReadonlySet<number> = new Set(), specimen?: number): number {
     const s = this.state;
+    const needsCalibration = specimen !== undefined && !hasCalibration(s, specimen);
     const incomplete = s.elements.map((e, i) => ({ e, z: i + 1 }))
-      .filter(({ e, z }) => z <= XENON_ELEMENT && e.discovered && !e.archived && e.inventory.lt(ARCHIVE_UNITS - e.deposited));
+      .filter(({ e, z }) => z <= XENON_ELEMENT && e.discovered && !e.archived &&
+        e.inventory.lt((needsCalibration && z === specimen ? ARCHIVE_UNITS : archiveUnits(z)) - e.deposited));
     if (!incomplete.length) return s.automation.target;
     const unassigned = incomplete.filter(({ z }) => !assigned.has(z));
     const available = unassigned.length ? unassigned : incomplete;
@@ -266,7 +356,7 @@ export class Engine {
     if (config) {
       const inRange = available.filter(({ z }) => z >= Math.max(1, config.anchor - 1) && z <= config.softMax);
       if (inRange.length) {
-        if (specimen !== undefined && inRange.some(({ z }) => z === specimen)) return specimen;
+        if (specimen !== undefined && needsCalibration && inRange.some(({ z }) => z === specimen)) return specimen;
         // Work downward within the assigned range so the stage edge is not starved.
         inRange.sort((a, b) => b.z - a.z);
         return inRange[0].z;
@@ -278,14 +368,17 @@ export class Engine {
     }
     return available[0].z;
   }
-  deposit(z: number, silent = false): number {
+  deposit(z: number, silent = false, purpose: 'archive' | 'calibration' = 'archive'): number {
     const s = this.state, e = s.elements[z - 1];
-    if (!e?.discovered || e.archived) return 0;
-    const n = Math.min(ARCHIVE_UNITS - e.deposited, finiteNumber(e.inventory.floor(), ARCHIVE_UNITS));
+    if (!e?.discovered || e.archived || (purpose === 'calibration' && !isCalibrationSpecimen(z))) return 0;
+    const goal = archiveUnits(z);
+    const limit = purpose === 'calibration' ? ARCHIVE_UNITS : goal;
+    const n = Math.min(limit - e.deposited, finiteNumber(e.inventory.floor(), limit));
     if (n <= 0) return 0;
+    const wasCalibrated = e.deposited >= ARCHIVE_UNITS;
     e.inventory = Big.max(0, e.inventory.minus(n)); e.deposited += n;
     this.recordExperiment('archive', n, z);
-    if (e.deposited === ARCHIVE_UNITS) {
+    if (e.deposited === goal) {
       e.archived = true; this.award('archive'); this.notify('archive', `${element(z).name}已正式收录 · 元素能力生效`, z);
       if (s.stats.milestones.firstArchive === undefined) s.stats.milestones.firstArchive = s.elapsed;
       if (z === 10 && s.stats.neonCompletedAt === null) { s.stats.neonCompletedAt = s.elapsed; s.stats.milestones.neonArchive = s.elapsed; this.award('complete'); this.notify('milestone', '氖档案已收录，继续向第二十号元素前进。', 10); }
@@ -306,7 +399,9 @@ export class Engine {
         this.award('fifty_four_collection');
         this.notify('complete', `H–Xe 全部 ${XENON_ELEMENT} 格档案已点亮。`, XENON_ELEMENT);
       }
-    } else if (!silent) this.notify('info', `已提交 ${n} 单位${element(z).name} · ${e.deposited}/${ARCHIVE_UNITS}`);
+    } else if (!wasCalibrated && e.deposited >= ARCHIVE_UNITS && isCalibrationSpecimen(z)) {
+      this.notify('info', `${element(z).name}样本校准完成 · 正式收录 ${e.deposited}/${goal}`);
+    } else if (!silent) this.notify('info', `已提交 ${n} 单位${element(z).name} · ${e.deposited}/${limit}`);
     return n;
   }
   private produce(r: ReactorState, amount: ReturnType<typeof D>, online: boolean, commissionTarget?: number) {
@@ -320,12 +415,12 @@ export class Engine {
       this.notify('discovery', `首次发现 · ${element(z).name} ${element(z).symbol}`, z);
       if (!s.settings.mix.includes(z) && s.settings.mix.length < 5) s.settings.mix.push(z);
       if (z === 2) this.award('helium');
-      if (z === 10) { this.award('neon'); this.notify('milestone', '已发现氖 · IV 级离子束反应器已开放。', 10); }
-      if (z === 18) { this.award('argon'); this.notify('milestone', '已发现氩 · V 级回旋加速器已开放。', 18); }
+      if (z === 10) { this.award('neon'); this.notify('milestone', '发现氖 · 科研园区、加速环东段与 IV 级反应器开放。', 10); }
+      if (z === 18) { this.award('argon'); this.notify('milestone', '发现氩 · V 级回旋加速器与加速环北段开放。', 18); }
       if (z === CALCIUM_ELEMENT) { this.award('calcium'); this.notify('milestone', '已发现钙 · 收录后达成第二十号里程碑，VI 级同步辐射研究环已开放。', CALCIUM_ELEMENT); }
       if (z === 30) { this.award('zinc'); this.notify('milestone', '已发现锌 · 第 30 号只是中段，继续向氪与氙推进。', 30); }
-      if (z === 36) { this.award('krypton'); this.notify('milestone', '已发现氪 · 第四周期结束；VII 级重离子储存环已开放，目标仍是氙。', 36); }
-      if (z === XENON_ELEMENT) { this.award('xenon'); this.notify('milestone', '已发现氙 · 收录氙以点亮第五十四号档案。', XENON_ELEMENT); }
+      if (z === 36) { this.award('krypton'); this.notify('milestone', '发现氪 · VII 级重离子储存环与加速环西段开放。', 36); }
+      if (z === XENON_ELEMENT) { this.award('xenon'); this.notify('milestone', '发现氙 · 加速环南段开放，可开始最后一段施工。', XENON_ELEMENT); }
     }
     const delivered = commissionTarget === undefined ? 0 :
       this.recordExperiment('production', finiteNumber(amount, ARCHIVE_UNITS), z, r.id);
@@ -395,14 +490,20 @@ export class Engine {
     if (!this.canManualPulse(reactorId)) return null;
     const s = this.state;
     const r = s.reactors[reactorId - 1];
-    const bonuses = abilityBonuses(s);
-    const energyMultiplier = bonuses?.energy ? D(100 + bonuses.energy).div(100) : null;
+    const bonuses = laboratoryBonuses(s);
+    const operations = s.projectOperations;
+    const { charge: chargeLimit } = pulseStationLimits(s);
+    const stationBoosted = operations.pulseHits > 0;
+    const stationCharged = !stationBoosted && chargeLimit > 0 && operations.pulseCharge === chargeLimit - 1;
+    if (stationBoosted) operations.pulseHits--;
+    else if (operations.pulseCharge < chargeLimit) operations.pulseCharge++;
+    const energyMultiplier = D(100 + bonuses.energy + projectBonus(s, 'pulse') + (stationBoosted ? STATION_SURGE : 0)).div(100);
     const dataMultiplier = bonuses?.data ? D(100 + bonuses.data).div(100) : null;
     const events = Big.max(D(2), eventRate(r).mul(D('0.055')).floor());
     const baseGain = events.mul(coinPerEvent(r));
     const active = this.activePulseBoost(now);
     const effect = active && PULSE_BOOSTS[active.kind];
-    const energy = (energyMultiplier ? baseGain.mul(energyMultiplier) : baseGain).mul(effect?.energy ?? 1);
+    const energy = baseGain.mul(energyMultiplier).mul(effect?.energy ?? 1);
     if (s.elements[1].archived) s.pulseTech.echoHits = (s.pulseTech.echoHits + 1) % ECHO_HITS;
     const echo = s.elements[1].archived && s.pulseTech.echoHits === 0;
     const priorCharge = s.pulseTech.lithium;
@@ -420,7 +521,7 @@ export class Engine {
     this.recordExperiment('pulse', 1);
     if (s.stats.events.gte(1)) this.award('collision');
     if (s.firstRun?.step === 'charge' && s.coins.gte(price(r, 'atoms'))) s.firstRun = { step: 'sample' };
-    return { energy, data, echo, charged };
+    return { energy, data, echo, charged, stationCharged, stationBoosted };
   }
   canReleaseLithium(reactorId: number) {
     const s = this.state;
@@ -556,9 +657,15 @@ export class Engine {
     const s = this.state; s.elapsed += seconds;
     if (online) {
       this.advanceExperiments(seconds);
+      const scan = s.projectOperations.scan;
+      if (scan && researchCampusUnlocked(s)) scan.remaining = scan.remaining - seconds > 1e-9 ? scan.remaining - seconds : 0;
       const { runRemaining } = s.accelerator;
       if (runRemaining !== undefined && runRemaining > 0) {
-        s.accelerator.runRemaining = Math.max(0, runRemaining - seconds);
+        const remaining = Math.max(0, runRemaining - seconds);
+        s.accelerator.runRemaining = remaining;
+        if (s.accelerator.runOffset !== undefined && acceleratorSweep(remaining).phase !== acceleratorSweep(runRemaining).phase) {
+          s.accelerator.runOffset = undefined;
+        }
       }
     }
     this.routeJobs();
@@ -575,10 +682,9 @@ export class Engine {
       discoverySeconds = Math.max(0, seconds - s.discoveryWait);
       s.discoveryWait = Math.max(0, s.discoveryWait - seconds);
     }
-    const bonuses = abilityBonuses(s);
+    const bonuses = laboratoryBonuses(s);
     const energyMultiplier = bonuses?.energy ? D(100 + bonuses.energy).div(100) : null;
     const dataMultiplier = bonuses?.data ? D(100 + bonuses.data).div(100) : null;
-    const productionBonus = bonuses?.production ? D(bonuses.production).div(100) : null;
     for (const r of s.reactors) {
       if (!r.built || !r.active) continue;
       const rate = eventRate(r);
@@ -622,6 +728,7 @@ export class Engine {
         else r.discoveryHazard -= hazard.toNumber();
       } else {
         const p = probability(target, r.id);
+        const bonus = bonuses.production + separationBonus(s, target);
         const parallel = s.modules.reaction && s.automation.reaction ? productionParallel(r.id, s.moduleLevels.reaction) : 1;
         const expected = events.mul(p).mul(parallel);
         let count;
@@ -637,9 +744,9 @@ export class Engine {
           }
           count = D(hits);
         } else count = D(poisson(s, expected.toNumber()));
-        if (fixedProduction || productionBonus) {
+        if (fixedProduction || bonus) {
           // Online bonuses add to actual production. They never alter first discovery odds.
-          const total = (productionBonus ? count.plus(count.mul(productionBonus)) : count).plus(commission ? D(commission.active.fraction ?? 0) : r.productionRemainder);
+          const total = (bonus ? count.plus(count.mul(D(bonus).div(100))) : count).plus(commission ? D(commission.active.fraction ?? 0) : r.productionRemainder);
           count = total.floor();
           const fraction = total.minus(count);
           if (commission) commission.active.fraction = Math.min(.9999999999999999, fraction.toNumber());
@@ -666,14 +773,15 @@ export class Engine {
         for (let z = 1; z <= PLAYABLE_ELEMENTS; z++) this.autoFile(z);
       } else {
         const stage = discoveryStage(discoveredMax(s) + 1);
-        if (stage) this.autoFile(stage.specimen);
+        if (stage) this.autoFile(stage.specimen, 'calibration');
       }
     }
   }
 
-  private autoFile(z: number) {
-    const submitted = this.deposit(z, true);
-    const bonus = submitted * filingDataPerSample(z, this.state.moduleLevels.allocation);
+  private autoFile(z: number, purpose: 'archive' | 'calibration' = 'archive') {
+    const rebateUnits = Math.max(0, ARCHIVE_UNITS - this.state.elements[z - 1].deposited);
+    const submitted = this.deposit(z, true, purpose);
+    const bonus = Math.min(submitted, rebateUnits) * filingDataPerSample(z, this.state.moduleLevels.allocation);
     if (bonus > 0) this.state.data = this.state.data.plus(bonus);
   }
   advance(seconds: number, online = true, allowDiscovery = online) {

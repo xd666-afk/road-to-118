@@ -1,4 +1,4 @@
-import { REACTORS } from './config';
+import { ARCHIVE_UNITS, REACTORS } from './config';
 import { eventRate } from './economy';
 import type { GameState, ReactorState } from './types';
 
@@ -28,13 +28,20 @@ export function discoveryStage(z: number) {
   return DISCOVERY_STAGES.find(stage => stage.from <= z && z <= stage.to);
 }
 
+export const isCalibrationSpecimen = (z: number) => DISCOVERY_STAGES.some(stage => stage.specimen === z);
+
+export function hasCalibration(state: GameState, z: number) {
+  const sample = state.elements[z - 1];
+  return !!sample?.discovered && (sample.archived || sample.deposited >= ARCHIVE_UNITS);
+}
+
 export function stageReadiness(state: GameState, stage: DiscoveryStage) {
   const reactor = state.reactors[stage.reactor - 1];
   const capacity = reactor.upgrades.capacity;
   const tuning = capacity + reactor.upgrades.yield;
-  const archived = state.elements[stage.specimen - 1].archived;
+  const calibrated = hasCalibration(state, stage.specimen);
   const tuned = capacity >= stage.capacity && tuning >= stage.tuning;
-  return { reactor, capacity, tuning, archived, tuned, ready: reactor.built && archived && tuned };
+  return { reactor, capacity, tuning, calibrated, tuned, ready: reactor.built && calibrated && tuned };
 }
 
 export function observationProgress(state: GameState, z: number) {

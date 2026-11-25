@@ -1,12 +1,24 @@
 import type { Module, Upgrade } from './types';
 export const GAME_VERSION = '0.18.0';
-/** Conventional reactors cover H–Xe. The separate accelerator covers Cs. */
+/** Conventional reactors cover H–Xe. The separate accelerator covers Cs–Ba. */
 export const XENON_ELEMENT = 54;
 export const CAESIUM_ELEMENT = 55;
-export const PLAYABLE_ELEMENTS = CAESIUM_ELEMENT;
+export const BARIUM_ELEMENT = 56;
+export const PLAYABLE_ELEMENTS = BARIUM_ELEMENT;
 export const CALCIUM_ELEMENT = 20;
-export const SAVE_VERSION = 6;
+export const SAVE_VERSION = 9;
 export const ARCHIVE_UNITS = 100;
+// Benchmarked at discovery against the available instruments. Hard-to-make
+// samples keep smaller goals even near the end of a reactor generation.
+const archiveGoals: Partial<Record<number, number>> = {
+  11: 1200, 12: 750, 13: 300, 14: 150, 19: 150, 20: 150,
+  21: 4000, 22: 3500, 23: 3000, 24: 2500, 25: 2200, 26: 4000, 27: 2400,
+  28: 2000, 29: 1600, 30: 1200, 31: 1100, 32: 1000, 33: 800, 34: 650, 35: 600, 36: 1200,
+  37: 10_000, 38: 9000, 39: 8000, 40: 7500, 41: 6500, 42: 12_000, 43: 6000, 44: 5000,
+  45: 4500, 46: 4000, 47: 3500, 48: 6000, 49: 2800, 50: 2500, 51: 2200, 52: 2000, 53: 1800,
+  [XENON_ELEMENT]: 4000, [CAESIUM_ELEMENT]: 150, [BARIUM_ELEMENT]: 180,
+};
+export const archiveUnits = (z: number) => archiveGoals[z] ?? ARCHIVE_UNITS;
 export const REACTORS = [
   { id: 1, roman: 'I', name: '自由碰撞容器', subtitle: 'FREE COLLISION CHAMBER', range: 'H — Be', softMax: 4, anchor: 2, p: .075, q: .25, h: .2, k: .65, samples: 2, cap: 14, gain: 1, buildCoins: 0, buildData: 0, unlock: 1, description: '从两颗氢原子开始。观察混合粒子，用自由碰撞积累碰撞能。' },
   { id: 2, roman: 'II', name: '受控反应容器', subtitle: 'CONTROLLED REACTION VESSEL', range: 'Be — N', softMax: 7, anchor: 4, p: .012, q: .32, h: .15, k: 2, samples: 16, cap: 42, gain: 6, buildCoins: 600, buildData: 400, unlock: 4, description: '电磁约束与独立反应控制，让中段元素研究突破旧容器的瓶颈。' },
@@ -15,7 +27,7 @@ export const REACTORS = [
   { id: 5, roman: 'V', name: '回旋加速器', subtitle: 'CYCLOTRON', range: 'K — Ca', softMax: 20, anchor: 19, p: .000025, q: .55, h: .15, k: 20, samples: 64, cap: 4000, gain: 1400, buildCoins: 6500000, buildData: 900000, unlock: 18, description: '更高能级的束流，完成钾与钙的里程碑；钙不是本版终点。' },
   { id: 6, roman: 'VI', name: '同步辐射研究环', subtitle: 'SYNCHROTRON RESEARCH RING', range: 'Sc — Kr', softMax: 36, anchor: 21, p: .00055, q: .8, h: .25, k: 5, samples: 96, cap: 10000, gain: 6000, buildCoins: 6000000000, buildData: 4200000, unlock: 20, description: '同步辐射与并行探测器推进到第四周期中段：钪到氪。' },
   { id: 7, roman: 'VII', name: '重离子储存环', subtitle: 'HEAVY-ION STORAGE RING', range: 'Rb — Xe', softMax: 54, anchor: 37, p: .00045, q: .86, h: .3, k: 8, samples: 128, cap: 20000, gain: 25000, buildCoins: 110000000000, buildData: 7800000, unlock: 36, description: '重离子束流覆盖铷到氙，把第五周期收束成完整档案。' },
-  { id: 8, roman: 'VIII', name: '强子对撞环', subtitle: 'HADRON COLLIDER RING', range: 'Cs — Og', softMax: 86, anchor: 55, p: .0003, q: .9, h: .22, k: 12, samples: 160, cap: 40000, gain: 120000, buildCoins: 360000000000, buildData: 12000000, unlock: 54, description: '用于持续生产和补齐 H–Xe 档案。铯研究在加速大厅进行。' },
+  { id: 8, roman: 'VIII', name: '强子对撞环', subtitle: 'HADRON COLLIDER RING', range: 'H — Xe · 补档', softMax: 86, anchor: 55, p: .0003, q: .9, h: .22, k: 12, samples: 160, cap: 40000, gain: 120000, buildCoins: 360000000000, buildData: 12000000, unlock: 54, description: '用于持续生产和补齐 H–Xe 档案。铯研究在加速大厅进行。' },
 ] as const;
 export const productionParallel = (id: number, level = 1) => (id === 1 ? 8 : 32) * (1 + .25 * (level - 1));
 export const UPGRADES: Record<Upgrade, { name: string; base: number; ratio: number; description: string }> = {
@@ -40,12 +52,12 @@ export const filingDataPerSample = (z: number, level: number) => z * Math.max(0,
 export const moduleEffect = (key: Module, level: number) => {
   if (key === 'feed') return level === 1 ? '自动补样按原价' : `自动补样省 ${feedDiscount(level)}%`;
   if (key === 'reaction') return `批量生产 · I 级 ×${productionParallel(1, level)}，II 级起 ×${productionParallel(2, level)}`;
-  return level === 1 ? '按所选范围自动提交' : `每份自动提交返还 ${level === 2 ? '1 倍' : '2 倍'}原子序数的研究数据`;
+  return level === 1 ? '按所选范围自动提交' : `各元素前 ${ARCHIVE_UNITS} 份自动提交，每份返还 ${level === 2 ? '1 倍' : '2 倍'}原子序数的研究数据`;
 };
 export const ACHIEVEMENTS = [
   { id: 'collision', name: '第一道信号', description: '完成第一次有效碰撞', hidden: false },
   { id: 'helium', name: '宇宙的第二种答案', description: '首次发现氦', hidden: false },
-  { id: 'archive', name: '正式入档', description: '首次累计提交 100 单位并点亮元素', hidden: false },
+  { id: 'archive', name: '正式入档', description: '首次达到正式收录目标并点亮元素', hidden: false },
   { id: 'bulk', name: '规模的力量', description: '一次批量购买至少 10 级升级', hidden: false },
   { id: 'reactor2', name: '控制变量', description: '建成 II 型反应容器', hidden: false },
   { id: 'automation', name: '让实验继续', description: '研发第一个工业模块', hidden: false },
@@ -57,14 +69,14 @@ export const ACHIEVEMENTS = [
   { id: 'reactor5', name: '回旋的能量', description: '建成 V 级回旋加速器', hidden: false },
   { id: 'argon', name: '第三周期的句点', description: '首次发现氩', hidden: false },
   { id: 'calcium', name: '通往第二十号', description: '首次发现钙', hidden: false },
-  { id: 'calcium_complete', name: '第二十号里程碑', description: '提交 100 Ca，保留第二十号里程碑并继续向氙推进', hidden: false },
+  { id: 'calcium_complete', name: '第二十号里程碑', description: `累计提交 ${archiveUnits(CALCIUM_ELEMENT)} 份钙，点亮档案`, hidden: false },
   { id: 'twenty_collection', name: '二十种元素的档案', description: '点亮 H — Ca 全部二十格', hidden: false },
   { id: 'reactor6', name: '同步辐射的窗口', description: '建成 VI 级同步辐射研究环', hidden: false },
   { id: 'zinc', name: '第三十号的中场', description: '首次发现锌：第 30 号不是终点，继续向氪与氙推进', hidden: false },
   { id: 'krypton', name: '第四周期的句点', description: '首次发现氪：第四周期结束，第五周期仍在前面', hidden: false },
   { id: 'reactor7', name: '重离子束流', description: '建成 VII 级重离子储存环', hidden: false },
   { id: 'xenon', name: '第五十四号 · 氙', description: '首次发现氙并点亮本阶段终点', hidden: false },
-  { id: 'xenon_complete', name: '氙的完整档案', description: '提交 100 Xe，保留第五十四号里程碑', hidden: false },
+  { id: 'xenon_complete', name: '氙的完整档案', description: `累计提交 ${archiveUnits(XENON_ELEMENT)} 份氙，点亮第五十四号档案`, hidden: false },
   { id: 'fifty_four_collection', name: '五十四种元素，一本档案', description: '点亮 H — Xe 全部五十四格', hidden: false },
   { id: 'reactor8', name: '为未来预留的能级', description: '建成 VIII 级强子对撞环', hidden: false },
   { id: 'impossible', name: '不可能的碰撞', description: '使用 I 型容器成功合成硼', hidden: true },

@@ -142,6 +142,12 @@ export default function OpeningSpotlight({ step, total, reduced, onBegin, onSkip
       };
       frame = requestAnimationFrame(track);
     }
+    const flight = id === 'drop' ? target?.parentElement : undefined;
+    const phaseObserver = flight && new MutationObserver(place);
+    if (flight && phaseObserver) {
+      phaseObserver.observe(flight, { attributes: true, attributeFilter: ['data-phase'] });
+      flight.addEventListener('animationend', place);
+    }
 
     const keepTarget = (event: Event) => {
       const node = event.target;
@@ -172,6 +178,8 @@ export default function OpeningSpotlight({ step, total, reduced, onBegin, onSkip
 
     return () => {
       observer.disconnect();
+      phaseObserver?.disconnect();
+      flight?.removeEventListener('animationend', place);
       cancelAnimationFrame(frame);
       window.removeEventListener('resize', place);
       window.removeEventListener('scroll', place, true);

@@ -7,6 +7,8 @@ const DIRECTORY_KEY = 'road-to-118.saves.v1';
 const ORIGINAL = { id: 'original', name: '存档 1' };
 const storageKey = (id: string) => id === ORIGINAL.id ? LEGACY_KEY : `${LEGACY_KEY}.slot.${id}`;
 export const SAVE_STORAGE_ERROR = '浏览器存储不可用。请导出存档以保留进度。';
+const SAVE_CHANGED = '另一个标签页已保存。请先导出本页要保留的进度，再刷新读取最新存档。';
+const lastRead = new Map<string, string | null>();
 
 export interface SaveSlot { id: string; name: string }
 interface SaveDirectory { active: string; slots: SaveSlot[] }
@@ -35,6 +37,7 @@ function loadSlot(slot: SaveSlot): LocalSave {
   let raw: string | null = null;
   try {
     raw = localStorage.getItem(storageKey(slot.id));
+    lastRead.set(slot.id, raw);
     return { slot, state: raw === null ? createFirstRun() : deserialize(raw) };
   } catch (error) {
     return { slot, state: createState(), raw: raw ?? undefined, error: `旧存档未被覆盖。${error instanceof Error ? error.message : '读取失败'}` };
@@ -55,7 +58,13 @@ export function saveLocal(slotId: string, state: GameState): { ok: boolean; mess
     if (!readDirectory().slots.some(slot => slot.id === slotId)) {
       return { ok: false, message: '这个存档已被删除。可以导出当前进度。' };
     }
-    localStorage.setItem(storageKey(slotId), serialize(state));
+    const key = storageKey(slotId);
+    if (lastRead.has(slotId) && localStorage.getItem(key) !== lastRead.get(slotId)) {
+      return { ok: false, message: SAVE_CHANGED };
+    }
+    const snapshot = serialize(state);
+    localStorage.setItem(key, snapshot);
+    lastRead.set(slotId, snapshot);
     return { ok: true, message: '存档已保存在此浏览器' };
   } catch {
     return { ok: false, message: SAVE_STORAGE_ERROR };
@@ -71,13 +80,15 @@ function addSlot(slots: SaveSlot[]): { slots: SaveSlot[]; save: LocalSave } {
   const slot = { id, name: `存档 ${number}` };
   const state = createFirstRun();
   const updated = [...slots, slot];
-  localStorage.setItem(storageKey(id), serialize(state));
+  const snapshot = serialize(state);
+  localStorage.setItem(storageKey(id), snapshot);
   try {
     localStorage.setItem(DIRECTORY_KEY, JSON.stringify({ active: id, slots: updated }));
   } catch (error) {
     localStorage.removeItem(storageKey(id));
     throw error;
   }
+  lastRead.set(id, snapshot);
   return { slots: updated, save: { slot, state } };
 }
 
@@ -107,5 +118,6 @@ export function deleteLocalSlot(id: string, currentId: string): { slots: SaveSlo
     result = { slots: remaining, save: active.id === currentId ? undefined : loadSlot(active) };
   }
   localStorage.removeItem(storageKey(id));
+  lastRead.delete(id);
   return result;
 }

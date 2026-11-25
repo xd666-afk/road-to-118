@@ -151,7 +151,8 @@ export const ELEMENTS: ElementInfo[] = NAMES.map(([symbol, name, english], i) =>
     ...(i < 54 ? {
       mass: i < 10 ? PLAYABLE_MASSES[i] : i < 20 ? EXPANDED_MASSES[i - 10] : EXPANDED54_MASSES[i - 20],
       specimenDescription: i < 10 ? SPECIMENS[i] : i < 20 ? EXPANDED_SPECIMENS[i - 10] : EXPANDED54_SPECIMENS[i - 20],
-    } : z === 55 ? { mass: '132.905', specimenDescription: '铯的原子结构示意' } : {}),
+    } : z === 55 ? { mass: '132.905', specimenDescription: '铯的原子结构示意' } :
+      z === 56 ? { mass: '137.327', specimenDescription: '钡的原子结构示意' } : {}),
   };
 });
 
@@ -251,8 +252,15 @@ export const KNOWLEDGE: Record<number, KnowledgeCard> = {
     title: '原子钟里的铯',
     fact: '铯是第六周期的第一种元素，熔点接近室温。',
     application: '铯-133 的特定跃迁频率用于定义国际单位制中的秒。',
-    unlock: '游戏中，在加速大厅完成试束后，用氙去校准探测舱。读取结果可获得铯样本，累计提交 100 份完成收录。',
+    unlock: '游戏中，在加速大厅完成试束后，用氙去校准探测舱。读取结果可获得铯样本，累计提交 150 份完成收录。',
     source: 'https://periodic-table.rsc.org/element/55/caesium',
+  },
+  56: {
+    title: '能在 X 光下显影的钡',
+    fact: '钡是第六周期的碱土金属，金属表面在空气中会很快失去光泽。',
+    application: '硫酸钡难溶于水，可用作消化道 X 光检查的造影剂。',
+    unlock: '收录铯后，在加速大厅用氪样本校准探测器。将束流偏差调到 0 可以加快扫描，累计提交 180 份钡即可收录。',
+    source: 'https://periodic-table.rsc.org/element/56/barium',
   },
 };
 

@@ -360,7 +360,6 @@
 .scene-drawer-content #target { min-height: 46px; }
 .scene-drawer-content .bulk-control { padding-top: 9px; }
 .scene-shell [data-guiding=true] .scene-tools { visibility: hidden; }
-.scene-shell [data-guiding=true] [data-guide-entry=true] { visibility: visible; }
 .scene-shell [data-guiding=true] .lab-playfield { inset-block: max(203px, 22svh) max(138px, 15svh); }
 
 @media (max-width: 660px) {

@@ -1,6 +1,8 @@
+import type { AcceleratorTarget } from './accelerator';
 import type { SAVE_VERSION } from './config';
 import type { Amount } from './numbers';
 import type { PulseBoost } from './pulseBoosts';
+import type { ProjectId, ProjectOperations, ProjectProgress } from './projects';
 import type { SampleContract } from './sampleContract';
 import type { ExperimentBoard } from './experiments';
 import type { TechniqueElement } from './pulseTechniques';
@@ -33,7 +35,9 @@ export interface GameState {
   firstRun?: FirstRun;
   pulseBoost?: PulseBoost;
   pulseTech: { echoHits: number; lithium: number; tried: TechniqueElement[] };
-  accelerator: { built: number; commissioned: boolean; runRemaining?: number };
+  accelerator: { built: number; commissioned: boolean; funded?: number; runTarget?: AcceleratorTarget; runRemaining?: number; runLocks?: number; runOffset?: number };
+  projects: Record<ProjectId, ProjectProgress>;
+  projectOperations: ProjectOperations;
   discoveryWait: number;
   sampleContract?: SampleContract;
   experimentBoard?: ExperimentBoard;

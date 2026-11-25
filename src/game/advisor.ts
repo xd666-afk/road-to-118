@@ -1,20 +1,20 @@
-import { ARCHIVE_UNITS, CAESIUM_ELEMENT, CALCIUM_ELEMENT, MODULES, REACTORS, UPGRADES, XENON_ELEMENT } from './config';
+import { ARCHIVE_UNITS, BARIUM_ELEMENT, CAESIUM_ELEMENT, CALCIUM_ELEMENT, MODULES, REACTORS, UPGRADES, XENON_ELEMENT, archiveUnits } from './config';
 import { element } from '../data/elements';
 import { archivedCount, discoveredMax, highestReactor, type Engine } from './engine';
 import { eventRate, income, price } from './economy';
 import type { GameState, Module, Upgrade } from './types';
-import { abilityBonuses } from './abilityProgress';
-import { discoveryStage, observationProgress, stageReadiness } from './discovery';
+import { laboratoryBonuses } from './abilityProgress';
+import { discoveryStage, hasCalibration, observationProgress, stageReadiness } from './discovery';
 
 export interface Advice {
   id: string; label: string; detail: string; enabled: boolean;
-  action: 'buy' | 'upgrade' | 'resume' | 'research' | 'build' | 'explore' | 'produce' | 'deposit' | 'archive' | 'table' | 'accelerator';
+  action: 'buy' | 'upgrade' | 'resume' | 'research' | 'build' | 'explore' | 'produce' | 'deposit' | 'calibrate' | 'archive' | 'table' | 'accelerator';
   reactor?: number; target?: number; module?: Module; upgrade?: Upgrade;
 }
 
 function fasterConstruction(s: GameState, next: { buildCoins: number; buildData: number; roman: string }): Advice | undefined {
   const running = s.reactors.filter(r => r.built && r.active);
-  const bonus = abilityBonuses(s);
+  const bonus = laboratoryBonuses(s);
   const energyBoost = 1 + bonus.energy / 100;
   const dataBoost = 1 + bonus.data / 100;
   const coinsPerSecond = running.reduce((sum, r) => sum + income(r).toNumber(), 0) * energyBoost;
@@ -79,21 +79,20 @@ export function recommend(s: GameState): Advice {
   }
   // Calcium remains the twentieth milestone. It is intentionally not labelled
   // as the end of the version; VI opens on discovery and zinc/krypton continue.
-  if (ca.discovered && !ca.archived && max <= CALCIUM_ELEMENT) {
+  if (ca.discovered && !hasCalibration(s, CALCIUM_ELEMENT) && max <= CALCIUM_ELEMENT) {
     const producer = s.reactors.filter(r => r.built && REACTORS[r.id - 1].softMax >= CALCIUM_ELEMENT).at(-1) ?? top;
     const enough = ca.inventory.gte(ARCHIVE_UNITS - ca.deposited), running = producer.target === CALCIUM_ELEMENT && producer.active;
-    return { id: 'calcium', label: enough ? '提交钙的记录' : running ? '钙正在生产…' : '生产钙 · 保留第二十号里程碑', detail: `钙档案 ${ca.deposited}/${ARCHIVE_UNITS}；库存 ${Math.floor(ca.inventory.toNumber())}。提交 ${ARCHIVE_UNITS} Ca 只保留历史里程碑，之后仍需建造 VI 级仪器并继续到氙。`, enabled: enough || !running, action: enough ? 'deposit' : 'produce', reactor: producer.id, target: CALCIUM_ELEMENT };
+    return { id: 'calcium', label: enough ? '提交钙的校准样本' : running ? '钙正在生产…' : '生产钙 · 准备 VI 级校准', detail: `校准 ${ca.deposited}/${ARCHIVE_UNITS} · 库存 ${Math.floor(ca.inventory.toNumber())}。累计提交 ${archiveUnits(CALCIUM_ELEMENT)} 份可正式收录并激活能力。`, enabled: enough || !running, action: enough ? 'calibrate' : 'produce', reactor: producer.id, target: CALCIUM_ELEMENT };
   }
-  // VI and VII are required range transitions. VIII is an optional post-Xe
-  // capacity instrument and should not block the final archive sweep.
-  if (next && (next.id <= 7 || (next.id === 8 && xe.archived && s.elements.slice(0, XENON_ELEMENT).every(element => element.archived) && canBuild))) {
+  // Prioritize range transitions and the accelerator before optional capacity.
+  if (next && (next.id <= 7 || (next.id === 8 && s.elements[BARIUM_ELEMENT - 1].archived && canBuild))) {
     if (!canBuild && next.id >= 6) return fasterConstruction(s, next) ?? build();
     return build();
   }
   if (max < XENON_ELEMENT) {
     const stage = discoveryStage(max + 1);
     if (stage) {
-      const { reactor, capacity, tuning, archived, tuned } = stageReadiness(s, stage);
+      const { reactor, capacity, tuning, calibrated, tuned } = stageReadiness(s, stage);
       const device = REACTORS[stage.reactor - 1], target = max + 1;
       if (!tuned) {
         const upgrade = capacity < stage.capacity || price(reactor, 'capacity').lt(price(reactor, 'yield')) ? 'capacity' : 'yield';
@@ -101,15 +100,15 @@ export function recommend(s: GameState): Advice {
         const detail = `扩容 ${capacity}/${stage.capacity} · 调校 ${tuning}/${stage.tuning}（扩容＋单次收益）。`;
         return { id: `tune-${device.id}-${upgrade}-${reactor.upgrades[upgrade]}`, label: `培养 ${device.roman} 级 · ${UPGRADES[upgrade].name}`, detail: detail + (s.coins.gte(cost) ? '' : `还差 ${Math.ceil(cost.minus(s.coins).toNumber()).toLocaleString('zh-CN')} 碰撞能。`), enabled: s.coins.gte(cost), action: 'upgrade', reactor: device.id, upgrade };
       }
-      if (!archived) {
+      if (!calibrated) {
         const z = stage.specimen, sample = s.elements[z - 1];
         const producer = s.reactors.find(r => r.built && REACTORS[r.id - 1].softMax >= z) ?? reactor;
         const enough = sample.inventory.gte(ARCHIVE_UNITS - sample.deposited);
         const producing = producer.active && producer.target === z && !producer.exploring;
         const symbol = element(z).symbol;
-        return { id: `calibration-${z}`, label: enough ? `收录 ${symbol} · 开放探索` : producing ? `正在生产 ${symbol}` : `生产校准样本 · ${symbol}`,
-          detail: `收录 ${symbol} 至 ${ARCHIVE_UNITS} 份，开放 ${element(stage.from).symbol}–${element(stage.to).symbol}。已提交 ${sample.deposited}/${ARCHIVE_UNITS}，库存 ${Math.floor(sample.inventory.toNumber())}。`,
-          enabled: enough || !producing, action: enough ? 'deposit' : 'produce', target: z, reactor: producer.id };
+        return { id: `calibration-${z}`, label: enough ? `提交 ${symbol} · 开放探索` : producing ? `正在生产 ${symbol}` : `生产校准样本 · ${symbol}`,
+          detail: `提交 ${ARCHIVE_UNITS} 份 ${symbol} 完成校准，开放 ${element(stage.from).symbol}–${element(stage.to).symbol}。已提交 ${sample.deposited}/${ARCHIVE_UNITS}，库存 ${Math.floor(sample.inventory.toNumber())}。`,
+          enabled: enough || !producing, action: enough ? 'calibrate' : 'produce', target: z, reactor: producer.id };
       }
       const running = reactor.active && reactor.target === target && reactor.exploring;
       return { id: `observe-${target}`, label: running ? `正在研究 · ${element(target).symbol}` : `开始研究 · ${element(target).symbol}`,
@@ -122,8 +121,9 @@ export function recommend(s: GameState): Advice {
   }
   if (!xe.archived) {
     const producer = s.reactors.filter(r => r.built && REACTORS[r.id - 1].softMax >= XENON_ELEMENT).at(-1) ?? top;
-    const enough = xe.inventory.gte(ARCHIVE_UNITS - xe.deposited), running = producer.target === XENON_ELEMENT && producer.active;
-    return { id: 'xenon', label: enough ? '提交氙的记录' : running ? '氙正在生产…' : '生产氙 · 点亮第五十四号', detail: `氙档案 ${xe.deposited}/${ARCHIVE_UNITS}；库存 ${Math.floor(xe.inventory.toNumber())}。氙是反应器路线的最后一站。提交 ${ARCHIVE_UNITS} Xe 之后还要补齐 H–Xe 的全部五十四格。`, enabled: enough || !running, action: enough ? 'deposit' : 'produce', reactor: producer.id, target: XENON_ELEMENT };
+    const target = archiveUnits(XENON_ELEMENT);
+    const enough = xe.inventory.gte(target - xe.deposited), running = producer.target === XENON_ELEMENT && producer.active;
+    return { id: 'xenon', label: enough ? '提交氙的记录' : running ? '氙正在生产…' : '生产氙 · 点亮第五十四号', detail: `氙档案 ${xe.deposited}/${target} · 库存 ${Math.floor(xe.inventory.toNumber())}。正式收录后激活氙的元素能力。`, enabled: enough || !running, action: enough ? 'deposit' : 'produce', reactor: producer.id, target: XENON_ELEMENT };
   }
   const archived = s.elements.slice(0, XENON_ELEMENT).filter(element => element.archived).length;
   if (archived < XENON_ELEMENT) {
@@ -134,7 +134,8 @@ export function recommend(s: GameState): Advice {
     return { id: 'archive-sweep', label: `补齐 H–Xe 档案 · ${archived}/${XENON_ELEMENT}`, detail: '切换到收录优先，各代仪器会分工生产，元素分配模块自动提交库存。', enabled: true, action: 'archive' };
   }
   const caesium = s.elements[CAESIUM_ELEMENT - 1];
-  if (caesium.archived) return { id: 'collection', label: '铯已收录', detail: '铯钟校时已生效。下一批重元素仍待研究。', enabled: true, action: 'table' };
+  if (s.elements[BARIUM_ELEMENT - 1].archived) return { id: 'collection', label: '钡已收录', detail: '束流校准已生效。', enabled: true, action: 'table' };
+  if (caesium.archived) return { id: 'accelerator', label: '前往大厅研究钡', detail: '用氪校准探测器，把束流偏差调到 0 可多拿样本。', enabled: true, action: 'accelerator' };
   return { id: 'accelerator', label: s.accelerator.commissioned ? '前往大厅研究铯' : '继续建造加速环',
     detail: s.accelerator.commissioned ? '用氙样本校准探测器，读取信号，取得铯样本。' : '四段合拢并试束后，即可进行铯研究。',
     enabled: true, action: 'accelerator' };
@@ -150,6 +151,7 @@ export function applyAdvice(e: Engine, advice: Advice): void {
   if (current.action === 'research') e.research(current.module!);
   if (current.action === 'build') e.build(current.reactor!);
   if (current.action === 'deposit') e.deposit(current.target!);
+  if (current.action === 'calibrate') e.deposit(current.target!, false, 'calibration');
   if (current.action === 'archive') {
     e.state.automation.reaction = true;
     e.state.automation.allocation = true;

@@ -1,6 +1,6 @@
 import { D } from './numbers';
 import { createState, FIRST_HELIUM_SECONDS } from './engine';
-import { ACHIEVEMENTS, ARCHIVE_UNITS, CAESIUM_ELEMENT, CALCIUM_ELEMENT, MODULE_ORDER, MODULE_UPGRADES, PLAYABLE_ELEMENTS, REACTORS, SAVE_VERSION, XENON_ELEMENT } from './config';
+import { ACHIEVEMENTS, ARCHIVE_UNITS, BARIUM_ELEMENT, CAESIUM_ELEMENT, CALCIUM_ELEMENT, MODULE_ORDER, MODULE_UPGRADES, PLAYABLE_ELEMENTS, REACTORS, SAVE_VERSION, XENON_ELEMENT, archiveUnits } from './config';
 import type { GameState } from './types';
 import { isPulseBoostKind, PULSE_BOOST_MS } from './pulseBoosts';
 import { ECHO_HITS, isTechniqueElement, LITHIUM_CHARGE, type TechniqueElement } from './pulseTechniques';
@@ -8,6 +8,7 @@ import { discoveryPreparation } from './discovery';
 import { restoreSampleContract } from './sampleContract';
 import { restoreExperimentBoard } from './experiments';
 import { restoreAccelerator } from './accelerator';
+import { restoreProjectOperations, restoreProjectProgress } from './projects';
 export function serialize(s: GameState, now = Date.now()): string {
   return JSON.stringify({ ...s, savedAt: now, notices: [] });
 }
@@ -18,10 +19,11 @@ export function deserialize(text: string): GameState {
   // v0/v1: released ten elements and three instruments.
   // v2: released twenty elements and five instruments.
   // v4 raises the archive goal and adds per-reactor jobs; v5 adds industry levels.
-  if (![0, 1, 2, 3, 4, 5, SAVE_VERSION].includes(raw.saveVersion)) throw new Error('存档版本不兼容。请保留原文件。');
+  if (![0, 1, 2, 3, 4, 5, 6, 7, 8, SAVE_VERSION].includes(raw.saveVersion)) throw new Error('存档版本不兼容。请保留原文件。');
   const legacy = raw.saveVersion < 4;
   const released10 = raw.saveVersion < 2, released20 = raw.saveVersion === 2;
-  const expectedElements = released10 ? 10 : released20 ? 20 : raw.saveVersion < 6 ? XENON_ELEMENT : PLAYABLE_ELEMENTS;
+  const expectedElements = released10 ? 10 : released20 ? 20 :
+    raw.saveVersion < 6 ? XENON_ELEMENT : raw.saveVersion === 6 ? CAESIUM_ELEMENT : PLAYABLE_ELEMENTS;
   const expectedReactors = released10 ? 3 : released20 ? 5 : REACTORS.length;
   if (!Array.isArray(raw.elements) || raw.elements.length !== expectedElements || !Array.isArray(raw.reactors) || raw.reactors.length !== expectedReactors) throw new Error('存档缺少元素或设备数据。');
   const s = createState(1, 0), defaults = createState(1, 0), num = (v: unknown, max = Number.MAX_SAFE_INTEGER): number => { if (typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > max) throw new Error('存档包含无效数值。'); return v; };
@@ -33,11 +35,13 @@ export function deserialize(text: string): GameState {
   let locked = false;
   s.elements = raw.elements.map((e: any, i: number) => {
     const discovered = bool(e.discovered); if (!discovered) locked = true; else if (locked) throw new Error('存档的元素发现顺序不正确。');
-    const archiveLimit = legacy ? 50 : ARCHIVE_UNITS;
+    const archiveLimit = legacy ? 50 : raw.saveVersion < 9 ? ARCHIVE_UNITS : archiveUnits(i + 1);
     const deposited = num(e.deposited, archiveLimit); if (!Number.isInteger(deposited)) throw new Error('收录进度必须为整数。');
     const inventory = amount(e.inventory), totalProduced = amount(e.totalProduced);
     const archived = bool(e.archived);
-    const validArchive = archived ? deposited === archiveLimit || deposited === 50 : deposited < archiveLimit;
+    const validArchive = archived
+      ? deposited === archiveLimit || deposited === 50 || (!legacy && deposited === ARCHIVE_UNITS)
+      : deposited < archiveLimit;
     if (!inventory.isInteger() || !totalProduced.isInteger() || !validArchive || (!discovered && (deposited > 0 || !inventory.isZero()))) throw new Error('元素库存或收录状态损坏。');
     if (totalProduced.lt(inventory.plus(deposited))) throw new Error('库存与历史产量不一致。');
     return { discovered, inventory, deposited, archived, totalProduced, firstDiscoveredAt: time(e.firstDiscoveredAt), firstDiscoveredReactor: time(e.firstDiscoveredReactor) === null ? null : num(e.firstDiscoveredReactor, REACTORS.length) };
@@ -138,6 +142,9 @@ export function deserialize(text: string): GameState {
   s.sampleContract = restoreSampleContract(raw.sampleContract, s);
   s.experimentBoard = restoreExperimentBoard(raw.experimentBoard, s);
   s.accelerator = restoreAccelerator(s, raw.accelerator);
+  s.projects = restoreProjectProgress(s, raw.projects);
+  s.projectOperations = restoreProjectOperations(s, raw.projectOperations);
   if (s.elements[CAESIUM_ELEMENT - 1].discovered && !s.accelerator.commissioned) throw new Error('铯档案缺少加速环的试束记录。');
+  if (s.elements[BARIUM_ELEMENT - 1].discovered && !s.elements[CAESIUM_ELEMENT - 1].archived) throw new Error('钡档案缺少铯的收录记录。');
   s.saveVersion = SAVE_VERSION; s.notices = []; return s;
 }

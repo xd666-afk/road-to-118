@@ -6,6 +6,7 @@ type Vec3 = readonly [number, number, number];
 type ScreenPoint = { x: number; y: number; visible: boolean };
 export type HallCamera = { view: HallView; yaw: number; pitch: number; zoom: number };
 type HallFrame = { camera: HallCamera; built: number; raised: number; beam: number };
+type MeshGeometry = { groups: number[][]; anchors: number[][] };
 const stride = 16;
 const radii = { plan: Math.hypot(62, 79.7, 55), aisle: Math.hypot(16, 12.2, .2) };
 const shadowSize = 1024;
@@ -34,18 +35,19 @@ function lookAt(eye: Vec3, center: Vec3) {
   ]);
 }
 
-function cameraMatrices(camera: HallCamera, aspect: number) {
+function cameraMatrices(camera: HallCamera, aspect: number, campus: boolean) {
   const plan = camera.view === 'plan';
   const azimuth = (plan ? -0.91 : 0.65) + camera.yaw;
-  const elevation = plan ? .52 + camera.pitch : -camera.pitch;
-  const radius = radii[camera.view] / (plan ? camera.zoom : 1);
+  const elevation = plan ? (campus ? .58 : .52) + camera.pitch : -camera.pitch;
+  const radius = (campus ? 91 : radii[camera.view]) / (plan ? camera.zoom : 1);
   const delta: Vec3 = [
     Math.cos(azimuth) * Math.cos(elevation) * radius,
     Math.sin(azimuth) * Math.cos(elevation) * radius,
     Math.sin(elevation) * radius,
   ];
-  const eye: Vec3 = plan ? [-1 + delta[0], 1.7 + delta[1], 1 + delta[2]] : [8, -30, 2.02];
-  const center: Vec3 = plan ? [-1, 1.7, 1] : [8 + delta[0], -30 + delta[1], 1.82 + delta[2]];
+  const focus: Vec3 = campus ? [0, 0, 3.5] : [-1, 1.7, 1];
+  const eye: Vec3 = plan ? [focus[0] + delta[0], focus[1] + delta[1], focus[2] + delta[2]] : [8, -30, 2.02];
+  const center: Vec3 = plan ? focus : [8 + delta[0], -30 + delta[1], 1.82 + delta[2]];
   const q = (plan ? 1 : camera.zoom) / Math.tan(plan ? .262 : .40);
   const xScale = plan ? Math.min(q / aspect, aspect < 1 ? 2.42 : 2.14) : q / aspect;
   const yScale = plan ? xScale * aspect : q;
@@ -55,7 +57,7 @@ function cameraMatrices(camera: HallCamera, aspect: number) {
     0, 0, 2 * near * far / (near - far), 0,
   ]);
   // Keep the hall slightly above the bottom controls on tall screens.
-  if (plan && aspect < 1) projection[9] = -.14;
+  if (plan && aspect < 1) projection[9] = campus ? -.18 : -.14;
   return { eye, vp: multiply(projection, lookAt(eye, center)) };
 }
 
@@ -174,17 +176,17 @@ function program(gl: WebGL2RenderingContext, vertexSource: string, fragmentSourc
   return result;
 }
 
-export async function loadHallMesh(url: string, signal: AbortSignal) {
+export async function loadHallMesh(url: string, signal: AbortSignal, model: MeshGeometry = geometry) {
   const response = await fetch(url, { signal });
   if (!response.ok || !response.body) throw Error('Could not load accelerator model');
   const unpacked = response.body.pipeThrough(new DecompressionStream('gzip'));
   const buffer = await new Response(unpacked).arrayBuffer();
-  const last = geometry.groups.at(-1)!;
+  const last = model.groups.at(-1)!;
   if (buffer.byteLength !== (last[0] + last[1]) * stride) throw Error('Accelerator geometry is incomplete');
   return buffer;
 }
 
-export function createHallRenderer(canvas: HTMLCanvasElement, mesh: ArrayBuffer) {
+export function createHallRenderer(canvas: HTMLCanvasElement, mesh: ArrayBuffer, model: MeshGeometry = geometry, campus = false) {
   const context = canvas.getContext('webgl2', { alpha: false, antialias: true });
   if (!context) throw Error('WebGL2 unavailable');
   const gl = context;
@@ -224,9 +226,10 @@ export function createHallRenderer(canvas: HTMLCanvasElement, mesh: ArrayBuffer)
   const du = uniforms(depth, ['vp']);
   const pu = uniforms(pulse, ['vp', 'progress']);
   let shadowBuilt = -1;
+  const firstStage = campus ? 1 : 2;
 
   function drawGroup(index: number) {
-    const [start, count] = geometry.groups[index];
+    const [start, count] = model.groups[index];
     gl.drawArrays(gl.TRIANGLES, start, count);
   }
 
@@ -239,7 +242,7 @@ export function createHallRenderer(canvas: HTMLCanvasElement, mesh: ArrayBuffer)
       canvas.width = pixelWidth;
       canvas.height = pixelHeight;
     }
-    const { eye, vp } = cameraMatrices(camera, width / height);
+    const { eye, vp } = cameraMatrices(camera, width / height, campus);
     const indoors = camera.view === 'aisle';
     gl.bindVertexArray(array);
     if (shadowBuilt !== built) {
@@ -249,7 +252,7 @@ export function createHallRenderer(canvas: HTMLCanvasElement, mesh: ArrayBuffer)
       gl.useProgram(depth);
       gl.uniformMatrix4fv(du.vp, false, sunVP);
       drawGroup(0);
-      for (let i = 0; i < built; i++) drawGroup(i + 2);
+      for (let i = 0; i < built; i++) drawGroup(i + firstStage);
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       shadowBuilt = built;
     }
@@ -265,10 +268,10 @@ export function createHallRenderer(canvas: HTMLCanvasElement, mesh: ArrayBuffer)
     gl.uniform1i(mu.depthMap, 0);
     gl.uniform1f(mu.lift, 0);
     drawGroup(0);
-    if (indoors) drawGroup(1);
+    if (indoors && !campus) drawGroup(1);
     for (let i = 0; i < built; i++) {
       gl.uniform1f(mu.lift, i === built - 1 ? raised : 0);
-      drawGroup(i + 2);
+      drawGroup(i + firstStage);
     }
     if (beam >= 0) {
       gl.useProgram(pulse);
@@ -281,7 +284,7 @@ export function createHallRenderer(canvas: HTMLCanvasElement, mesh: ArrayBuffer)
       gl.depthMask(true);
       gl.disable(gl.BLEND);
     }
-    return geometry.anchors.map(anchor => project(vp, anchor));
+    return model.anchors.map(anchor => project(vp, anchor));
   }
 
   return { draw, dispose: () => {

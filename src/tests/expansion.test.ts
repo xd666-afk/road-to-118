@@ -7,7 +7,7 @@ import { deserialize, serialize } from '../game/save';
 import { reactorDisplayPool } from '../game/visuals';
 import { ATOMIC_PROFILES } from '../data/atomic';
 import { KNOWLEDGE, element } from '../data/elements';
-import { CALCIUM_ELEMENT, REACTORS, XENON_ELEMENT } from '../game/config';
+import { CALCIUM_ELEMENT, REACTORS, XENON_ELEMENT, archiveUnits } from '../game/config';
 import { discoverThrough } from './discovery-fixture';
 
 function discover(e: Engine, z: number) {
@@ -32,7 +32,7 @@ function released20Save() {
   e.research('feed'); e.research('reaction'); e.research('allocation');
   e.state.elements[0].inventory = D(38); e.state.elements[0].totalProduced = D(38); e.deposit(1);
   e.state.elements[9].inventory = D(100); e.state.elements[9].totalProduced = D(100); e.deposit(10);
-  e.state.elements[19].inventory = D(100); e.state.elements[19].totalProduced = D(100); e.deposit(20);
+  e.state.elements[19].inventory = e.state.elements[19].totalProduced = D(archiveUnits(20)); e.deposit(20);
   const raw = JSON.parse(serialize(e.state, 100000));
   raw.saveVersion = 2; raw.elements = raw.elements.slice(0, 20); raw.reactors = raw.reactors.slice(0, 5);
   for (const z of [10, 20]) {
@@ -58,17 +58,17 @@ describe('H–Xe progression, instrumentation and migration', () => {
     const e = new Engine(createState(744)); discover(e, 20);
     e.state.elements[9].inventory = D(100); e.state.elements[9].totalProduced = D(100); e.deposit(10);
     expect(e.state.stats.neonCompletedAt).not.toBeNull(); expect(e.state.stats.completedAt).toBeNull();
-    const ca = e.state.elements[CALCIUM_ELEMENT - 1]; ca.inventory = D(100); ca.totalProduced = D(100); e.deposit(CALCIUM_ELEMENT);
+    const ca = e.state.elements[CALCIUM_ELEMENT - 1]; ca.inventory = ca.totalProduced = D(archiveUnits(CALCIUM_ELEMENT)); e.deposit(CALCIUM_ELEMENT);
     expect(e.state.stats.calciumCompletedAt).not.toBeNull(); expect(e.state.stats.xeCompletedAt).toBeNull(); expect(e.state.stats.completedAt).toBeNull();
     expect(e.state.achievements).toContain('complete'); expect(e.state.achievements).toContain('calcium_complete');
     expect(e.state.notices.filter(n => n.kind === 'complete')).toHaveLength(0);
     discover(e, 54);
-    const xe = e.state.elements[XENON_ELEMENT - 1]; xe.inventory = D(100); xe.totalProduced = D(100); e.deposit(XENON_ELEMENT);
+    const xe = e.state.elements[XENON_ELEMENT - 1]; xe.inventory = xe.totalProduced = D(archiveUnits(XENON_ELEMENT)); e.deposit(XENON_ELEMENT);
     expect(e.state.stats.xeCompletedAt).not.toBeNull(); expect(e.state.stats.completedAt).toBeNull();
     expect(e.state.achievements).toContain('xenon_complete');
     for (let z = 1; z <= XENON_ELEMENT; z++) {
       const row = e.state.elements[z - 1]; if (row.archived) continue;
-      row.inventory = D(100); row.totalProduced = row.totalProduced.plus(100); e.deposit(z, true);
+      row.inventory = D(archiveUnits(z) - row.deposited); row.totalProduced = row.totalProduced.plus(row.inventory); e.deposit(z, true);
     }
     expect(e.state.stats.completedAt).not.toBeNull();
     expect(e.state.notices.filter(n => n.kind === 'complete')).toHaveLength(1);
@@ -76,7 +76,7 @@ describe('H–Xe progression, instrumentation and migration', () => {
   });
   it.each([0, 1])('preserves released v%i balances, RNG, partial archives and the Ne milestone', version => {
     const raw = released10Save(version), s = deserialize(JSON.stringify(raw));
-    expect(s.saveVersion).toBe(6); expect(s.elements).toHaveLength(55); expect(s.reactors).toHaveLength(8);
+    expect(s.saveVersion).toBe(9); expect(s.elements).toHaveLength(56); expect(s.reactors).toHaveLength(8);
     expect(s.coins.toString()).toBe(raw.coins); expect(s.data.toString()).toBe(raw.data); expect(s.rng).toBe(raw.rng);
     expect(s.elements[0].deposited).toBe(38); expect(s.elements[0].inventory.eq(12)).toBe(true);
     expect(s.stats.neonCompletedAt).toBe(raw.stats.completedAt); expect(s.stats.calciumCompletedAt).toBeNull(); expect(s.stats.xeCompletedAt).toBeNull(); expect(s.stats.completedAt).toBeNull();
@@ -149,7 +149,7 @@ describe('H–Xe progression, instrumentation and migration', () => {
   });
   it('migrates a released v2 20/5 save without turning its Ca completion into Xe', () => {
     const raw = released20Save(), s = deserialize(JSON.stringify(raw));
-    expect(s.saveVersion).toBe(6); expect(s.elements).toHaveLength(55); expect(s.reactors).toHaveLength(8);
+    expect(s.saveVersion).toBe(9); expect(s.elements).toHaveLength(56); expect(s.reactors).toHaveLength(8);
     expect(s.elements[CALCIUM_ELEMENT - 1].archived).toBe(true);
     expect(s.stats.neonCompletedAt).not.toBeNull();
     expect(s.stats.calciumCompletedAt).toBe(raw.stats.completedAt);
@@ -167,11 +167,11 @@ describe('H–Xe progression, instrumentation and migration', () => {
     expect(discoverThrough(e, 54)).toEqual(Array.from({ length: 33 }, (_, index) => index + 22));
     expect(discoveredMax(e.state)).toBe(54);
     expect(e.state.reactors[6].built).toBe(true);
-    const xe = e.state.elements[XENON_ELEMENT - 1]; xe.inventory = D(100); xe.totalProduced = D(100); e.deposit(XENON_ELEMENT);
+    const xe = e.state.elements[XENON_ELEMENT - 1]; xe.inventory = xe.totalProduced = D(archiveUnits(XENON_ELEMENT)); e.deposit(XENON_ELEMENT);
     expect(e.state.stats.xeCompletedAt).not.toBeNull();
     for (let z = 1; z <= XENON_ELEMENT; z++) {
       const row = e.state.elements[z - 1]; if (row.archived) continue;
-      row.inventory = D(100); row.totalProduced = row.totalProduced.plus(100); e.deposit(z, true);
+      row.inventory = D(archiveUnits(z) - row.deposited); row.totalProduced = row.totalProduced.plus(row.inventory); e.deposit(z, true);
     }
     expect(e.state.stats.completedAt).not.toBeNull();
     expect(archivedCount(e.state)).toBe(XENON_ELEMENT);
@@ -187,7 +187,7 @@ describe('H–Xe progression, instrumentation and migration', () => {
       (r: any) => r.stats.xeCompletedAt = 1,
       (r: any) => r.stats.neonCompletedAt = 1,
       (r: any) => r.elements.pop(),
-      (r: any) => r.saveVersion = 7,
+      (r: any) => r.saveVersion = 10,
     ]) { const copy = structuredClone(raw); mutate(copy); expect(() => deserialize(JSON.stringify(copy))).toThrow(); }
     const old = released20Save(); old.stats.completedAt = null; expect(() => deserialize(JSON.stringify(old))).toThrow();
   });

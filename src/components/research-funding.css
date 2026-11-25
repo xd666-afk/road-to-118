@@ -1,0 +1,10 @@
+.research-funding { display: grid; gap: 6px; font-size: 12px; }
+.research-funding-meter { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.research-funding-meter span { display: inline-flex; align-items: center; gap: 6px; }
+.research-funding-meter strong, .research-funding-balance b { color: #ffca91; font-family: var(--mono); }
+.research-funding progress { width: 100%; height: 6px; accent-color: #ffb870; }
+.research-funding-balance { color: var(--equipment-muted, #a8bfc3); }
+.research-funding-actions { display: flex; gap: 6px; }
+.research-funding-actions button { min-height: 44px; }
+.research-funding-actions .secondary-button { flex-shrink: 0; }
+.research-funding-lock { margin: 0; color: var(--equipment-muted, #a8bfc3); }

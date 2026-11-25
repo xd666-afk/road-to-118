@@ -127,27 +127,13 @@ test('new-player practice uses a real drop, collision, reactor construction and 
   const deposit = record.getByRole('button', { name: '提交 100 单位至档案' });
   await expect(deposit).toBeFocused();
   await deposit.click();
-  await advance('accelerator');
-  const accelerator = page.getByRole('button', { name: '加速环工程', exact: true });
-  await expect(accelerator).toContainText('加速环');
-  await expect(accelerator).toBeInViewport();
-  await expect(accelerator).toBeFocused();
-  await accelerator.click();
-  await expect.poll(async () => {
-    await page.clock.runFor(350);
-    return page.locator('[data-guide-target="accelerator-ne"]').count();
-  }).toBe(1);
-  await advance('accelerator-sector');
-  const east = page.getByRole('button', { name: '东段 · 探测区', exact: true });
-  await expect(east).toBeFocused();
-  await east.click();
   await advance('done');
   const completion = page.getByRole('dialog', { name: '新手引导完成' });
   await completion.getByRole('button', { name: '完成引导' }).click();
   await page.clock.runFor(1000);
   await expect(spotlight).toHaveCount(0);
-  await expect(page.getByRole('complementary', { name: '工区操作' })).toContainText('发现氖后开放');
-  await page.getByRole('button', { name: '返回反应容器' }).click();
+  await expect(page.getByRole('button', { name: '科研工程', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '加速环工程', exact: true })).toHaveCount(0);
   await openLabPanel(page, 'next');
   await expect(page.getByRole('region', { name: '下一步', exact: true })).toBeVisible();
   await openLabPanel(page, 'archive');
@@ -198,4 +184,12 @@ test('the guide waits for earned resources and then highlights the research cont
   await page.keyboard.press('Escape');
   await page.clock.runFor(1000);
   await expect(overlay).toHaveCount(0);
+});
+
+test('a fresh periodic-table link can begin the hands-on guide', async ({ page }) => {
+  await page.goto('/#periodic-table');
+  await page.getByRole('button', { name: '开始引导' }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await page.getByRole('button', { name: '开始实验', exact: true }).click();
+  await expect(page.locator('.opening-spotlight')).toHaveAttribute('data-step', 'charge');
 });

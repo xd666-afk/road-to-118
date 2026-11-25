@@ -99,6 +99,7 @@
   box-shadow: 0 2px 12px #02141bb8;
 }
 .accelerator-marker[hidden] { display: none; }
+.accelerator-marker:not(:disabled):active { transform: translate(-50%, -50%); background: #28515d; }
 .accelerator-marker::after {
   content: '';
   position: absolute;
@@ -165,6 +166,50 @@
 }
 .accelerator-beam-controls { display: flex; justify-self: end; gap: 6px; }
 .accelerator-run-progress { width: 100%; accent-color: var(--equipment-accent); margin: 0 0 8px; }
+.accelerator-signal {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 9px;
+  align-items: center;
+  padding: 8px 0;
+  color: var(--equipment-muted);
+  font-size: 12px;
+}
+.accelerator-signal[data-ready=true] { color: var(--equipment-accent); }
+.accelerator-sweeps { display: flex; gap: 4px; }
+.accelerator-sweeps i { height: 5px; background: #3a535a; border-radius: 6px; flex: 1; }
+.accelerator-sweeps i[data-done=true] { background: #75ddcb; box-shadow: 0 0 8px #50d6c74f; }
+.accelerator-signal strong { min-width: 41px; text-align: right; font: 700 13px var(--mono); }
+.accelerator-signal strong[data-bonus=true] { color: #baf9d8; animation: accelerator-lock-confirm .5s ease-out; }
+.accelerator-lock-button {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  min-height: 44px;
+  background: #266867;
+  border: 1px solid #7ce6cc;
+  border-radius: 7px;
+  color: #e5fff6;
+  font-weight: 700;
+  text-align: left;
+}
+.accelerator-lock-button[aria-disabled=true] {
+  color: #a6c1c6;
+  background: #1b343d;
+  border-color: #516c76;
+  cursor: default;
+}
+.accelerator-lock-button small { font: 650 12px var(--mono); }
+@keyframes accelerator-lock-confirm {
+  from { color: white; transform: scale(1.28); text-shadow: 0 0 15px #86ffe3; }
+  to { color: #baf9d8; transform: scale(1); text-shadow: none; }
+}
+.accelerator[data-reduced=true] .accelerator-signal strong { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .accelerator-signal strong { animation: none; }
+}
 .accelerator-detail {
   position: absolute;
   z-index: 5;
@@ -188,6 +233,32 @@
 }
 .accelerator-detail h2 { margin: 0; font-size: 17px; }
 .accelerator-detail p { margin: 2px 0 7px; color: var(--equipment-muted); font-size: 12px; line-height: 1.55; }
+.accelerator-research-picker, .accelerator-alignment-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.accelerator-research-picker { margin: 4px 0 8px; }
+.accelerator-research-picker button {
+  min-height: 34px;
+  border: 1px solid var(--equipment-border);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--equipment-muted);
+}
+.accelerator-research-picker button[aria-pressed=true] {
+  color: var(--equipment-accent);
+  border-color: var(--equipment-accent);
+}
+.accelerator-alignment-value { font: 650 14px var(--mono); color: #ffcf95; }
+.accelerator-alignment-track { display: flex; justify-content: space-between; margin: 8px 0; }
+.accelerator-alignment-track i {
+  width: 12px;
+  height: 12px;
+  border: 1px solid var(--equipment-border);
+  border-radius: 50%;
+}
+.accelerator-alignment-track i[data-center=true] { border-color: var(--equipment-accent); }
+.accelerator-alignment-track i[data-beam=true] { background: #ffcf95; box-shadow: 0 0 9px #ffcf9580; }
+.accelerator-alignment-actions button { min-height: 44px; justify-content: center; }
+.accelerator-alignment-actions button[aria-disabled=true] { opacity: .55; }
+.accelerator-arrow-right { rotate: 180deg; }
 .accelerator-finished { display: flex; align-items: center; gap: 7px; color: var(--equipment-accent); font-size: 13px; }
 .accelerator-costs { list-style: none; padding: 0; margin: 0 0 8px; }
 .accelerator-costs li {
@@ -214,7 +285,7 @@
   .accelerator-beam-button { min-height: 37px; }
   .accelerator-dock:has(.accelerator-beam-controls) + .accelerator-detail { bottom: calc(max(13px, env(safe-area-inset-bottom)) + 94px); }
   .accelerator-camera button, .accelerator-sector-picker button { min-width: 29px; padding-inline: 4px; }
-  .accelerator-marker { width: 35px; height: 35px; }
+  .accelerator-marker { width: 44px; height: 44px; touch-action: manipulation; }
   .scene-shell:has(.accelerator) > .toast-stack {
     top: 149px;
     bottom: auto;

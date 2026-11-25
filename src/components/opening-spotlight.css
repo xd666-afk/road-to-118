@@ -34,7 +34,7 @@ html:has(.opening-spotlight) { overflow: hidden; }
   top: var(--hint-y, 10px);
   width: min(314px, calc(100% - 20px));
   padding: 10px 13px 4px;
-  pointer-events: auto;
+  pointer-events: none;
 }
 
 .opening-spotlight__note span { color: #ffc998; font: 12px var(--mono); }

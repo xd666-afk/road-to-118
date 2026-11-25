@@ -6,7 +6,7 @@ import { deserialize, serialize } from '../game/save';
 import { ELEMENTS, KNOWLEDGE } from '../data/elements';
 import { discoverThrough } from './discovery-fixture';
 import { abilityBonuses } from '../game/abilityProgress';
-import { MODULE_UPGRADES } from '../game/config';
+import { MODULE_UPGRADES, archiveUnits } from '../game/config';
 const rich = () => { const e = new Engine(createState(123, 100000)); e.state.coins = D('1e100'); e.state.data = D('1e100'); return e; };
 
 
@@ -80,16 +80,17 @@ describe('authoritative progression', () => {
     expect(e.state.stats.completedAt).toBeNull(); expect(e.state.stats.calciumCompletedAt).toBeNull();
     const ca = e.state.elements[19]; ca.inventory = D(99); ca.totalProduced = D(99); e.deposit(20);
     expect(e.state.stats.calciumCompletedAt).toBeNull(); expect(e.state.stats.completedAt).toBeNull();
-    ca.inventory = D(1); ca.totalProduced = D(100); e.deposit(20);
+    ca.inventory = D(archiveUnits(20) - 99); ca.totalProduced = D(archiveUnits(20)); e.deposit(20);
     expect(e.state.stats.calciumCompletedAt).not.toBeNull(); expect(e.state.stats.completedAt).toBeNull();
     expect(e.state.notices.filter(n => n.kind === 'complete')).toHaveLength(0);
     discoverThrough(e, 54);
-    const xe = e.state.elements[53]; xe.inventory = D(100); xe.totalProduced = D(100); e.deposit(54);
+    const xe = e.state.elements[53]; xe.inventory = D(archiveUnits(54)); xe.totalProduced = xe.inventory; e.deposit(54);
     expect(e.state.stats.xeCompletedAt).not.toBeNull(); expect(e.state.stats.completedAt).toBeNull();
     for (let z = 1; z <= 54; z++) {
       const element = e.state.elements[z - 1];
       if (element.archived) continue;
-      element.inventory = D(100); element.totalProduced = element.totalProduced.plus(100); e.deposit(z, true);
+      element.inventory = D(archiveUnits(z) - element.deposited);
+      element.totalProduced = element.totalProduced.plus(element.inventory); e.deposit(z, true);
     }
     expect(e.state.stats.completedAt).not.toBeNull();
     expect(e.state.notices.filter(n => n.kind === 'complete')).toHaveLength(1);
@@ -276,10 +277,10 @@ describe('automation, offline and saves', () => {
   it('requires ordered modules; buys inside reserve; allocation stops at one hundred', () => { const e = rich(); discoverThrough(e, 7); expect(e.research('reaction')).toBe(false); expect(e.research('feed')).toBe(true); expect(e.research('reaction')).toBe(true); expect(e.research('allocation')).toBe(true); e.state.coins = D(200); e.state.automation.reserve = D(150); e.state.reactors[0].active = false; const h = e.state.elements[0]; h.inventory = D(125); h.totalProduced = D(125); e.step(1); expect(e.state.coins.gte(150)).toBe(true); expect(h.deposited).toBe(100); expect(h.inventory.gte(25)).toBe(true); const deposited = h.deposited; e.step(1); expect(h.deposited).toBe(deposited); });
   it('manual exploration remains available under production and archive modes', () => { const e = rich(); discoverThrough(e, 4); e.research('feed'); e.research('reaction'); for (const mode of ['produce','archive'] as const) { e.setMode(mode,2); expect(e.target(1,discoveredMax(e.state)+1,true)).toBe(true); e.state.reactors[0].discoveryHazard=0; e.step(e.state.discoveryWait + 1); } expect(discoveredMax(e.state)).toBe(6); });
   it('offline caps at 4 hours, never discovers or awards hidden achievements, time reversal yields zero', () => { const e = new Engine(createState(5,100000)); const negative = e.offline(90000); expect(negative.seconds).toBe(0); expect(e.state.coins.eq(0)).toBe(true); const summary = e.offline(100000 + 24*3600*1000); expect(summary.seconds).toBe(14400); expect(discoveredMax(e.state)).toBe(1); discoverThrough(e,6); e.state.achievements = []; e.target(1,6); e.state.savedAt=100000; e.offline(100000+14400000); expect(e.state.elements[5].inventory.gt(0)).toBe(true); expect(e.state.achievements).not.toContain('limit'); expect(e.state.achievements).not.toContain('upstream'); });
-  it('round-trips fully populated state with RNG state preserved and accepts a structured v0 migration', () => { const e = rich(); discoverThrough(e,7); e.build(2); e.build(3); e.research('feed'); e.research('reaction'); e.state.notices=[]; const text = serialize(e.state,999999), loaded = deserialize(text); expect(JSON.parse(serialize(loaded,999999))).toEqual(JSON.parse(text)); const old = JSON.parse(text); old.saveVersion=0; old.elements=old.elements.slice(0,10); old.reactors=old.reactors.slice(0,3); delete old.stats.neonCompletedAt; delete old.stats.calciumCompletedAt; delete old.stats.xeCompletedAt; expect(deserialize(JSON.stringify(old)).saveVersion).toBe(6); });
+  it('round-trips fully populated state with RNG state preserved and accepts a structured v0 migration', () => { const e = rich(); discoverThrough(e,7); e.build(2); e.build(3); e.research('feed'); e.research('reaction'); e.state.notices=[]; const text = serialize(e.state,999999), loaded = deserialize(text); expect(JSON.parse(serialize(loaded,999999))).toEqual(JSON.parse(text)); const old = JSON.parse(text); old.saveVersion=0; old.elements=old.elements.slice(0,10); old.reactors=old.reactors.slice(0,3); delete old.stats.neonCompletedAt; delete old.stats.calciumCompletedAt; delete old.stats.xeCompletedAt; expect(deserialize(JSON.stringify(old)).saveVersion).toBe(9); });
   it.each(['{bad','{}','null','[]','{"saveVersion":100}'])('rejects malformed saves safely: %s', text => { expect(() => deserialize(text)).toThrow(); });
   it('rejects invalid balances, noninteger deposits, out-of-order discoveries and corrupt unlocks', () => { const raw = JSON.parse(serialize(createState(3))); for(const mutate of [(s:any)=>s.coins='Infinity',(s:any)=>s.elements[0].deposited=49.5,(s:any)=>s.elements[3].discovered=true,(s:any)=>s.reactors[2].built=true,(s:any)=>s.elements[0].inventory='1e1000']) { const copy=structuredClone(raw);mutate(copy);expect(()=>deserialize(JSON.stringify(copy))).toThrow(); } });
 });
 describe('educational data', () => {
-  it('places all 118 real elements in unique valid cells and supplies readable H–Cs knowledge', () => { expect(ELEMENTS).toHaveLength(118); expect(new Set(ELEMENTS.map(e=>e.z)).size).toBe(118); expect(new Set(ELEMENTS.map(e=>`${e.row}:${e.col}`)).size).toBe(118); expect(ELEMENTS.every(e=>e.col>=1&&e.col<=18&&[1,2,3,4,5,6,7,9,10].includes(e.row))).toBe(true); expect(ELEMENTS[9]).toMatchObject({z:10,symbol:'Ne',col:18,row:2});expect(ELEMENTS[53]).toMatchObject({z:54,symbol:'Xe',name:'氙',col:18,row:5});expect(ELEMENTS[117]).toMatchObject({z:118,symbol:'Og',name:'鿫',col:18,row:7}); expect(Object.keys(KNOWLEDGE)).toHaveLength(55); expect(ELEMENTS.slice(0,55).every(e=>e.mass&&e.specimenDescription&&KNOWLEDGE[e.z])).toBe(true); expect(Object.values(KNOWLEDGE).every(k=>k.source.startsWith('https://periodic-table.rsc.org/'))).toBe(true); });
+  it('places all 118 real elements in unique valid cells and supplies readable H–Ba knowledge', () => { expect(ELEMENTS).toHaveLength(118); expect(new Set(ELEMENTS.map(e=>e.z)).size).toBe(118); expect(new Set(ELEMENTS.map(e=>`${e.row}:${e.col}`)).size).toBe(118); expect(ELEMENTS.every(e=>e.col>=1&&e.col<=18&&[1,2,3,4,5,6,7,9,10].includes(e.row))).toBe(true); expect(ELEMENTS[9]).toMatchObject({z:10,symbol:'Ne',col:18,row:2});expect(ELEMENTS[53]).toMatchObject({z:54,symbol:'Xe',name:'氙',col:18,row:5});expect(ELEMENTS[117]).toMatchObject({z:118,symbol:'Og',name:'鿫',col:18,row:7}); expect(Object.keys(KNOWLEDGE)).toHaveLength(56); expect(ELEMENTS.slice(0,56).every(e=>e.mass&&e.specimenDescription&&KNOWLEDGE[e.z])).toBe(true); expect(Object.values(KNOWLEDGE).every(k=>k.source.startsWith('https://periodic-table.rsc.org/'))).toBe(true); });
 });

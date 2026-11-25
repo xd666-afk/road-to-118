@@ -17,7 +17,7 @@ export function discoverThrough(e: Engine, z: number) {
       if (status.capacity < stage.capacity) e.buy(stage.reactor, 'capacity', stage.capacity - status.capacity);
       const missingTuning = stage.tuning - status.reactor.upgrades.capacity - status.reactor.upgrades.yield;
       if (missingTuning > 0) e.buy(stage.reactor, 'yield', missingTuning);
-      if (!status.archived) {
+      if (!status.calibrated) {
         const specimen = e.state.elements[stage.specimen - 1];
         const needed = ARCHIVE_UNITS - specimen.deposited;
         specimen.inventory = specimen.inventory.plus(needed);

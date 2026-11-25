@@ -67,8 +67,8 @@ test('damaged local save remains protected until its original text is exported a
   await page.getByRole('button',{name:'备份旧档并保存当前进度',exact:true}).click();
   const saved = await page.evaluate(key=>({main:JSON.parse(localStorage.getItem(key)!),backups:Object.keys(localStorage).filter(k=>k.startsWith('road-to-118.recovery.')).map(k=>localStorage.getItem(k))}),KEY);
   expect(saved.backups).toEqual([raw]);
-  expect(saved.main.saveVersion).toBe(6);
-  expect(saved.main.elements).toHaveLength(55);
+  expect(saved.main.saveVersion).toBe(9);
+  expect(saved.main.elements).toHaveLength(56);
   expect(saved.main.settings.scientific).toBe(true);
   await page.keyboard.press('Escape');
   await expect(alert).toHaveCount(0);

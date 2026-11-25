@@ -3,6 +3,7 @@ import { openLabPanel } from './lab-controls';
 import { createState, Engine } from '../../game/engine';
 import { D } from '../../game/numbers';
 import { serialize } from '../../game/save';
+import { archiveUnits } from '../../game/config';
 
 test('instrument roles and module scopes can be set independently in the mobile console', async ({ page }) => {
   const e = new Engine(createState(22));
@@ -99,9 +100,11 @@ test('archiving the last unit of Xe completes H–Xe and leaves Cs undiscovered'
   const e = new Engine(createState(27));
   e.state.settings.guideDismissed = true;
   e.state.reactors[0].active = false;
-  e.state.elements.slice(0,54).forEach(row => { row.discovered = true; row.inventory = D(100); row.totalProduced = D(100); });
+  e.state.elements.slice(0,54).forEach((row, i) => {
+    row.discovered = true; row.inventory = row.totalProduced = D(archiveUnits(i + 1));
+  });
   for (let z = 1; z < 54; z++) e.deposit(z, true);
-  e.state.elements[53].deposited = 99;
+  e.state.elements[53].deposited = archiveUnits(54) - 1;
   e.state.elements[53].inventory = D(1);
   await page.addInitScript(text => localStorage.setItem('road-to-118.save.v1', text), serialize(e.state));
   await page.setViewportSize({ width: 360, height: 800 });
@@ -117,4 +120,33 @@ test('archiving the last unit of Xe completes H–Xe and leaves Cs undiscovered'
   await completion.getByRole('button', { name: '继续我的实验室' }).click();
   await openLabPanel(page, 'archive');
   await expect(page.locator('.periodic-cell[data-z="55"]')).toHaveClass(/next/);
+});
+
+test('calibrating calcium keeps the ability locked until its larger archive is complete', async ({ page }) => {
+  const state = createState(251);
+  state.settings.guideDismissed = true;
+  state.reactors[0].active = false;
+  state.elements.slice(0, 20).forEach(row => { row.discovered = true; });
+  state.elements[19].inventory = state.elements[19].totalProduced = D(150);
+  await page.addInitScript(text => {
+    const key = 'road-to-118.save.v1';
+    if (!localStorage.getItem(key)) localStorage.setItem(key, text);
+  }, serialize(state));
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.goto('/#periodic-table');
+  const calcium = page.locator('.periodic-cell[data-z="20"]');
+  await expect(calcium).toContainText('0/150');
+  await calcium.click();
+  const dialog = page.getByRole('dialog', { name: '钙 · Calcium' });
+  const ability = dialog.getByRole('region', { name: /钙格定格/ });
+  await dialog.getByRole('button', { name: '提交 100 单位至校准' }).click();
+  await expect(dialog.getByText('探索校准', { exact: true }).locator('..')).toContainText('已完成');
+  await expect(ability).toHaveAttribute('data-stage', 'locked');
+  await page.reload();
+  await expect(calcium).toContainText('100/150');
+  await calcium.click();
+  await dialog.getByRole('button', { name: '提交 50 单位至档案' }).click();
+  await expect(ability).toHaveAttribute('data-stage', 'active');
+  await page.keyboard.press('Escape');
+  await expect(calcium).toHaveClass(/archived/);
 });

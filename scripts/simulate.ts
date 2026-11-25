@@ -3,7 +3,7 @@ import { dirname } from 'node:path';
 import { Engine, createFirstRun, discoveredMax, highestReactor, archivedCount } from '../src/game/engine';
 import { D } from '../src/game/numbers';
 import { income, price } from '../src/game/economy';
-import { ARCHIVE_UNITS, XENON_ELEMENT, REACTORS } from '../src/game/config';
+import { ARCHIVE_UNITS, XENON_ELEMENT, REACTORS, archiveUnits } from '../src/game/config';
 import type { Upgrade } from '../src/game/types';
 import { applyAdvice, recommend } from '../src/game/advisor';
 import { discoveryStage, stageReadiness } from '../src/game/discovery';
@@ -110,7 +110,7 @@ export function pilot(e: Engine, strategy: Strategy) {
 
   // Manual submissions are allowed too; the allocation module is the normal
   // path, but a player can submit one visible archive per action window.
-  const nextArchive = s.elements.findIndex((element, index) => element.discovered && !element.archived && element.inventory.gte(ARCHIVE_UNITS - element.deposited));
+  const nextArchive = s.elements.findIndex((element, index) => element.discovered && !element.archived && element.inventory.gte(archiveUnits(index + 1) - element.deposited));
   if (nextArchive >= 0) e.deposit(nextArchive + 1, true);
   s.notices = [];
 }

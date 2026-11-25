@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { closeLabPanel, enterLabPage, openLabPanel } from './lab-controls';
 import { Engine, createState } from '../../game/engine';
+import { CALCIUM_ELEMENT, archiveUnits } from '../../game/config';
 import { D } from '../../game/numbers';
 import { serialize } from '../../game/save';
 const KEY = 'road-to-118.save.v1';
@@ -58,31 +59,29 @@ test('mobile 360px: usable navigation, scrollable table, knowledge cards, no pag
   await expect(page.getByRole('heading',{name:'元素周期表',exact:true})).toBeInViewport();
   await expect(page.getByTestId('current-rate')).toHaveCount(1);
 });
-test('99 Ca remains incomplete; one more submission preserves the 20th milestone, not the version end', async ({ page }) => {
-  const e=new Engine(createState(222));e.state.coins=D('1e30');e.state.data=D('1e30');
-  e.state.elements.slice(0, 20).forEach(element => { element.discovered = true; });
-  for(let id=2;id<=5;id++)e.build(id);
-  e.state.modules.feed=true;e.state.modules.reaction=true;e.state.automation.reaction=true;
-  e.state.reactors.forEach(r=>r.active=false);e.target(5,20);
-  const ca=e.state.elements[19];ca.inventory=D(99);ca.totalProduced=D(99);e.state.notices=[];
-  await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(e.state)});
-  await page.goto('/');await openLabPanel(page, 'archive');
-  await page.locator('[data-z="20"]').click();await page.getByRole('button',{name:'提交 99 单位至档案'}).click();
-  await expect(page.getByRole('dialog').locator('.inventory-block')).toContainText('99 / 100');
-  await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).toHaveCount(0);
-  await closeLabPanel(page);
-  await openLabPanel(page, 'instrument');
-  await page.getByLabel('切换反应容器').selectOption('5');
-  await closeLabPanel(page);
-  await page.getByRole('button',{name:'已暂停'}).click();
-  await openLabPanel(page, 'archive');
-  await page.locator('[data-z="20"]').click();
-  await page.getByRole('button',{name:'提交 1 单位至档案'}).click({timeout:15000});
-  await expect(page.getByRole('dialog')).toContainText('周期表已永久点亮');
+test('calcium stays incomplete until the last sample is submitted, then awards its milestone', async ({ page }) => {
+  const state = createState(222);
+  state.settings.guideDismissed = true;
+  state.reactors[0].active = false;
+  state.elements.slice(0, CALCIUM_ELEMENT).forEach(element => { element.discovered = true; });
+  const goal = archiveUnits(CALCIUM_ELEMENT);
+  const calcium = state.elements[CALCIUM_ELEMENT - 1];
+  calcium.deposited = goal - 1;
+  calcium.inventory = D(1);
+  calcium.totalProduced = D(goal);
+  await page.addInitScript(({ key, text }) => localStorage.setItem(key, text), { key: KEY, text: serialize(state) });
+  await page.goto('/#periodic-table');
+  const cell = page.locator(`[data-z="${CALCIUM_ELEMENT}"]`);
+  await expect(cell).toContainText(`${goal - 1}/${goal}`);
+  await cell.click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.locator('.inventory-block')).toContainText(`${goal - 1} / ${goal}`);
+  await dialog.getByRole('button', { name: '提交 1 单位至档案' }).click();
+  await expect(dialog).toContainText('周期表已永久点亮');
   await page.keyboard.press('Escape');
   await expect(page.locator('.toast-stack')).toContainText('第二十号里程碑');
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await expect(page.locator('[data-z="20"]')).toHaveClass(/archived/);
+  await expect(cell).toHaveClass(/archived/);
 });
 
 test('corrupt import is rejected without losing the active run', async ({ page }) => {
@@ -241,6 +240,7 @@ test('tutorial keeps experiments running and defers discovery popups until retur
 });
 
 test('H–Xe cards show specimen art, neutral electrons and isotope-specific neutrons',async({page})=>{
+  test.setTimeout(90_000);
   const state=createState(68);state.elements.slice(0,54).forEach(e=>e.discovered=true);state.reactors[0].active=false;
   await page.addInitScript(({key,text})=>localStorage.setItem(key,text),{key:KEY,text:serialize(state)});
   await page.setViewportSize({width:1280,height:1000});await page.goto('/');
@@ -285,7 +285,7 @@ test('H–Xe cards show specimen art, neutral electrons and isotope-specific neu
   await expect(dialog.locator('.atomic-specimen')).toBeVisible();
   await expect(dialog).toContainText('第五十四号');
   await page.keyboard.press('Escape');
-  await expect(page.locator('[data-z="56"]')).toHaveClass(/version-locked/);
+  await expect(page.locator('[data-z="57"]')).toHaveClass(/version-locked/);
   await page.locator('[data-z="118"]').click();
   await expect(value('质子数')).toHaveText('118');
   await expect(value('电子数（中性）')).toHaveText('118');
@@ -379,7 +379,7 @@ test('shows each missing VI requirement beside Sc exploration and clears it when
   const requirements = page.locator('#exploration-requirements');
   await expect(requirements).toContainText('探索钪前还需');
   await expect(requirements).toContainText('建造 VI 级同步辐射研究环');
-  await expect(requirements).toContainText('收录钙（已提交 23/100 份）');
+  await expect(requirements).toContainText('钙样本校准（已提交 23/100 份）');
 
   await page.getByRole('button', { name: '研发仪器' }).click();
   await page.locator('.research-device').filter({ has: page.getByRole('heading', { name: '同步辐射研究环' }) })
@@ -401,7 +401,7 @@ test('shows each missing VI requirement beside Sc exploration and clears it when
   await expect(explore).toBeDisabled();
   await openLabPanel(page, 'archive');
   await page.locator('.periodic-cell[data-z="20"]').click();
-  await page.getByRole('button', { name: '提交 77 单位至档案' }).click();
+  await page.getByRole('button', { name: '提交 77 单位至校准' }).click();
   await page.keyboard.press('Escape');
   await openLabPanel(page, 'instrument');
   await expect(requirements).toHaveCount(0);

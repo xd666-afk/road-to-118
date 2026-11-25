@@ -3,7 +3,7 @@ import { applyAdvice, openingStep, recommend } from '../game/advisor';
 import { createState, Engine } from '../game/engine';
 import { D } from '../game/numbers';
 import { deserialize, serialize } from '../game/save';
-import { CALCIUM_ELEMENT, PLAYABLE_ELEMENTS, XENON_ELEMENT } from '../game/config';
+import { CALCIUM_ELEMENT, PLAYABLE_ELEMENTS, XENON_ELEMENT, archiveUnits } from '../game/config';
 
 function advanced() {
   const e = new Engine(createState(123));
@@ -51,8 +51,13 @@ describe('progress recommendations', () => {
     expect(e.state.reactors[4].exploring).toBe(false);
     expect(recommend(e.state).enabled).toBe(false);
     ca.inventory = D(20);
+    expect(recommend(e.state).action).toBe('calibrate');
     applyAdvice(e, recommend(e.state));
-    expect(ca.archived).toBe(true); expect(ca.inventory.eq(8)).toBe(true);
+    expect(ca.archived).toBe(false); expect(ca.deposited).toBe(100); expect(ca.inventory.eq(8)).toBe(true);
+    expect(e.state.stats.calciumCompletedAt).toBeNull();
+    ca.inventory = D(50);
+    expect(e.deposit(CALCIUM_ELEMENT)).toBe(50);
+    expect(ca.archived).toBe(true);
     expect(e.state.stats.calciumCompletedAt).not.toBeNull();
     expect(e.state.stats.xeCompletedAt).toBeNull(); expect(e.state.stats.completedAt).toBeNull();
   });
@@ -132,7 +137,8 @@ describe('progress recommendations', () => {
     applyAdvice(e, recommend(e.state));
     expect(e.state.reactors[6].built).toBe(true);
     for (let z = 37; z <= XENON_ELEMENT; z++) e.state.elements[z - 1].discovered = true;
-    const xe = e.state.elements[XENON_ELEMENT - 1]; xe.archived = false; xe.deposited = 99; xe.inventory = D(1); xe.totalProduced = D(100);
+    const xe = e.state.elements[XENON_ELEMENT - 1]; xe.archived = false;
+    xe.deposited = archiveUnits(XENON_ELEMENT) - 1; xe.inventory = D(1); xe.totalProduced = D(archiveUnits(XENON_ELEMENT));
     expect(recommend(e.state)).toMatchObject({ id: 'xenon', action: 'deposit', target: XENON_ELEMENT });
     applyAdvice(e, recommend(e.state));
     expect(xe.archived).toBe(true); expect(e.state.stats.xeCompletedAt).not.toBeNull();
@@ -162,7 +168,11 @@ describe('progress recommendations', () => {
     const advice = recommend(e.state);
     expect(advice.action).toBe('accelerator');
     expect(advice.label).toBe('继续建造加速环');
-    expect(PLAYABLE_ELEMENTS).toBe(55);
+    expect(PLAYABLE_ELEMENTS).toBe(56);
+    e.state.accelerator = { built: 4, commissioned: true };
+    expect(recommend(e.state).label).toBe('前往大厅研究铯');
+    Object.assign(e.state.elements[54], { discovered: true, archived: true, deposited: 100 });
+    expect(recommend(e.state).label).toBe('前往大厅研究钡');
   });
   it('refuses an obsolete command and retains dismissed guide and resources through save/load', () => {
     const e = new Engine(createState(9)); e.state.coins = D(10);

@@ -1,6 +1,7 @@
-import { ARCHIVE_UNITS, MODULE_UPGRADES, productionParallel, REACTORS } from './config';
+import { ARCHIVE_UNITS, MODULE_UPGRADES, archiveUnits, productionParallel, REACTORS } from './config';
 import { eventRate, probability } from './economy';
-import { abilityBonuses } from './abilityProgress';
+import { laboratoryBonuses } from './abilityProgress';
+import { separationBonus } from './projects';
 import { assignedToSample } from './sampleContract';
 import type { GameState, Module, ReactorState } from './types';
 
@@ -25,7 +26,7 @@ export type ExperimentBoard = {
 export function productionPlans(state: GameState, offer: Extract<ExperimentOffer, { kind: 'production' }>) {
   const lead = state.reactors.filter(r => r.built).at(-1)!;
   const support = state.reactors[offer.reactor - 1];
-  const productionBoost = 1 + abilityBonuses(state).production / 100;
+  const productionBoost = 1 + (laboratoryBonuses(state).production + separationBonus(state, offer.z)) / 100;
   return ([{ kind: 'lead', reactor: lead }, { kind: 'support', reactor: support }] as const)
     .filter(plan => plan.kind === 'lead' || plan.reactor.id !== lead.id)
     .map(({ kind, reactor }) => {
@@ -71,7 +72,7 @@ export function nextExperimentRound(state: GameState, round: number, coupon: boo
   // Early known samples are the most accessible commissioning targets.
   if (archives.length) {
     const z = archives[mixer(11) % Math.min(archives.length, 4)];
-    const goal = Math.min(ARCHIVE_UNITS - state.elements[z - 1].deposited, 12 + mixer(17) % 9);
+    const goal = Math.min(archiveUnits(z) - state.elements[z - 1].deposited, 12 + mixer(17) % 9);
     const reward: Reward = !coupon && availableIndustryUpgrade(state)
       ? { kind: 'discount', amount: data } : { kind: 'energy', amount: energy * 2 };
     offers.push({ kind: 'archive', z, goal, reward });
@@ -80,7 +81,7 @@ export function nextExperimentRound(state: GameState, round: number, coupon: boo
 }
 
 export function isOfferAvailable(state: GameState, offer: ExperimentOffer) {
-  return offer.kind !== 'archive' || ARCHIVE_UNITS - state.elements[offer.z - 1].deposited >= offer.goal && !state.elements[offer.z - 1].archived;
+  return offer.kind !== 'archive' || archiveUnits(offer.z) - state.elements[offer.z - 1].deposited >= offer.goal && !state.elements[offer.z - 1].archived;
 }
 
 export function restoreExperimentBoard(value: unknown, state: GameState): ExperimentBoard | undefined {

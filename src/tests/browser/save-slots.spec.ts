@@ -95,3 +95,30 @@ test('the handbook shows the actual calibration requirements on narrow screens',
   await expect(table.getByRole('row', { name: /钪–锰/ }).getByRole('cell')).toHaveText(['1 级', '4 级', '钙 Ca']);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
 });
+
+test('a stale tab cannot overwrite progress saved by a second tab', async ({ context, page }) => {
+  const initial = createState(797);
+  initial.settings.guideDismissed = true;
+  initial.reactors[0].active = false;
+  initial.elements[0].inventory = initial.elements[0].totalProduced = D(100);
+  await page.addInitScript(({ key, text }) => {
+    if (!localStorage.getItem(key)) localStorage.setItem(key, text);
+  }, { key: SAVE_KEY, text: serialize(initial) });
+  await page.goto('/');
+  const oldTab = await context.newPage();
+  await oldTab.goto('/');
+  await expect(oldTab.getByRole('button', { name: '存档与设置' })).toBeVisible();
+  await page.getByRole('button', { name: '打开元素收集' }).click();
+  await page.getByRole('button', { name: /^1号 氢 H/ }).click();
+  await page.getByRole('button', { name: '提交 100 单位至档案' }).click();
+  await page.getByRole('button', { name: '关闭弹窗' }).click();
+  await page.getByRole('button', { name: '关闭面板' }).click();
+  await page.getByRole('button', { name: '存档与设置' }).click();
+  await page.getByRole('button', { name: '立即保存' }).click();
+  await oldTab.getByRole('button', { name: '存档与设置' }).click();
+  const settings = oldTab.getByRole('dialog', { name: '存档与实验室设置' });
+  await settings.getByRole('button', { name: '立即保存' }).click();
+  await expect(settings.getByText(/另一个标签页已保存/)).toBeVisible();
+  const saved = await oldTab.evaluate(key => JSON.parse(localStorage.getItem(key)!), SAVE_KEY);
+  expect(saved.elements[0]).toMatchObject({ archived: true, deposited: 100, inventory: '0' });
+});
